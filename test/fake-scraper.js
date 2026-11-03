@@ -59,9 +59,9 @@ export function createFakeScraper({ csv } = {}) {
     const job = m && jobs.get(m[1])
     if (!job) return json(res, 404, { code: 404, message: 'not found' })
     if (m[2]) return res.writeHead(200, { 'content-type': 'text/csv' }).end(csv ?? csvExemplo(job.keywords))
-    // primeira consulta devolve "working", as seguintes "ok"
+    // primeira consulta devolve "working", as seguintes "ok"; campos com maiúscula como no gosom v1.18.1 (struct Job sem tag json)
     job.consultas++
-    return json(res, 200, { id: m[1], status: job.consultas === 1 ? 'working' : 'ok' })
+    return json(res, 200, { ID: m[1], Name: 'busca', Status: job.consultas === 1 ? 'working' : 'ok', Data: { keywords: job.keywords } })
   })
 }
 
