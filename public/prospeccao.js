@@ -160,9 +160,10 @@ function seletor({ id, rotulo, placeholder, opcoes, aoMudar, vazio = 'Nenhuma op
 const caixas = (name, mapa, marcados = []) =>
   h('div', { class: 'caixas' }, (Array.isArray(mapa) ? mapa : Object.entries(mapa)).map(([v, r]) => h('label', { class: 'check' }, h('input', { type: 'checkbox', name, value: v, checked: marcados.includes(v) }), r)))
 const escolha = (rotulo, name, opcoes) => h('label', {}, rotulo, h('select', { name }, opcoes.map(([v, r]) => h('option', { value: v }, r))))
-// cada grupo é um botão da barra que abre um painel; name="filtros" deixa só um aberto por vez
+// cada grupo é uma seção do menu lateral que abre e fecha; localização e ramo já começam abertos
+const ABERTOS = new Set(['local', 'ramo'])
 const grupo = (chave, titulo, ...conteudo) =>
-  h('details', { class: 'grupo', name: 'filtros' }, h('summary', {}, titulo, h('span', { class: 'contagem', 'data-grupo': chave, hidden: true }), icone('baixo', 15)), h('div', { class: 'grupo-corpo' }, conteudo))
+  h('details', { class: 'grupo', open: ABERTOS.has(chave) }, h('summary', {}, titulo, h('span', { class: 'contagem', 'data-grupo': chave, hidden: true }), icone('baixo', 15)), h('div', { class: 'grupo-corpo' }, conteudo))
 
 // etiquetas do que está ligado; o x desliga só aquele filtro e, se já houve busca, refaz na hora
 function desenharEtiquetas(f) {
@@ -275,25 +276,10 @@ function montarFormulario(form) {
       h('div', { class: 'par' }, h('label', {}, 'Capital mínimo (R$)', h('input', { type: 'number', inputmode: 'numeric', name: 'capital_min', min: '0', step: '1000' })), h('label', {}, 'Capital máximo (R$)', h('input', { type: 'number', inputmode: 'numeric', name: 'capital_max', min: '0', step: '1000' }))),
     ),
     grupo('contato', 'Contato e sócios', caixas('contato', CONTATO), h('p', { class: 'muted pequeno' }, 'Idade do sócio principal (a Receita informa só a faixa)'), caixas('faixas_socio', FAIXAS)),
-    h('button', { class: 'primario', id: 'btn-buscar' }, icone('buscar'), 'Buscar'),
-    h('p', { class: 'erro-filtros', id: 'erro-filtros', role: 'alert', hidden: true }),
+    h('div', { class: 'pe-filtros' }, h('p', { class: 'erro-filtros', id: 'erro-filtros', role: 'alert', hidden: true }), h('button', { class: 'primario', id: 'btn-buscar' }, icone('buscar'), 'Buscar')),
   )
   if (ref.carga?.mes_referencia) $('.ativos').append(h('span', { class: 'muted pequeno base-receita' }, `Base da Receita de ${ref.carga.mes_referencia}`))
   atualizarContagens()
-}
-
-// painel aberto fecha ao clicar fora ou com Esc (o foco volta para o botão do grupo)
-function prepararPaineis(form) {
-  // composedPath: o clique num x de etiqueta dentro do painel tira o botão do DOM antes de chegar aqui
-  document.addEventListener('click', (e) => {
-    for (const d of form.querySelectorAll('details[open]')) if (!e.composedPath().includes(d)) d.open = false
-  })
-  form.addEventListener('keydown', (e) => {
-    const aberto = form.querySelector('details[open]')
-    if (e.key !== 'Escape' || !aberto) return
-    aberto.open = false
-    aberto.querySelector('summary').focus()
-  })
 }
 
 function atualizarCidades() {
@@ -371,7 +357,6 @@ async function buscar(nova = true) {
   if (f.bairros && !f.municipios) return erroFiltros('Para buscar por bairro, escolha também a cidade.', abrirGrupoDe($('#f-cidades')))
   erroFiltros(null)
   buscou = true
-  for (const d of document.querySelectorAll('#form-prospeccao details[open]')) d.open = false
 
   const corpo = $('#lista-empresas')
   $('#estado-prospeccao').replaceChildren()
@@ -661,7 +646,6 @@ export async function carregarProspeccao({ abrirLead }) {
   }
   iniciado = true
   montarFormulario(form)
-  prepararPaineis(form)
   estadoInicial()
   $('#marcar-pagina').addEventListener('change', (ev) => marcarPagina(ev.currentTarget.checked))
   form.addEventListener('input', atualizarContagens)

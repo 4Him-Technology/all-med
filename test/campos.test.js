@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { camposLead, mensagemErro, termoBusca, ultimoContato } from '../public/campos.js'
+import { buscaMaps, camposLead, mensagemErro, termoBusca, ultimoContato } from '../public/campos.js'
 
 test('converte o formulário para as colunas do Supabase', () => {
   assert.deepEqual(camposLead({ nome: ' Clínica ', site: '', emails: 'a@b.com, ,c@d.com', temperatura: '' }), {
@@ -23,6 +23,16 @@ test('último contato: hoje com a hora, ontem, a data, ou nada', () => {
   assert.equal(ultimoContato(new Date(2026, 9, 27, 23, 50).toISOString(), agora), 'ontem')
   assert.equal(ultimoContato(new Date(2026, 9, 25, 10, 0).toISOString(), agora), '25/10/2026')
   assert.equal(ultimoContato(null, agora), null)
+})
+
+test('busca do Maps: cada ramo vira um termo na cidade, com o bairro quando houver', () => {
+  assert.deepEqual(buscaMaps({ ramos: ' dentista, clínica odontológica,, dentista ', cidade: ' Campinas - SP ', bairro: '' }), {
+    nome: 'dentista, clínica odontológica · Campinas - SP',
+    keywords: ['dentista em Campinas - SP', 'clínica odontológica em Campinas - SP'],
+  })
+  assert.deepEqual(buscaMaps({ ramos: 'ortopedista', cidade: 'São José do Rio Preto - SP', bairro: 'Centro' }).keywords, [
+    'ortopedista em Centro, São José do Rio Preto - SP',
+  ])
 })
 
 test('traduz os erros do banco para mensagens da tela', () => {

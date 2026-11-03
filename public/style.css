@@ -1000,27 +1000,51 @@ dialog.saindo::backdrop {
 }
 
 /* ---------- prospecção ---------- */
-/* barra no topo: cada grupo de filtro é um botão que abre um painel; a lista fica com a largura toda */
-.barra-filtros {
-  position: relative;
+/* filtros num menu lateral fixo ao rolar; a lista fica ao lado com o resto da largura */
+#aba-prospeccao:not([hidden]) {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.menu-filtros {
+  position: sticky;
+  top: 88px;
+  max-height: calc(100dvh - 104px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
   background: var(--bg-2);
   border-radius: var(--raio);
   box-shadow: var(--sombra-fina);
-  padding: 12px 14px;
-  margin-bottom: 14px;
 }
 
-.barra-filtros .aviso-demo,
-.barra-filtros .erro-filtros {
-  flex-basis: 100%;
+.menu-filtros > .aviso-demo {
+  margin: 12px 12px 4px;
+}
+
+/* Buscar preso no pé do menu: fica à vista com os grupos abertos */
+.pe-filtros {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding: 12px 16px;
+  background: var(--bg-2);
+  border-top: 1px solid var(--borda);
+}
+
+.pe-filtros .erro-filtros {
+  margin: 0;
 }
 
 #btn-buscar {
-  margin-left: auto;
+  justify-content: center;
 }
 
 .aviso-demo {
@@ -1040,24 +1064,21 @@ dialog.saindo::backdrop {
 }
 
 .grupo {
-  position: relative;
+  border-bottom: 1px solid var(--borda);
 }
 
 .grupo summary {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  padding: 8px 12px 8px 16px;
-  border: 1px solid var(--borda-forte);
-  border-radius: var(--raio-p);
-  background: var(--bg-2);
-  font-weight: 500;
+  gap: 8px;
+  min-height: 46px;
+  padding: 12px 16px;
+  font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   list-style: none;
   user-select: none;
-  transition: background-color var(--dur-rapida) var(--ease-out), border-color var(--dur-rapida) var(--ease-out);
+  transition: background-color var(--dur-rapida) var(--ease-out);
 }
 
 .grupo summary::-webkit-details-marker {
@@ -1066,15 +1087,10 @@ dialog.saindo::backdrop {
 
 .grupo summary:hover {
   background: var(--bg-3);
-  border-color: var(--destaque);
-}
-
-.grupo[open] summary {
-  background: var(--destaque-suave);
-  border-color: var(--destaque);
 }
 
 .grupo summary .ico {
+  margin-left: auto;
   color: var(--muted);
   transition: transform var(--dur-rapida) var(--ease-out);
 }
@@ -1096,31 +1112,12 @@ dialog.saindo::backdrop {
   font-variant-numeric: tabular-nums;
 }
 
-/* painel do grupo, por cima da lista; rola por dentro quando o conteúdo é alto */
 .grupo-corpo {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 6;
-  width: 360px;
-  max-height: min(70dvh, 520px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-  background: var(--bg-2);
-  border-radius: var(--raio);
-  box-shadow: var(--sombra-alta);
+  padding: 2px 16px 16px;
   animation: surgir var(--dur-rapida) var(--ease-out);
-}
-
-/* os dois últimos grupos abrem para a esquerda, para o painel não passar da borda */
-.grupo:nth-last-of-type(-n + 2) .grupo-corpo {
-  left: auto;
-  right: 0;
 }
 
 .grupo-corpo p {
@@ -1460,20 +1457,10 @@ th[aria-sort="ascending"] .ordenar .ico {
 }
 
 .nova-linha {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: flex-start;
-}
-
-.termos-busca {
-  flex: 1;
-}
-
-.termos-busca textarea {
-  field-sizing: content;
-  min-height: 40px;
-  max-height: 160px;
-  resize: none;
+  align-items: end;
 }
 
 .mais-opcoes summary {
@@ -1919,6 +1906,14 @@ th[aria-sort="ascending"] .ordenar .ico {
   .conta {
     margin-left: auto;
   }
+  /* o menu de filtros sobe para cima da lista */
+  #aba-prospeccao:not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .menu-filtros {
+    position: static;
+    max-height: none;
+  }
   .com-mapa {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1955,23 +1950,8 @@ th[aria-sort="ascending"] .ordenar .ico {
   .coluna {
     scroll-snap-align: start;
   }
-  /* no celular o painel do grupo ocupa a largura da barra, logo abaixo do botão */
-  .grupo {
-    position: static;
-  }
-  .grupo-corpo,
-  .grupo:nth-last-of-type(-n + 2) .grupo-corpo {
-    top: auto;
-    left: 12px;
-    right: 12px;
-    width: auto;
-  }
-  #btn-buscar {
-    flex-basis: 100%;
-  }
   .nova-linha {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
   }
   button,
   .botao,

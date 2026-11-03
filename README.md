@@ -64,7 +64,8 @@ No Netlify ou no Cloudflare Pages, ligue o repositório e configure:
 
 - comando de build: `node scripts/gerar-config.js`
 - pasta publicada: `public`
-- variáveis: `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY`
+- variáveis: `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY`; no Cloudflare, também `NODE_VERSION=24.19.0` e `SKIP_DEPENDENCY_INSTALL=1`
+- opcional: `PC_URL` com o endereço do túnel até o PC ([INSTALAR.md](INSTALAR.md), passo 8), que faz Prospecção e Google Maps aparecerem no site enquanto o PC estiver ligado
 
 O build gera `public/config.js` (com `local: false`, que esconde as abas do PC) e `public/_headers` com CSP, HSTS e os demais cabeçalhos de segurança. Depois coloque o endereço do site em `WEB_URL` no `.env` do PC para ter o atalho "CRM online".
 

@@ -1,8 +1,9 @@
 // Cabeçalhos de segurança e checagem da configuração do Supabase, usados pelo servidor local e pelo build do site
 
-export function cabecalhosSeguranca(supabaseUrl) {
+// urlPc: no site da internet, o endereço do túnel que leva às abas Prospecção e Google Maps do PC
+export function cabecalhosSeguranca(supabaseUrl, urlPc) {
   const supa = supabaseUrl ? new URL(supabaseUrl) : null
-  const conectar = supa ? ` ${supa.origin} wss://${supa.host}` : ''
+  const conectar = `${supa ? ` ${supa.origin} wss://${supa.host}` : ''}${urlPc ? ` ${new URL(urlPc).origin}` : ''}`
   return {
     // fonte Montserrat vem do Google Fonts: CSS de fonts.googleapis.com, arquivos de fonts.gstatic.com
     // mapa do Google Maps: Leaflet (JS e CSS com versão fixa e SRI) no jsDelivr, tiles do OpenStreetMap
@@ -31,4 +32,30 @@ export function validarConfigSupabase({ url, chave }) {
     throw new Error('SUPABASE_PUBLISHABLE_KEY recebeu a chave secreta. Use a chave pública (publishable ou anon).')
   }
   return { supabaseUrl: u.origin, supabaseKey: chave }
+}
+
+export function validarUrlPc(url) {
+  if (!url) return null
+  const u = new URL(url)
+  if (u.protocol !== 'https:') throw new Error('PC_URL deve começar com https://')
+  return u.origin
+}
+
+const FORMATO_JWT = /^[\w-]+\.[\w-]+\.[\w-]+$/
+
+// Confere o token do login no próprio Auth do Supabase (a mesma conta do CRM). Guarda a resposta por 1 minuto
+// para não consultar a cada chamada; um token revogado vale no máximo até lá.
+export function criarVerificadorSupabase({ supabaseUrl, supabaseKey, fetchImpl = globalThis.fetch, validadeMs = 60_000 }) {
+  const cache = new Map()
+  return async (token) => {
+    if (typeof token !== 'string' || token.length > 4096 || !FORMATO_JWT.test(token)) return null
+    const guardado = cache.get(token)
+    if (guardado && guardado.expira > Date.now()) return guardado.usuario
+    const res = await fetchImpl(new URL('/auth/v1/user', supabaseUrl), { headers: { apikey: supabaseKey, authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) })
+    const usuario = res.ok ? { id: (await res.json()).id } : null
+    // tokens inventados em série não enchem a memória: passou do teto, o cache recomeça
+    if (cache.size >= 1000) cache.clear()
+    cache.set(token, { usuario, expira: Date.now() + validadeMs })
+    return usuario
+  }
 }

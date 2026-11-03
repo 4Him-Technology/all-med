@@ -3,7 +3,8 @@
 #   docker compose up -d --build                  sobe banco + tela em http://localhost:3000
 #   docker compose --profile maps up -d           sobe também o scraper do Google Maps
 #   docker compose run --rm app node importador/importar.js --ufs SP   carrega a base da Receita
-# As portas ficam presas em 127.0.0.1: nada fica exposto na rede enquanto não houver login.
+#   docker compose --profile tunel up -d          abre Prospecção e Google Maps no site da internet (INSTALAR.md, passo 8)
+# As portas ficam presas em 127.0.0.1. O túnel sai do PC para o Cloudflare (não abre porta) e a API exige o login do CRM.
 
 services:
   db:
@@ -50,6 +51,8 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
       WEB_URL: ${WEB_URL:-}
+      # o endereço do túnel entra aqui (PC_HOST); "app" é o nome que o túnel usa dentro do Docker
+      ALLOWED_HOSTS: localhost,127.0.0.1,app,${PC_HOST:-localhost}
       CNPJ_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
     ports:
@@ -69,6 +72,17 @@ services:
       DISABLE_TELEMETRY: "1"
     volumes:
       - gmapsdata:/gmapsdata
+    restart: unless-stopped
+
+  # túnel do Cloudflare até a tela do PC; com o PC desligado, Prospecção e Google Maps ficam fora do ar em todo lugar
+  tunel:
+    image: cloudflare/cloudflared:2026.10.0
+    profiles: ["tunel"]
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - app
     restart: unless-stopped
 
 volumes:

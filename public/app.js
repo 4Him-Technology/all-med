@@ -1,4 +1,4 @@
-import { camposLead, ultimoContato } from './campos.js'
+import { buscaMaps, camposLead, ultimoContato } from './campos.js'
 import * as crm from './crm.js'
 import { carregarProspeccao } from './prospeccao.js'
 import { ROTULOS as R, STATUS } from './rotulos.js'
@@ -51,7 +51,7 @@ async function carregarKanban({ focar, assentar } = {}) {
       vazio
         ? estado({
             titulo: 'Seu kanban está vazio',
-            texto: config.local ? 'Mande empresas pela aba Prospecção ou pelo Google Maps, ou cadastre um lead em "Novo lead".' : 'Mande empresas pela prospecção no seu computador ou cadastre um lead em "Novo lead".',
+            texto: config.local || config.urlPc ? 'Mande empresas pela aba Prospecção ou pelo Google Maps, ou cadastre um lead em "Novo lead".' : 'Mande empresas pela prospecção no seu computador ou cadastre um lead em "Novo lead".',
           })
         : '',
       cortado ? h('p', { class: 'muted pequeno' }, `Mostrando os ${crm.LIMITE_KANBAN} leads mexidos mais recentemente. Use a aba Leads para ver todos.`) : '',
@@ -440,7 +440,7 @@ async function carregarBuscas() {
   try {
     const p = await api('/api/buscas?limit=50')
     if (!p.itens.length) {
-      lista.replaceChildren(estado({ titulo: 'Nenhuma busca ainda', texto: 'Escreva o que procurar acima, como "dentistas em Campinas", e clique em Iniciar busca.' }))
+      lista.replaceChildren(estado({ titulo: 'Nenhuma busca ainda', texto: 'Preencha o ramo e a cidade acima e clique em Iniciar busca. Quando ela terminar, a lista e o mapa aparecem aqui para você escolher quem vai para o kanban.' }))
     } else {
       const els = p.itens.map(cartaoBusca)
       // só remonta a lista quando entra busca nova: mexer no DOM tira o foco de quem está marcando empresas
@@ -690,9 +690,10 @@ async function iniciar() {
   $('#btn-sair').prepend(icone('sair'))
   $('#link-web').append(icone('externo', 14))
   $('#btn-iniciar-busca').prepend(icone('buscar'))
-  // abas de prospecção e Google Maps só existem no PC com Docker
-  for (const el of document.querySelectorAll('[data-local]')) el.hidden = !config.local
-  if (!config.local) {
+  // prospecção e Google Maps rodam no PC com Docker; no site da internet aparecem quando há o túnel até ele (urlPc)
+  const temPc = config.local || Boolean(config.urlPc)
+  for (const el of document.querySelectorAll('[data-local]')) el.hidden = !temPc
+  if (!temPc) {
     delete abas.prospeccao
     delete abas.buscas
   }
@@ -747,10 +748,9 @@ async function iniciar() {
   $('#form-busca').addEventListener(
     'submit',
     enviar(
-      async (d, form) => {
-        d.email = form.elements.email.checked
-        await api('/api/buscas', { method: 'POST', body: d })
-        form.elements.keywords.value = ''
+      async ({ ramos, cidade, bairro, ...opcoes }, form) => {
+        await api('/api/buscas', { method: 'POST', body: { ...opcoes, ...buscaMaps({ ramos, cidade, bairro }), email: form.elements.email.checked } })
+        form.elements.ramos.value = ''
         carregarBuscas()
       },
       'Busca enviada. Quando ela ficar pronta, envie os leads ao kanban.',

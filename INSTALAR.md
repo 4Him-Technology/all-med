@@ -98,10 +98,47 @@ docker compose --profile maps up -d
 
 Depois disso a aba Google Maps aceita buscas. Vá com calma no volume: muitas buscas seguidas fazem o Google bloquear o IP.
 
+## 8. Abrir Prospecção e Google Maps no site da internet (opcional)
+
+Sem este passo, Prospecção e Google Maps só abrem neste PC, em http://localhost:3000. Com ele, as duas abas aparecem também no site (por exemplo `https://allmed.4him.com.br`), em qualquer computador, **enquanto este PC estiver ligado com o Docker rodando**. Com o PC desligado, elas avisam que o PC está fora do ar; Kanban e Leads continuam funcionando.
+
+O túnel sai deste PC para o Cloudflare: não abre porta no roteador. Quem chama a prospecção pelo túnel precisa estar logado no CRM.
+
+**No Cloudflare**
+
+1. No painel, vá em **Networking > Tunnels** e clique em **Create a tunnel**.
+2. Dê um nome (por exemplo `all-med-pc`) e clique em **Create Tunnel**.
+3. Na tela de instalação, escolha **Docker** (ou qualquer sistema) e copie só o código longo que vem depois de `--token` (ou de `install`). Esse código é segredo.
+
+**Neste PC**, no `.env`:
+
+```
+TUNNEL_TOKEN=<o código copiado>
+PC_HOST=allmed-pc.4him.com.br
+WEB_URL=https://allmed.4him.com.br
+```
+
+E suba com o túnel junto:
+
+```powershell
+docker compose --profile maps --profile tunel up -d --build
+```
+
+**De volta ao Cloudflare**
+
+1. A tela do túnel deve mostrar que ele conectou. Clique em **Continue**.
+2. Em **Routes**, clique em **Add route** > **Published application**.
+3. **Subdomain:** `allmed-pc`. **Domain:** `4him.com.br`. **Service URL:** `http://app:3000`. Clique em **Add route**.
+4. No projeto do site (**Workers & Pages** > `all-med` > **Settings** > **Environment variables**), adicione `PC_URL` = `https://allmed-pc.4him.com.br` e publique de novo (**Deployments** > **Retry deployment**).
+
+Use um subdomínio de um nível só (`allmed-pc.4him.com.br`, e não `pc.allmed.4him.com.br`): é o que o certificado gratuito do Cloudflare cobre.
+
+Daí em diante, o dia a dia usa `--profile maps --profile tunel` nos comandos de subir, parar e atualizar.
+
 ## Dia a dia
 
 - Com o Docker Desktop abrindo no login, o sistema sobe sozinho com o PC. É só abrir http://localhost:3000.
-- A tela só abre neste PC (fica presa em 127.0.0.1, porque não tem login próprio). Não libere a porta na rede.
+- A porta 3000 fica presa em 127.0.0.1. Para usar de fora, use o túnel do passo 8; não libere a porta na rede.
 - Parar tudo: `docker compose --profile maps stop`. Voltar: `docker compose --profile maps up -d`.
 
 ## Atualizar o sistema
@@ -135,6 +172,8 @@ Os leads, o kanban e o histórico ficam no CRM online e não são afetados por n
 
 - **"port is already allocated"**: outro programa usa a porta 3000 ou 5432. Feche o programa ou troque a porta da esquerda em `docker-compose.yml` (por exemplo `"127.0.0.1:3001:3000"`) e abra http://localhost:3001.
 - **"Não consegui falar com o scraper"** na aba Google Maps: falta o passo 7.
+- **Busca do Google Maps parada em "Na fila"**: veja o que o scraper está fazendo com `docker compose --profile maps logs --tail 50 scraper`.
+- **"O PC da prospecção está desligado"** no site: o PC está desligado, sem internet, ou o túnel não subiu (`docker compose --profile tunel ps`).
 - **PC com menos de 8 GB de RAM**: em `docker-compose.yml`, reduza `shared_buffers` para `256MB`, `effective_cache_size` para `1GB` e `maintenance_work_mem` para `256MB`, e rode `docker compose up -d` de novo.
 - **Ver o que está acontecendo**: `docker compose logs -f app` (Ctrl+C sai do log, o sistema continua rodando).
 - **Começar a base do zero**: `docker compose --profile maps down -v` apaga o banco local, a base de CNPJ e as buscas do Maps que ainda não foram mandadas ao kanban. O CRM online não é afetado. Depois, volte ao passo 5.

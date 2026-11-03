@@ -133,6 +133,74 @@ test('serve o front com security headers e bloqueia path traversal e Host estran
   assert.equal(await cru(porta, '/api/buscas', { host: 'evil.example.com' }), 403)
 })
 
+// pedido com Host e Origin à escolha (fetch não deixa trocar esses cabeçalhos)
+const bruto = (porta, path, { method = 'GET', headers = {} } = {}) =>
+  new Promise((resolve, reject) => {
+    request({ host: '127.0.0.1', port: porta, path, method, headers }, (res) => {
+      res.resume()
+      resolve({ status: res.statusCode, headers: res.headers })
+    })
+      .on('error', reject)
+      .end()
+  })
+
+test('pela internet: a API do PC exige o login do CRM e só libera CORS para o site', async () => {
+  const pc = createApp({
+    store: createStore(join(dir, 'pc.json')),
+    scraper: createScraperClient('http://127.0.0.1:9'),
+    publicDir,
+    log: silencioso,
+    config,
+    hostsPermitidos: ['localhost', '127.0.0.1', 'pc.exemplo.com'],
+    autenticar: async (token) => (token === 'token-bom' ? { id: 'u1' } : null),
+    origensWeb: ['https://crm.exemplo.com'],
+  })
+  const porta = await ouvir(pc.server)
+  const site = { host: 'pc.exemplo.com', origin: 'https://crm.exemplo.com' }
+  try {
+    assert.equal((await bruto(porta, '/api/buscas', { headers: site })).status, 401)
+    assert.equal((await bruto(porta, '/api/buscas', { headers: { ...site, authorization: 'Bearer token-ruim' } })).status, 401)
+    const ok = await bruto(porta, '/api/buscas', { headers: { ...site, authorization: 'Bearer token-bom' } })
+    assert.equal(ok.status, 200)
+    assert.equal(ok.headers['access-control-allow-origin'], 'https://crm.exemplo.com')
+    // até o 401 leva o CORS, senão o site não consegue ler o motivo
+    assert.equal((await bruto(porta, '/api/buscas', { headers: site })).headers['access-control-allow-origin'], 'https://crm.exemplo.com')
+    const outro = await bruto(porta, '/api/buscas', { headers: { ...site, origin: 'https://evil.example.com', authorization: 'Bearer token-bom' } })
+    assert.equal(outro.headers['access-control-allow-origin'], undefined)
+    const pre = await bruto(porta, '/api/buscas', { method: 'OPTIONS', headers: { ...site, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' } })
+    assert.equal(pre.status, 204)
+    assert.match(pre.headers['access-control-allow-headers'], /authorization/)
+    // a tela em si continua pública, como o site: só a API mexe na base e no scraper
+    assert.equal((await bruto(porta, '/', { headers: { host: 'pc.exemplo.com' } })).status, 200)
+  } finally {
+    pc.server.close()
+  }
+})
+
+test('sem o CRM configurado, a API só atende o próprio PC', async () => {
+  const pc = createApp({ store: createStore(join(dir, 'so-pc.json')), scraper: createScraperClient('http://127.0.0.1:9'), publicDir, log: silencioso, hostsPermitidos: ['localhost', '127.0.0.1', 'pc.exemplo.com'] })
+  const porta = await ouvir(pc.server)
+  try {
+    assert.equal((await bruto(porta, '/api/buscas', { headers: { host: 'pc.exemplo.com' } })).status, 403)
+    assert.equal((await bruto(porta, '/api/buscas', { headers: { host: 'localhost' } })).status, 200)
+  } finally {
+    pc.server.close()
+  }
+})
+
+test('limita as chamadas por endereço de origem', async () => {
+  const pc = createApp({ store: createStore(join(dir, 'limite.json')), scraper: createScraperClient('http://127.0.0.1:9'), publicDir, log: silencioso, limite: { max: 2, janelaMs: 60_000 } })
+  const porta = await ouvir(pc.server)
+  try {
+    const status = []
+    for (let i = 0; i < 3; i++) status.push((await bruto(porta, '/api/buscas', { headers: { host: 'localhost', 'cf-connecting-ip': '203.0.113.7' } })).status)
+    assert.deepEqual(status, [200, 200, 429])
+    assert.equal((await bruto(porta, '/api/buscas', { headers: { host: 'localhost', 'cf-connecting-ip': '203.0.113.8' } })).status, 200)
+  } finally {
+    pc.server.close()
+  }
+})
+
 test('scraper fora do ar responde 502 com mensagem amigável', async () => {
   const fora = createApp({
     store: createStore(join(dir, 'fora.json')),

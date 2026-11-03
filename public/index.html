@@ -11,7 +11,7 @@
       THESIS: sistema de trabalho de uma pessoa só; cada tela serve para escolher empresas e agir sobre várias de uma vez, sem janela por cima.
       OWN-WORLD: o mesmo bege, azul-marinho e azul-petróleo do kanban, Montserrat, cartões com sombra fina; nada novo de identidade.
       STORY: Prospecção acha e manda em lote; Google Maps revisa o que a busca trouxe (lista e mapa) antes de mandar; Leads ordena e trabalha um lead por vez.
-      FIRST VIEWPORT: Prospecção = barra de grupos de filtro + etiquetas do que está ligado + lista na largura toda;
+      FIRST VIEWPORT: Prospecção = menu lateral de grupos de filtro + etiquetas do que está ligado + lista ao lado (pedido do Filipe em 03/11/2026, no lugar da barra no topo);
         Leads = tabela ordenável com a ficha do lead ao lado; Google Maps = buscas em cartões, a aberta com lista e mapa numerados igual.
       FORM: Prospecção barra no topo (seed bb63c07d), Leads tabela com ficha ao lado (seed 5d3c6ead), Google Maps cartões que abrem com mapa (seed d9b4c1ec).
       FINISH: barra escura de lote fixa embaixo, movimento só para mudança de estado (140 a 220 ms, ease-out), teclado e leitor de tela em tudo, contraste AA.
@@ -54,7 +54,7 @@
 
     <main id="conteudo" tabindex="-1">
       <section id="aba-prospeccao" aria-label="Prospecção na base de CNPJ" hidden>
-        <form id="form-prospeccao" class="barra-filtros" aria-label="Filtros da prospecção"></form>
+        <form id="form-prospeccao" class="menu-filtros" aria-label="Filtros da prospecção"></form>
         <div class="resultados">
           <div class="ativos">
             <p id="resumo-busca" class="resumo" role="status" tabindex="-1"></p>
@@ -105,11 +105,12 @@
       <section id="aba-buscas" aria-label="Buscas no Google Maps" hidden>
         <form id="form-busca" class="nova-busca">
           <div class="nova-linha">
-            <label class="termos-busca"><span class="sr-only">Termos de busca, um por linha</span>
-              <textarea name="keywords" rows="1" required maxlength="10000" placeholder="dentistas em Campinas (um termo por linha)"></textarea>
-            </label>
+            <label>Ramo <input name="ramos" required maxlength="1000" placeholder="Ex.: ortopedista, clínica de fisioterapia" autocomplete="off" aria-describedby="ajuda-ramos" /></label>
+            <label>Cidade <input name="cidade" required maxlength="100" placeholder="Ex.: São José do Rio Preto - SP" autocomplete="off" /></label>
+            <label>Bairro <input name="bairro" maxlength="100" placeholder="Opcional, ex.: Centro" autocomplete="off" /></label>
             <button class="primario" id="btn-iniciar-busca">Iniciar busca</button>
           </div>
+          <p id="ajuda-ramos" class="muted pequeno">Mais de um ramo de uma vez: separe por vírgula. Cada ramo é procurado nessa cidade.</p>
           <details class="mais-opcoes">
             <summary>Mais opções</summary>
             <div class="linha">
