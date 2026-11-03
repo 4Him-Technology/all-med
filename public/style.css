@@ -1576,26 +1576,36 @@ th[aria-sort="ascending"] .ordenar .ico {
   margin: 16px;
 }
 
+/* lista e mapa meio a meio: o mapa é onde se escolhe, então ganha altura de tela */
 .com-mapa {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 440px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
 }
 
 /* shortcut: a lista mostra todas as empresas da busca de uma vez (vêm do PC, já em memória); paginar se passar de alguns milhares */
 .bc-lista {
-  max-height: 540px;
+  max-height: 664px;
   overflow: auto;
   overscroll-behavior: contain;
 }
 
 /* em tela estreita a tabela rola para o lado dentro do cartão, em vez de espremer o nome da empresa */
 .bc-lista .tabela {
-  min-width: 720px;
+  min-width: 640px;
 }
 
 .bc-lista td:nth-child(2) {
-  min-width: 220px;
+  min-width: 200px;
+}
+
+/* linha da empresa cuja ficha está aberta no mapa */
+.bc-lista tr.foco td {
+  background: var(--destaque-suave);
+}
+
+.bc-lista tr.foco td:first-child {
+  box-shadow: inset 3px 0 0 var(--primaria);
 }
 
 .bc-lista thead th {
@@ -1609,7 +1619,7 @@ th[aria-sort="ascending"] .ordenar .ico {
 }
 
 .bc-lista .endereco {
-  min-width: 200px;
+  min-width: 160px;
   max-width: 300px;
   font-size: 13px;
   color: var(--muted);
@@ -1622,7 +1632,7 @@ th[aria-sort="ascending"] .ordenar .ico {
 
 /* isolation: o Leaflet usa z-index alto nas camadas e passaria por cima do topo fixo ao rolar */
 .mapa {
-  height: 440px;
+  height: 620px;
   border-radius: var(--raio-p);
   background: var(--bg-3);
   isolation: isolate;
@@ -1686,6 +1696,61 @@ th[aria-sort="ascending"] .ordenar .ico {
 
 .pino.mini:first-child {
   margin-left: 0;
+}
+
+/* ficha que abre ao clicar no número do mapa */
+.mapa .leaflet-popup-content-wrapper {
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-alta);
+}
+
+.mapa .leaflet-popup-content {
+  margin: 14px 16px;
+}
+
+.ficha-pino {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: 400 13px/1.45 var(--fonte);
+  color: var(--fg);
+}
+
+/* .mapa na frente: o CSS do Leaflet carrega depois e põe margem em todo parágrafo do balão */
+.mapa .ficha-pino p {
+  margin: 0;
+}
+
+.fp-nome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 14px;
+  font-size: 14px;
+}
+
+.fp-emails {
+  overflow-wrap: anywhere;
+}
+
+.fp-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.fp-links:empty {
+  display: none;
+}
+
+.ficha-pino a {
+  color: var(--primaria);
+  font-weight: 600;
+}
+
+.ficha-pino button {
+  margin-top: 6px;
+  justify-content: center;
 }
 
 .legenda {
@@ -1889,6 +1954,18 @@ th[aria-sort="ascending"] .ordenar .ico {
   #usuario {
     display: none;
   }
+  /* lista e mapa não cabem lado a lado: o mapa sobe para cima da lista */
+  .com-mapa {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .com-mapa .lado {
+    order: -1;
+    border-left: 0;
+    border-bottom: 1px solid var(--borda);
+  }
+  .mapa {
+    height: 460px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1913,16 +1990,6 @@ th[aria-sort="ascending"] .ordenar .ico {
   .menu-filtros {
     position: static;
     max-height: none;
-  }
-  .com-mapa {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .com-mapa .lado {
-    border-left: 0;
-    border-top: 1px solid var(--borda);
-  }
-  .mapa {
-    height: 300px;
   }
 }
 
@@ -1952,6 +2019,9 @@ th[aria-sort="ascending"] .ordenar .ico {
   }
   .nova-linha {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .mapa {
+    height: 380px;
   }
   button,
   .botao,

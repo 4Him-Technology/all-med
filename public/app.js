@@ -563,7 +563,7 @@ function marcarTodasMaps(a, sim) {
   atualizarBusca(a)
 }
 
-// linhas, caixa "todas", contagem, botão e pinos do mapa seguem a mesma seleção
+// linhas, caixa "todas", contagem, botão, pinos do mapa e a ficha aberta seguem a mesma seleção
 function atualizarBusca(a) {
   const livres = a.leads.filter((l) => !l.enviado).length
   const n = a.marcadas.size
@@ -579,7 +579,12 @@ function atualizarBusca(a) {
   a.ui.contagem.textContent = livres ? `${n} de ${livres} marcadas` : 'Todas as empresas desta busca já estão no kanban'
   a.ui.mandar.disabled = !n
   a.ui.mandar.replaceChildren(icone('enviar', 15), n ? `Mandar ${n} para o kanban` : 'Mandar para o kanban')
-  for (const l of a.leads) a.pinos.get(l.place_id)?.getElement()?.firstElementChild?.setAttribute('class', `pino ${estadoPino(a, l)}`)
+  for (const l of a.leads) {
+    const pino = a.pinos.get(l.place_id)
+    pino?.getElement()?.firstElementChild?.setAttribute('class', `pino ${estadoPino(a, l)}`)
+    // o conteúdo da ficha é uma função: update() monta de novo com a seleção atual
+    if (pino?.isPopupOpen()) pino.getPopup().update()
+  }
 }
 
 // Leaflet só baixa quando a primeira busca abre; versão fixa com SRI (hash conferido no jsDelivr em 28/10/2026)
@@ -617,13 +622,54 @@ async function montarMapa(a, el) {
   for (const [l, i] of comLugar) {
     // o HTML do pino só leva o número e uma classe fixa; o nome da empresa vai como texto no title
     const pino = L.marker([l.latitude, l.longitude], { keyboard: false, title: l.nome, icon: L.divIcon({ className: '', html: `<span class="pino ${estadoPino(a, l)}">${i + 1}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] }) })
-    pino.on('click', () => !l.enviado && supabase && marcarMaps(a, l.place_id, !a.marcadas.has(l.place_id)))
+    // clicar no número abre a ficha da empresa no mapa e destaca a linha dela na lista
+    pino.bindPopup(() => fichaPino(a, l, i), { maxWidth: 300, minWidth: 240, autoPanPadding: [24, 24] })
+    pino.on('popupopen', () => destacarLinha(a, l.place_id, true))
+    pino.on('popupclose', () => destacarLinha(a, l.place_id, false))
     a.pinos.set(l.place_id, pino.addTo(a.mapa))
   }
   a.mapa.fitBounds(
     comLugar.map(([l]) => [l.latitude, l.longitude]),
     { padding: [28, 28], maxZoom: 16 },
   )
+}
+
+// Ficha que abre no mapa: tudo que a busca trouxe da empresa e o botão de marcar para o kanban.
+// Montada com h() (sem HTML em texto): nome, endereço e links vêm do Google e nunca viram HTML.
+function fichaPino(a, l, i) {
+  const marcada = a.marcadas.has(l.place_id)
+  const externo = { target: '_blank', rel: 'noopener noreferrer' }
+  const acao = l.enviado
+    ? h('p', { class: 'ja' }, 'Já está no kanban')
+    : supabase &&
+      h(
+        'button',
+        {
+          type: 'button',
+          class: marcada ? '' : 'primario',
+          onclick: () => marcarMaps(a, l.place_id, !marcada),
+        },
+        marcada ? 'Desmarcar' : 'Marcar para o kanban',
+      )
+  return h(
+    'div',
+    { class: 'ficha-pino' },
+    h('p', { class: 'fp-nome' }, h('span', { class: 'nr' }, String(i + 1)), h('strong', {}, l.nome)),
+    l.categoria && h('p', { class: 'muted pequeno' }, l.categoria),
+    l.avaliacao != null && h('p', {}, avaliacao(l.avaliacao, l.total_avaliacoes ?? 0)),
+    l.endereco && h('p', {}, l.endereco),
+    l.telefone && h('p', {}, h('a', { href: `tel:${l.telefone.replace(/[^\d+]/g, '')}` }, l.telefone)),
+    l.emails?.length > 0 && h('p', { class: 'fp-emails' }, l.emails.join(', ')),
+    h('p', { class: 'fp-links' }, l.site && h('a', { href: l.site, ...externo }, 'Site'), l.link_maps && h('a', { href: l.link_maps, ...externo }, 'Abrir no Google Maps')),
+    acao,
+  )
+}
+
+function destacarLinha(a, placeId, sim) {
+  const tr = a.ui.tbody.querySelector(`tr[data-place="${CSS.escape(placeId)}"]`)
+  if (!tr) return
+  tr.classList.toggle('foco', sim)
+  if (sim) tr.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
 }
 
 // Manda as empresas marcadas para o CRM online; repetidas (mesmo lugar do Maps) o banco ignora
