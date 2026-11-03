@@ -54,7 +54,7 @@
 
     <main id="conteudo" tabindex="-1">
       <section id="aba-prospeccao" aria-label="Prospecção na base de CNPJ" hidden>
-        <form id="form-prospeccao" class="barra-filtros" aria-label="Filtros da prospecção"></form>
+        <form id="form-prospeccao" class="menu-filtros" aria-label="Filtros da prospecção"></form>
         <div class="resultados">
           <div class="ativos">
             <p id="resumo-busca" class="resumo" role="status" tabindex="-1"></p>
@@ -105,11 +105,12 @@
       <section id="aba-buscas" aria-label="Buscas no Google Maps" hidden>
         <form id="form-busca" class="nova-busca">
           <div class="nova-linha">
-            <label class="termos-busca"><span class="sr-only">Termos de busca, um por linha</span>
-              <textarea name="keywords" rows="1" required maxlength="10000" placeholder="dentistas em Campinas (um termo por linha)"></textarea>
-            </label>
+            <label>Ramo <input name="ramos" required maxlength="1000" placeholder="Ex.: ortopedista, clínica de fisioterapia" autocomplete="off" aria-describedby="ajuda-ramos" /></label>
+            <label>Cidade <input name="cidade" required maxlength="100" placeholder="Ex.: São José do Rio Preto - SP" autocomplete="off" /></label>
+            <label>Bairro <input name="bairro" maxlength="100" placeholder="Opcional, ex.: Centro" autocomplete="off" /></label>
             <button class="primario" id="btn-iniciar-busca">Iniciar busca</button>
           </div>
+          <p id="ajuda-ramos" class="muted pequeno">Mais de um ramo de uma vez: separe por vírgula. Cada ramo é procurado nessa cidade.</p>
           <details class="mais-opcoes">
             <summary>Mais opções</summary>
             <div class="linha">

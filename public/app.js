@@ -1,4 +1,4 @@
-import { camposLead, ultimoContato } from './campos.js'
+import { buscaMaps, camposLead, ultimoContato } from './campos.js'
 import * as crm from './crm.js'
 import { carregarProspeccao } from './prospeccao.js'
 import { ROTULOS as R, STATUS } from './rotulos.js'
@@ -440,7 +440,7 @@ async function carregarBuscas() {
   try {
     const p = await api('/api/buscas?limit=50')
     if (!p.itens.length) {
-      lista.replaceChildren(estado({ titulo: 'Nenhuma busca ainda', texto: 'Escreva o que procurar acima, como "dentistas em Campinas", e clique em Iniciar busca.' }))
+      lista.replaceChildren(estado({ titulo: 'Nenhuma busca ainda', texto: 'Preencha o ramo e a cidade acima e clique em Iniciar busca. Quando ela terminar, a lista e o mapa aparecem aqui para você escolher quem vai para o kanban.' }))
     } else {
       const els = p.itens.map(cartaoBusca)
       // só remonta a lista quando entra busca nova: mexer no DOM tira o foco de quem está marcando empresas
@@ -747,10 +747,9 @@ async function iniciar() {
   $('#form-busca').addEventListener(
     'submit',
     enviar(
-      async (d, form) => {
-        d.email = form.elements.email.checked
-        await api('/api/buscas', { method: 'POST', body: d })
-        form.elements.keywords.value = ''
+      async ({ ramos, cidade, bairro, ...opcoes }, form) => {
+        await api('/api/buscas', { method: 'POST', body: { ...opcoes, ...buscaMaps({ ramos, cidade, bairro }), email: form.elements.email.checked } })
+        form.elements.ramos.value = ''
         carregarBuscas()
       },
       'Busca enviada. Quando ela ficar pronta, envie os leads ao kanban.',

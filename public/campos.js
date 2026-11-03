@@ -21,6 +21,20 @@ export const termoBusca = (q) =>
     .trim()
     .slice(0, 100)
 
+// Busca do Google Maps a partir dos campos separados: cada ramo vira um termo "<ramo> em <bairro>, <cidade>"
+export function buscaMaps({ ramos, cidade, bairro }) {
+  const lista = [
+    ...new Set(
+      String(ramos ?? '')
+        .split(/[,\n]/)
+        .map((r) => r.trim())
+        .filter(Boolean),
+    ),
+  ]
+  const local = [bairro, cidade].map((v) => String(v ?? '').trim()).filter(Boolean).join(', ')
+  return { nome: `${lista.join(', ')} · ${String(cidade ?? '').trim()}`.slice(0, 200), keywords: lista.map((r) => `${r} em ${local}`) }
+}
+
 const hora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 const dia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 const mesmoDia = (a, b) => a.toDateString() === b.toDateString()
