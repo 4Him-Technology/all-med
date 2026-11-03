@@ -17,7 +17,8 @@ export function createScraperClient(baseUrl, fetchImpl = globalThis.fetch) {
       return (await res.json()).id
     },
     async statusJob(id) {
-      return (await (await call(`/api/v1/jobs/${encodeURIComponent(id)}`)).json()).status
+      // o gosom devolve o Job sem tag json: o campo vem como "Status", com maiúscula
+      return (await (await call(`/api/v1/jobs/${encodeURIComponent(id)}`)).json()).Status
     },
     async baixarCsv(id) {
       return (await call(`/api/v1/jobs/${encodeURIComponent(id)}/download`)).text()
