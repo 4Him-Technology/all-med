@@ -1,0 +1,8 @@
+node_modules/
+data/
+webdata/
+.env
+public/config.js
+public/_headers
+.impeccable/*
+!.impeccable/design.json

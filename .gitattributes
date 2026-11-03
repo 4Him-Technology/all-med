@@ -1,0 +1,4 @@
+# LF em tudo, também no Windows: o SQL e os arquivos do Docker rodam dentro de Linux
+* text=auto eol=lf
+*.jpg binary
+*.png binary

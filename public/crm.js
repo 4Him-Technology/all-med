@@ -1,0 +1,85 @@
+// Leads, kanban e histórico no Supabase. Quem é dono de quê a RLS decide; aqui é só leitura e gravação.
+import { mensagemErro, termoBusca } from './campos.js'
+import { STATUS } from './rotulos.js'
+import { supabase } from './supa.js'
+
+const cliente = () => {
+  if (!supabase) throw new Error('O CRM online não está ligado neste computador.')
+  return supabase
+}
+
+const ok = ({ data, error, count }) => {
+  if (error) {
+    console.error('CRM:', error.code, error.message)
+    throw new Error(mensagemErro(error))
+  }
+  return { data, count }
+}
+
+// Uma consulta só para o quadro inteiro (antes eram sete, uma por coluna, e a tela levava uns 2 a 3 s)
+// shortcut: traz os 1000 leads ativos mais recentes; acima disso os totais das colunas ficam por baixo (avisado na tela)
+export const LIMITE_KANBAN = 1000
+export async function kanban() {
+  const { data } = ok(
+    await cliente()
+      .from('leads_kanban')
+      .select('id,nome,categoria,telefone,temperatura,avaliacao,status,updated_at,ultimo_atendimento')
+      .order('updated_at', { ascending: false })
+      .limit(LIMITE_KANBAN),
+  )
+  const colunas = STATUS.map((status) => {
+    const doStatus = data.filter((l) => l.status === status)
+    return { status, total: doStatus.length, itens: doStatus.slice(0, 100) }
+  })
+  return { colunas, cortado: data.length >= LIMITE_KANBAN }
+}
+
+// colunas que a tela deixa ordenar (o nome vai direto para o order do PostgREST)
+export const ORDENAVEIS = ['nome', 'status', 'temperatura', 'ultimo_atendimento', 'created_at']
+
+// lê da view do kanban (só leads ativos) porque ela já traz o último atendimento para ordenar
+export async function listarLeads({ q, status, temperatura, ordem = 'ultimo_atendimento', crescente = false, page = 1, limit = 25 }) {
+  let consulta = cliente().from('leads_kanban').select('id,nome,categoria,status,temperatura,ultimo_atendimento,created_at', { count: 'exact' })
+  if (status) consulta = consulta.eq('status', status)
+  if (temperatura) consulta = consulta.eq('temperatura', temperatura)
+  const termo = termoBusca(q)
+  if (termo) consulta = consulta.or(`nome.ilike.*${termo}*,categoria.ilike.*${termo}*,telefone.ilike.*${termo}*`)
+  const coluna = ORDENAVEIS.includes(ordem) ? ordem : 'ultimo_atendimento'
+  // lead sem contato ou sem temperatura vai para o fim nos dois sentidos; o desempate mantém a página estável
+  consulta = consulta.order(coluna, { ascending: crescente, nullsFirst: false })
+  if (coluna !== 'created_at') consulta = consulta.order('created_at', { ascending: false })
+  const pagina = Math.max(1, Number(page) || 1)
+  const de = (pagina - 1) * limit
+  const { data, count } = ok(await consulta.order('id').range(de, de + limit - 1))
+  return { itens: data, total: count ?? 0, pagina, paginas: Math.max(1, Math.ceil((count ?? 0) / limit)) }
+}
+
+// Quais destas empresas já estão no CRM (inclusive arquivadas, que o banco também não deixa voltar): Map cnpj -> arquivada?
+export async function jaNoCrm(cnpjs) {
+  if (!supabase || !cnpjs.length) return new Map()
+  const { data } = ok(await cliente().from('leads').select('cnpj,deleted_at').in('cnpj', cnpjs))
+  return new Map(data.map((l) => [l.cnpj, l.deleted_at != null]))
+}
+
+export async function lerLead(id) {
+  const [lead, historico] = await Promise.all([
+    cliente().from('leads').select('*').eq('id', id).is('deleted_at', null).single(),
+    cliente().from('atendimentos').select('id,tipo,descricao,data').eq('lead_id', id).order('data', { ascending: false }).limit(500),
+  ])
+  return { ...ok(lead).data, atendimentos: ok(historico).data }
+}
+
+export const criarLead = async (campos) => ok(await cliente().from('leads').insert(campos).select().single()).data
+export const atualizarLead = async (id, campos) => ok(await cliente().from('leads').update(campos).eq('id', id).select().single()).data
+export const arquivarLead = async (id) => ok(await cliente().from('leads').update({ deleted_at: new Date().toISOString() }).eq('id', id).select('id').single())
+export const registrarAtendimento = async (leadId, a) => ok(await cliente().from('atendimentos').insert({ lead_id: leadId, ...a }).select('id').single())
+
+// Manda leads em lotes; os que já estão no CRM (mesmo place_id do Maps ou mesmo CNPJ) o banco ignora
+export async function enviarLeads(leads, chave = 'place_id') {
+  let novos = 0
+  for (let i = 0; i < leads.length; i += 500) {
+    const { data } = ok(await cliente().from('leads').upsert(leads.slice(i, i + 500), { onConflict: `user_id,${chave}`, ignoreDuplicates: true }).select('id'))
+    novos += data.length
+  }
+  return novos
+}

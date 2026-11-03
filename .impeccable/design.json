@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-28T19:30:00Z",
+  "title": "Design System: Leads Maps",
+  "extensions": {
+    "colorMeta": {
+      "petroleo-acao": { "role": "primary", "displayName": "Petróleo de ação", "canonical": "#2f6b80" },
+      "petroleo-destaque": { "role": "primary", "displayName": "Petróleo de destaque", "canonical": "#4e90a7" },
+      "bege-fundo": { "role": "neutral", "displayName": "Bege de fundo", "canonical": "#ece8e5" },
+      "marinho-texto": { "role": "neutral", "displayName": "Marinho", "canonical": "#0b1238" }
+    },
+    "typographyMeta": {
+      "marca": { "displayName": "Marca", "purpose": "Leads Maps no topo." },
+      "rotulo-coluna": { "displayName": "Rótulo de coluna", "purpose": "Cabeçalho de tabela e títulos de seção da ficha, em maiúsculas." }
+    },
+    "shadows": [
+      { "name": "fina", "value": "0 0 0 1px rgb(11 18 56 / 0.06), 0 1px 2px -1px rgb(11 18 56 / 0.08), 0 2px 4px rgb(11 18 56 / 0.04)", "purpose": "Cartões, tabelas, barra de filtros e ficha ao lado." },
+      { "name": "media", "value": "0 6px 18px rgb(11 18 56 / 0.1)", "purpose": "Lista de sugestões dos campos." },
+      { "name": "alta", "value": "0 18px 48px rgb(11 18 56 / 0.18)", "purpose": "O que flutua: painel de filtro, barra de lote, gaveta, aviso." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Entrada e mudança de estado." },
+      { "name": "ease-in", "value": "cubic-bezier(0.7, 0, 0.84, 0)", "purpose": "Saída, mais curta que a entrada." },
+      { "name": "rapida", "value": "140ms", "purpose": "Hover, painel de filtro, seta." },
+      { "name": "media", "value": "220ms", "purpose": "Barra de lote, ficha, gaveta, cartão aberto." }
+    ],
+    "breakpoints": [
+      { "name": "celular", "value": "720px" },
+      { "name": "mapa-embaixo", "value": "900px" },
+      { "name": "ficha-na-gaveta", "value": "1100px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Barra de lote",
+      "kind": "custom",
+      "refersTo": "barra-lote",
+      "description": "Aparece com a primeira empresa marcada e manda todas de uma vez.",
+      "html": "<div class=\"ds-lote\"><span>3 empresas marcadas</span><button class=\"ds-link\">Limpar</button><button class=\"ds-branco\">Mandar 3 para o kanban</button></div>",
+      "css": ".ds-lote{display:inline-flex;gap:18px;align-items:center;background:#0b1238;color:#fff;padding:10px 10px 10px 20px;border-radius:12px;box-shadow:0 18px 48px rgb(11 18 56 / .18);font:600 14px Montserrat,system-ui,sans-serif}.ds-link{background:none;border:0;color:#cfe3ea;font:inherit}.ds-branco{background:#fff;color:#0b1238;border:0;border-radius:8px;padding:8px 16px;font:inherit}"
+    },
+    {
+      "name": "Etiqueta de filtro",
+      "kind": "chip",
+      "refersTo": "etiqueta-filtro",
+      "description": "Um filtro ligado; o x desliga só ele.",
+      "html": "<span class=\"ds-chip\">Campinas - SP <button aria-label=\"Tirar o filtro Campinas - SP\">x</button></span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:2px;font:500 12px Montserrat,system-ui,sans-serif;background:#dbeaf0;color:#0b1238;border-radius:99px;padding:2px 2px 2px 11px}.ds-chip button{border:0;background:none;color:#545b78;min-width:26px;min-height:26px;border-radius:99px}"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f3f1" />
+    <meta name="color-scheme" content="light" />
+    <title>Leads Maps</title>
+    <!--
+      Direção das telas (impeccable, 28/10/2026; o kanban não entra e fica como está)
+      THESIS: sistema de trabalho de uma pessoa só; cada tela serve para escolher empresas e agir sobre várias de uma vez, sem janela por cima.
+      OWN-WORLD: o mesmo bege, azul-marinho e azul-petróleo do kanban, Montserrat, cartões com sombra fina; nada novo de identidade.
+      STORY: Prospecção acha e manda em lote; Google Maps revisa o que a busca trouxe (lista e mapa) antes de mandar; Leads ordena e trabalha um lead por vez.
+      FIRST VIEWPORT: Prospecção = barra de grupos de filtro + etiquetas do que está ligado + lista na largura toda;
+        Leads = tabela ordenável com a ficha do lead ao lado; Google Maps = buscas em cartões, a aberta com lista e mapa numerados igual.
+      FORM: Prospecção barra no topo (seed bb63c07d), Leads tabela com ficha ao lado (seed 5d3c6ead), Google Maps cartões que abrem com mapa (seed d9b4c1ec).
+      FINISH: barra escura de lote fixa embaixo, movimento só para mudança de estado (140 a 220 ms, ease-out), teclado e leitor de tela em tudo, contraste AA.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+    <header class="topo">
+      <h1 class="marca" translate="no">Leads <span>Maps</span></h1>
+      <nav class="abas" aria-label="Seções">
+        <button type="button" class="aba" data-aba="kanban" data-crm>Kanban</button>
+        <button type="button" class="aba" data-aba="leads" data-crm>Leads</button>
+        <button type="button" class="aba" data-aba="prospeccao" data-local hidden>Prospecção</button>
+        <button type="button" class="aba" data-aba="buscas" data-local hidden>Google Maps</button>
+      </nav>
+      <div class="conta">
+        <a id="link-web" class="botao" target="_blank" rel="noopener noreferrer" hidden>CRM online</a>
+        <span id="usuario" class="muted pequeno"></span>
+        <button type="button" id="btn-sair" hidden>Sair</button>
+        <button type="button" id="btn-novo-lead" class="primario" data-crm>Novo lead</button>
+      </div>
+    </header>
+    <p id="aviso" class="aviso" role="status" hidden></p>
+
+    <section id="tela-login" class="tela-login" aria-labelledby="login-titulo" hidden>
+      <form id="form-login" class="cartao">
+        <p class="marca marca-login" translate="no" aria-hidden="true">Leads <span>Maps</span></p>
+        <h2 id="login-titulo">Entrar</h2>
+        <label>E-mail <input type="email" name="email" required autocomplete="username" inputmode="email" spellcheck="false" maxlength="200" placeholder="voce@empresa.com.br" /></label>
+        <label>Senha <input type="password" name="senha" required autocomplete="current-password" maxlength="200" /></label>
+        <button class="primario">Entrar</button>
+        <p class="muted pequeno">Acesso restrito. Peça seu usuário ao administrador.</p>
+      </form>
+    </section>
+
+    <main id="conteudo" tabindex="-1">
+      <section id="aba-prospeccao" aria-label="Prospecção na base de CNPJ" hidden>
+        <form id="form-prospeccao" class="barra-filtros" aria-label="Filtros da prospecção"></form>
+        <div class="resultados">
+          <div class="ativos">
+            <p id="resumo-busca" class="resumo" role="status" tabindex="-1"></p>
+            <div id="etiquetas-filtros" class="chips" aria-label="Filtros ligados"></div>
+          </div>
+          <div id="estado-prospeccao"></div>
+          <div class="tabela-wrap" id="tabela-empresas" hidden>
+            <table class="tabela">
+              <thead>
+                <tr><th scope="col" class="col-marcar"><input type="checkbox" id="marcar-pagina" aria-label="Marcar todas as empresas desta página" /></th><th scope="col">Empresa</th><th scope="col">Atividade</th><th scope="col">Local</th><th scope="col">Situação</th><th scope="col">Abertura</th><th scope="col">Contato</th></tr>
+              </thead>
+              <tbody id="lista-empresas"></tbody>
+            </table>
+          </div>
+          <nav id="paginacao-empresas" class="paginacao" aria-label="Paginação dos resultados"></nav>
+        </div>
+        <div id="barra-lote" class="barra-lote" role="region" aria-label="Empresas marcadas" hidden></div>
+      </section>
+
+      <section id="aba-kanban" aria-label="Kanban de acompanhamento" hidden>
+        <p id="kanban-ajuda" class="sr-only">Enter abre a ficha. Setas para a esquerda e para a direita movem o lead de coluna.</p>
+        <div id="kanban-aviso"></div>
+        <div id="kanban" class="kanban" aria-busy="true"></div>
+      </section>
+
+      <section id="aba-leads" aria-label="Gerenciador de leads" hidden>
+        <div class="leads-layout">
+          <div class="leads-lista">
+            <form id="filtros" class="filtros" role="search">
+              <label>Buscar <input type="search" name="q" placeholder="Nome, categoria ou telefone…" autocomplete="off" /></label>
+              <label>Etapa <select name="status" id="filtro-status"></select></label>
+              <label>Temperatura <select name="temperatura" id="filtro-temperatura"></select></label>
+            </form>
+            <div class="tabela-wrap">
+              <table class="tabela">
+                <thead>
+                  <tr id="cabecalho-leads"></tr>
+                </thead>
+                <tbody id="lista-leads"></tbody>
+              </table>
+            </div>
+            <nav id="paginacao" class="paginacao" aria-label="Paginação"></nav>
+          </div>
+          <aside id="ficha-lead" class="ficha-lado" aria-labelledby="ficha-lead-titulo" hidden></aside>
+        </div>
+      </section>
+
+      <section id="aba-buscas" aria-label="Buscas no Google Maps" hidden>
+        <form id="form-busca" class="nova-busca">
+          <div class="nova-linha">
+            <label class="termos-busca"><span class="sr-only">Termos de busca, um por linha</span>
+              <textarea name="keywords" rows="1" required maxlength="10000" placeholder="dentistas em Campinas (um termo por linha)"></textarea>
+            </label>
+            <button class="primario" id="btn-iniciar-busca">Iniciar busca</button>
+          </div>
+          <details class="mais-opcoes">
+            <summary>Mais opções</summary>
+            <div class="linha">
+              <label>Idioma <input name="lang" value="pt" maxlength="2" pattern="[a-z]{2}" required size="3" autocomplete="off" spellcheck="false" /></label>
+              <label>Profundidade (1 a 10) <input name="depth" type="number" inputmode="numeric" min="1" max="10" value="1" required /></label>
+              <label>Tempo máximo (min) <input name="max_minutos" type="number" inputmode="numeric" min="3" max="120" value="10" required /></label>
+              <label class="check"><input type="checkbox" name="email" /> Procurar e-mails nos sites (mais lento)</label>
+            </div>
+          </details>
+          <p class="muted pequeno">Cada busca leva alguns minutos. Vá com calma no volume: muitas buscas seguidas fazem o Google bloquear.</p>
+        </form>
+        <div id="lista-buscas" class="buscas"></div>
+      </section>
+    </main>
+
+    <dialog id="drawer" class="drawer" aria-labelledby="drawer-titulo"></dialog>
+    <dialog id="dlg-novo" class="modal" aria-labelledby="novo-titulo"></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

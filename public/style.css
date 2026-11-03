@@ -1,0 +1,1994 @@
+/* Identidade inspirada em saúde ocupacional: fundo bege claro, azul-marinho para texto, azul-petróleo de destaque, Montserrat.
+   Todas as combinações de texto e fundo abaixo passam no contraste AA (4,5:1). Sempre tema claro, como a referência. */
+:root {
+  color-scheme: light;
+  --bg: #ece8e5;
+  --bg-2: #ffffff;
+  --bg-3: #e3ded9;
+  --bg-topo: #f6f3f1;
+  --fg: #0b1238;
+  --muted: #545b78;
+  --placeholder: #6a7089;
+  --borda: #d8d1cb;
+  --borda-forte: #c4bcb5;
+  --destaque: #4e90a7;
+  --destaque-suave: #dbeaf0;
+  --primaria: #2f6b80;
+  --primaria-hover: #0b1238;
+  --primaria-fg: #ffffff;
+  --perigo: #b3261e;
+  --perigo-suave: #f9e3e1;
+  --aviso-suave: #f6ecd9;
+  --sombra: 0 1px 2px rgb(11 18 56 / 0.06), 0 2px 8px rgb(11 18 56 / 0.05);
+  --sombra-fina: 0 0 0 1px rgb(11 18 56 / 0.06), 0 1px 2px -1px rgb(11 18 56 / 0.08), 0 2px 4px rgb(11 18 56 / 0.04);
+  --sombra-media: 0 6px 18px rgb(11 18 56 / 0.1);
+  --sombra-alta: 0 18px 48px rgb(11 18 56 / 0.18);
+  --raio: 12px;
+  --raio-p: 8px;
+  --novo: #5b6478;
+  --contato: #2f6b80;
+  --qualificado: #4b4f9e;
+  --proposta: #9a6a12;
+  --negociacao: #b4541f;
+  --ganho: #2e7d5b;
+  --perdido: #b3261e;
+  --fonte: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* movimento: ease-out exponencial, curto, só para mudança de estado (sistema de trabalho, não vitrine) */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --dur-rapida: 140ms;
+  --dur-media: 220ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* o atributo hidden precisa vencer os display definidos nas classes (botões, cartões, telas) */
+[hidden] {
+  display: none !important;
+}
+
+html {
+  scrollbar-color: var(--borda-forte) transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (pointer: fine) {
+  html {
+    overscroll-behavior: none;
+  }
+}
+
+body {
+  margin: 0;
+  font: 15px/1.5 var(--fonte);
+  background: var(--bg);
+  color: var(--fg);
+  caret-color: var(--primaria);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--destaque-suave);
+  color: var(--fg);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--primaria);
+  text-underline-offset: 3px;
+}
+
+a,
+button,
+summary,
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+}
+
+::placeholder {
+  color: var(--placeholder);
+  opacity: 1;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.pequeno {
+  font-size: 13px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ico {
+  flex: none;
+}
+
+.pular {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 60;
+  padding: 10px 14px;
+  border-radius: var(--raio-p);
+  background: var(--fg);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top var(--dur-rapida) var(--ease-out);
+}
+
+.pular:focus {
+  top: 10px;
+}
+
+/* ---------- topo ---------- */
+.topo {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 14px 28px;
+  padding-left: max(28px, env(safe-area-inset-left));
+  padding-right: max(28px, env(safe-area-inset-right));
+  background: var(--bg-topo);
+  border-bottom: 3px solid var(--destaque);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.marca {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+
+.marca span {
+  color: var(--destaque);
+  font-weight: 500;
+}
+
+.abas {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.aba {
+  background: none;
+  border: 0;
+  border-radius: var(--raio-p);
+  padding: 8px 14px;
+  color: var(--muted);
+  font: 500 14px var(--fonte);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--ease-out), color var(--dur-rapida) var(--ease-out);
+}
+
+.aba:hover {
+  background: var(--bg-3);
+  color: var(--fg);
+}
+
+.aba[aria-current="page"] {
+  background: var(--destaque-suave);
+  color: var(--fg);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--destaque);
+}
+
+.conta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* quando o topo aperta, quem cede é o e-mail: marca e botões não quebram linha */
+.marca,
+.conta button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+#usuario {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 28px;
+  background: var(--aviso-suave);
+  border-bottom: 1px solid var(--borda);
+  font-size: 14px;
+}
+
+.aviso .ico {
+  color: var(--proposta);
+}
+
+main {
+  padding: 24px 28px 48px;
+  scroll-margin-top: 80px;
+}
+
+main:focus {
+  outline: none;
+}
+
+/* ---------- botões e campos ---------- */
+button,
+.botao {
+  font: 500 14px var(--fonte);
+  min-height: 38px;
+  padding: 8px 16px;
+  border-radius: var(--raio-p);
+  border: 1px solid var(--borda-forte);
+  background: var(--bg-2);
+  color: var(--fg);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background-color var(--dur-rapida) var(--ease-out), border-color var(--dur-rapida) var(--ease-out), color var(--dur-rapida) var(--ease-out), transform var(--dur-rapida) var(--ease-out);
+}
+
+button:hover:not(:disabled),
+.botao:hover {
+  background: var(--bg-3);
+  border-color: var(--destaque);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button[aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+}
+
+button[aria-busy="true"] .ico-girando {
+  animation: girar 0.8s linear infinite;
+}
+
+.primario {
+  background: var(--primaria);
+  border-color: var(--primaria);
+  color: var(--primaria-fg);
+  font-weight: 600;
+}
+
+.primario:hover:not(:disabled) {
+  background: var(--primaria-hover);
+  border-color: var(--primaria-hover);
+  color: var(--primaria-fg);
+}
+
+.perigo {
+  color: var(--perigo);
+}
+
+.perigo:hover:not(:disabled) {
+  background: var(--perigo-suave);
+  border-color: var(--perigo);
+}
+
+button.link {
+  min-height: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--primaria);
+  font-weight: 600;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+button.link:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+label.check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--fg);
+  font-weight: 400;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font: 400 14px var(--fonte);
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio-p);
+  background: var(--bg-2);
+  color: var(--fg);
+  transition: border-color var(--dur-rapida) var(--ease-out), box-shadow var(--dur-rapida) var(--ease-out);
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--muted);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--destaque);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--destaque) 25%, transparent);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--primaria);
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 2px 0 0;
+  flex: none;
+}
+
+input[type="checkbox"]:focus {
+  box-shadow: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+/* ---------- estados (vazio e erro) ---------- */
+.estado {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 22px 24px;
+  background: var(--bg-2);
+  border: 1px dashed var(--borda-forte);
+  border-radius: var(--raio);
+  color: var(--fg);
+  text-align: left;
+}
+
+.estado .ico {
+  color: var(--destaque);
+  margin-top: 1px;
+}
+
+.estado strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.estado p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 62ch;
+}
+
+.estado button {
+  margin-top: 12px;
+}
+
+.estado-erro {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--perigo) 35%, var(--borda));
+  background: color-mix(in srgb, var(--perigo-suave) 55%, var(--bg-2));
+}
+
+.estado-erro .ico {
+  color: var(--perigo);
+}
+
+.tabela td .estado {
+  border: 0;
+  background: none;
+  padding: 18px 6px;
+}
+
+/* ---------- kanban ---------- */
+#kanban-aviso:not(:empty) {
+  margin-bottom: 16px;
+}
+
+.kanban {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(250px, 1fr);
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 8px;
+  min-height: calc(100dvh - 140px);
+}
+
+.kanban > .estado {
+  grid-column: 1 / -1;
+  align-self: start;
+}
+
+.coluna {
+  --cor: var(--novo);
+  background: var(--bg-3);
+  border-radius: var(--raio);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: box-shadow var(--dur-rapida) var(--ease-out), background-color var(--dur-rapida) var(--ease-out);
+}
+
+.coluna.alvo {
+  box-shadow: inset 0 0 0 2px var(--cor);
+  background: color-mix(in srgb, var(--cor) 8%, var(--bg-3));
+}
+
+.coluna header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px;
+}
+
+.coluna h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.marcador {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--cor);
+}
+
+.contador {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-2);
+  border-radius: 99px;
+  padding: 1px 9px;
+  color: var(--muted);
+}
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 60px;
+  flex: 1;
+}
+
+.cards:empty::before {
+  content: attr(data-vazio);
+  display: block;
+  padding: 20px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px dashed var(--borda-forte);
+  border-radius: var(--raio-p);
+}
+
+.card {
+  background: var(--bg-2);
+  border-radius: var(--raio-p);
+  padding: 11px 13px;
+  box-shadow: var(--sombra);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: grab;
+  transition: transform var(--dur-rapida) var(--ease-out), box-shadow var(--dur-rapida) var(--ease-out), opacity var(--dur-rapida) var(--ease-out);
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--sombra-media);
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.card.arrastando {
+  opacity: 0.45;
+}
+
+/* depois de soltar, o card assenta no lugar novo: confirma onde ele foi parar */
+.card.assentou {
+  animation: assentar var(--dur-media) var(--ease-out);
+}
+
+body.arrastando-card {
+  user-select: none;
+}
+
+.card strong {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.card > .muted {
+  font-size: 13px;
+}
+
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.avaliacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.avaliacao .ico {
+  color: var(--proposta);
+  fill: currentColor;
+}
+
+.st-novo { --cor: var(--novo); }
+.st-contato { --cor: var(--contato); }
+.st-qualificado { --cor: var(--qualificado); }
+.st-proposta { --cor: var(--proposta); }
+.st-negociacao { --cor: var(--negociacao); }
+.st-ganho { --cor: var(--ganho); }
+.st-perdido { --cor: var(--perdido); }
+
+/* sem declarar --cor aqui: a regra vinha depois de .st-* e deixava toda etapa cinza na aba Leads */
+.pill {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+  color: var(--cor, var(--novo));
+  background: color-mix(in srgb, var(--cor, var(--novo)) 13%, var(--bg-2));
+}
+
+.sb-pendente { --cor: var(--novo); }
+.sb-executando { --cor: var(--contato); }
+.sb-importado { --cor: var(--ganho); }
+.sb-falhou { --cor: var(--perdido); }
+
+.sit-2 { --cor: var(--ganho); }
+.sit-3 { --cor: var(--proposta); }
+.sit-4 { --cor: var(--negociacao); }
+.sit-8 { --cor: var(--perdido); }
+.sit-1 { --cor: var(--novo); }
+
+.tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.t-quente { background: color-mix(in srgb, var(--perdido) 14%, var(--bg-2)); color: var(--perdido); }
+.t-morno { background: color-mix(in srgb, var(--proposta) 16%, var(--bg-2)); color: var(--proposta); }
+.t-frio { background: color-mix(in srgb, var(--contato) 14%, var(--bg-2)); color: var(--contato); }
+.tel-celular { background: color-mix(in srgb, var(--ganho) 14%, var(--bg-2)); color: var(--ganho); }
+.tel-fixo { background: color-mix(in srgb, var(--novo) 14%, var(--bg-2)); color: var(--novo); }
+.tel-outro { background: var(--bg-3); color: var(--muted); }
+
+/* ---------- tabelas e cartões ---------- */
+.filtros {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filtros label:first-child {
+  flex: 1;
+  min-width: 220px;
+}
+
+.tabela-wrap {
+  /* contém o texto só para leitor de tela (.sr-only), que vazava e criava rolagem horizontal na página */
+  position: relative;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tabela th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 16px;
+  background: var(--bg-topo);
+  border-bottom: 1px solid var(--borda);
+  white-space: nowrap;
+}
+
+.tabela td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--borda);
+  vertical-align: top;
+}
+
+.tabela tbody tr {
+  transition: background-color var(--dur-rapida) var(--ease-out);
+}
+
+.tabela tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tabela tbody tr:hover {
+  background: color-mix(in srgb, var(--destaque) 6%, var(--bg-2));
+}
+
+/* resultado novo da busca aparece de uma vez, num único movimento */
+tbody.atualizado {
+  animation: aparecer var(--dur-media) var(--ease-out);
+}
+
+/* só a célula numérica alinha à direita; o número miúdo embaixo do nome (CNPJ, CNAE) segue o texto */
+.tabela td.num,
+.tabela th.num {
+  text-align: right;
+}
+
+.vazio {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px !important;
+}
+
+.erro {
+  display: block;
+  color: var(--perigo);
+  margin-top: 4px;
+}
+
+.paginacao {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.paginacao:empty {
+  display: none;
+}
+
+.cartao {
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 900px;
+}
+
+.cartao h2 {
+  font-size: 18px;
+}
+
+.cartao p {
+  margin: 0;
+  font-size: 14px;
+  max-width: 72ch;
+}
+
+.linha {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+/* ---------- gaveta e modal ---------- */
+dialog {
+  border: 0;
+  padding: 0;
+  background: var(--bg-2);
+  color: var(--fg);
+  box-shadow: var(--sombra-alta);
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  background: rgb(11 18 56 / 0.45);
+}
+
+dialog[open]::backdrop {
+  animation: aparecer var(--dur-media) var(--ease-out);
+}
+
+.drawer {
+  margin: 0 0 0 auto;
+  width: min(640px, 100vw);
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+.drawer[open] {
+  animation: deslizar-entra var(--dur-media) var(--ease-out);
+}
+
+/* saída mais curta que a entrada e acelerando: sai do caminho sem chamar atenção */
+.drawer.saindo {
+  animation: deslizar-sai var(--dur-rapida) var(--ease-in) forwards;
+}
+
+.modal {
+  width: min(560px, calc(100vw - 32px));
+  border-radius: var(--raio);
+}
+
+.modal[open] {
+  animation: surgir var(--dur-media) var(--ease-out);
+}
+
+.modal.saindo {
+  animation: sumir var(--dur-rapida) var(--ease-in) forwards;
+}
+
+dialog.saindo::backdrop {
+  animation: sumir-fundo var(--dur-rapida) var(--ease-in) forwards;
+}
+
+.modal form {
+  padding: 22px 24px;
+}
+
+.drawer-corpo {
+  padding: 22px 26px 34px;
+  padding-bottom: max(34px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.drawer-corpo h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-top: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--borda);
+}
+
+.drawer-corpo > p {
+  margin: 0;
+}
+
+.drawer-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.drawer-topo h2 {
+  font-size: 21px;
+  overflow-wrap: anywhere;
+}
+
+.drawer-topo p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.fechar {
+  min-height: 38px;
+  min-width: 38px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.fechar:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.grade .largo {
+  grid-column: 1 / -1;
+}
+
+.acoes {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 16px;
+  border-left: 2px solid var(--borda);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ev {
+  position: relative;
+}
+
+.ev::before {
+  content: "";
+  position: absolute;
+  left: -23px;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--destaque);
+  border: 3px solid var(--bg-2);
+}
+
+.ev-status::before {
+  background: var(--borda-forte);
+}
+
+.ev-topo {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.ev-topo time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ev p {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.ev-status p {
+  color: var(--muted);
+}
+
+.ficha {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 7px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.ficha dt {
+  color: var(--muted);
+}
+
+.ficha dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lista-simples {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 14px;
+}
+
+/* ---------- prospecção ---------- */
+/* barra no topo: cada grupo de filtro é um botão que abre um painel; a lista fica com a largura toda */
+.barra-filtros {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.barra-filtros .aviso-demo,
+.barra-filtros .erro-filtros {
+  flex-basis: 100%;
+}
+
+#btn-buscar {
+  margin-left: auto;
+}
+
+.aviso-demo {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: var(--raio-p);
+  background: var(--aviso-suave);
+}
+
+.aviso-demo .ico {
+  color: var(--proposta);
+  margin-top: 1px;
+}
+
+.grupo {
+  position: relative;
+}
+
+.grupo summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 12px 8px 16px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio-p);
+  background: var(--bg-2);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background-color var(--dur-rapida) var(--ease-out), border-color var(--dur-rapida) var(--ease-out);
+}
+
+.grupo summary::-webkit-details-marker {
+  display: none;
+}
+
+.grupo summary:hover {
+  background: var(--bg-3);
+  border-color: var(--destaque);
+}
+
+.grupo[open] summary {
+  background: var(--destaque-suave);
+  border-color: var(--destaque);
+}
+
+.grupo summary .ico {
+  color: var(--muted);
+  transition: transform var(--dur-rapida) var(--ease-out);
+}
+
+.grupo[open] summary .ico {
+  transform: rotate(180deg);
+}
+
+.contagem {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--primaria);
+  color: var(--primaria-fg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* painel do grupo, por cima da lista; rola por dentro quando o conteúdo é alto */
+.grupo-corpo {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 6;
+  width: 360px;
+  max-height: min(70dvh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-alta);
+  animation: surgir var(--dur-rapida) var(--ease-out);
+}
+
+/* os dois últimos grupos abrem para a esquerda, para o painel não passar da borda */
+.grupo:nth-last-of-type(-n + 2) .grupo-corpo {
+  left: auto;
+  right: 0;
+}
+
+.grupo-corpo p {
+  margin: 0;
+}
+
+.seletor {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.seletor > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* lista dentro do fluxo: o painel do grupo rola e cortaria um menu flutuante */
+.sugestoes {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-p);
+  box-shadow: var(--sombra-media);
+  max-height: 232px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.sugestao {
+  padding: 8px 9px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sugestao:hover,
+.sugestao[aria-selected="true"] {
+  background: var(--destaque-suave);
+}
+
+.sugestao-vazia {
+  padding: 9px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips:empty {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--destaque-suave);
+  color: var(--fg);
+  border-radius: 99px;
+  padding: 2px 2px 2px 11px;
+  max-width: 100%;
+}
+
+.chip button {
+  min-height: 26px;
+  min-width: 26px;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+}
+
+.chip button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--destaque) 25%, transparent);
+  color: var(--fg);
+}
+
+.caixas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+}
+
+.par {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.erro-filtros {
+  display: flex;
+  margin: 4px 0 0;
+  padding: 9px 11px;
+  border-radius: var(--raio-p);
+  background: var(--perigo-suave);
+  color: var(--perigo);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.resultados {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* abaixo disso as colunas ficavam espremidas; a tabela rola dentro do cartão */
+.resultados .tabela {
+  min-width: 940px;
+}
+
+.resultados .tabela td:nth-child(2) {
+  min-width: 190px;
+}
+
+.resultados .tabela td:nth-child(3) {
+  min-width: 180px;
+}
+
+/* total da busca e etiquetas do que está ligado, na mesma linha */
+.ativos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.ativos .chips {
+  align-items: center;
+}
+
+.chip-texto {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.base-receita {
+  margin-left: auto;
+}
+
+.resumo {
+  margin: 0;
+  font-weight: 600;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resumo:empty {
+  display: none;
+}
+
+.resumo:focus {
+  outline: none;
+}
+
+/* coluna de marcar das listas de empresas (Prospecção e Google Maps) */
+.col-marcar {
+  width: 44px;
+}
+
+.tabela th.col-marcar {
+  padding-right: 4px;
+}
+
+.tabela tbody tr.sel td {
+  background: color-mix(in srgb, var(--destaque) 10%, var(--bg-2));
+}
+
+.ja {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ganho);
+  white-space: nowrap;
+}
+
+/* barra escura do envio em lote: aparece com a primeira empresa marcada */
+.barra-lote {
+  position: fixed;
+  left: 50%;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  z-index: 7;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px 18px;
+  max-width: calc(100vw - 32px);
+  width: max-content;
+  padding: 10px 10px 10px 20px;
+  border-radius: var(--raio);
+  background: var(--fg);
+  color: #ffffff;
+  box-shadow: var(--sombra-alta);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  animation: barra-entra var(--dur-media) var(--ease-out);
+}
+
+.barra-lote button.link {
+  color: #cfe3ea;
+}
+
+.barra-lote button.link:hover {
+  color: #ffffff;
+}
+
+.barra-lote .branco {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.barra-lote .branco:hover:not(:disabled) {
+  background: var(--destaque-suave);
+  border-color: var(--destaque-suave);
+}
+
+/* a barra cobre o fim da lista e o aviso: os dois sobem enquanto ela está na tela */
+#aba-prospeccao:has(.barra-lote:not([hidden])) {
+  padding-bottom: 76px;
+}
+
+body:has(#aba-prospeccao:not([hidden]) .barra-lote:not([hidden])) .toast {
+  bottom: 92px;
+}
+
+/* ---------- leads: tabela ordenável com a ficha ao lado ---------- */
+.leads-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.leads-layout:has(> .ficha-lado:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr) 470px;
+}
+
+#lista-leads tr[data-id] {
+  cursor: pointer;
+}
+
+/* em tela estreita a tabela rola para o lado em vez de quebrar o nome em várias linhas */
+.leads-lista .tabela {
+  min-width: 620px;
+}
+
+#lista-leads td:first-child {
+  min-width: 190px;
+}
+
+.ordenar {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  gap: 4px;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+.ordenar:hover:not(:disabled) {
+  background: none;
+  color: var(--fg);
+}
+
+.ordenar .ico {
+  opacity: 0;
+  transition: opacity var(--dur-rapida) var(--ease-out), transform var(--dur-rapida) var(--ease-out);
+}
+
+.ordenar:hover .ico,
+.ordenar:focus-visible .ico {
+  opacity: 0.5;
+}
+
+th[aria-sort] .ordenar {
+  color: var(--fg);
+}
+
+th[aria-sort] .ordenar .ico {
+  opacity: 1;
+  color: var(--primaria);
+}
+
+th[aria-sort="ascending"] .ordenar .ico {
+  transform: rotate(180deg);
+}
+
+.ficha-lado {
+  position: sticky;
+  top: 84px;
+  max-height: calc(100dvh - 104px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+  animation: deslizar-entra var(--dur-media) var(--ease-out);
+}
+
+.ficha-lado .drawer-corpo {
+  padding: 20px 22px 26px;
+}
+
+/* ---------- Google Maps: buscas em cartões, a aberta com lista e mapa ---------- */
+.nova-busca {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.nova-linha {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.termos-busca {
+  flex: 1;
+}
+
+.termos-busca textarea {
+  field-sizing: content;
+  min-height: 40px;
+  max-height: 160px;
+  resize: none;
+}
+
+.mais-opcoes summary {
+  width: max-content;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primaria);
+}
+
+.mais-opcoes .linha {
+  margin-top: 10px;
+}
+
+.nova-busca > p {
+  margin: 0;
+}
+
+.buscas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bc {
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+  overflow: hidden;
+}
+
+.bc-topo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.bc-topo,
+.bc-topo > button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 13px 16px;
+}
+
+.bc-topo:has(> button) {
+  padding: 0;
+}
+
+.bc-topo > button {
+  width: 100%;
+  min-height: 0;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+
+.bc-topo > button:hover:not(:disabled) {
+  background: var(--bg-topo);
+}
+
+.bc-topo .ico-baixo {
+  color: var(--muted);
+  transition: transform var(--dur-rapida) var(--ease-out);
+}
+
+.bc-topo > button[aria-expanded="false"] .ico-baixo {
+  transform: rotate(-90deg);
+}
+
+.bc-topo strong {
+  font-weight: 600;
+}
+
+.bc-topo .erro {
+  display: inline;
+  margin: 0;
+}
+
+/* busca rodando: o scraper não informa o andamento, então a barra só mostra que está trabalhando */
+.prog {
+  position: relative;
+  width: 140px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+
+.prog span {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--contato);
+  animation: vai-e-volta 1.4s var(--ease-out) infinite alternate;
+}
+
+.bc-corpo {
+  border-top: 1px solid var(--borda);
+  animation: aparecer var(--dur-media) var(--ease-out);
+}
+
+.bc-corpo > .skel {
+  margin: 16px;
+}
+
+.bc-corpo > .estado {
+  margin: 16px;
+}
+
+.com-mapa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  align-items: start;
+}
+
+/* shortcut: a lista mostra todas as empresas da busca de uma vez (vêm do PC, já em memória); paginar se passar de alguns milhares */
+.bc-lista {
+  max-height: 540px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* em tela estreita a tabela rola para o lado dentro do cartão, em vez de espremer o nome da empresa */
+.bc-lista .tabela {
+  min-width: 720px;
+}
+
+.bc-lista td:nth-child(2) {
+  min-width: 220px;
+}
+
+.bc-lista thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.bc-lista .tel {
+  white-space: nowrap;
+}
+
+.bc-lista .endereco {
+  min-width: 200px;
+  max-width: 300px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.com-mapa .lado {
+  padding: 12px 14px;
+  border-left: 1px solid var(--borda);
+}
+
+/* isolation: o Leaflet usa z-index alto nas camadas e passaria por cima do topo fixo ao rolar */
+.mapa {
+  height: 440px;
+  border-radius: var(--raio-p);
+  background: var(--bg-3);
+  isolation: isolate;
+  font-family: var(--fonte);
+}
+
+/* mapa em cinza para os pinos coloridos aparecerem */
+.mapa .leaflet-tile-pane {
+  filter: grayscale(1) contrast(0.9) brightness(1.05);
+}
+
+.sem-mapa {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pino {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  border: 2px solid var(--borda-forte);
+  background: #ffffff;
+  color: var(--fg);
+  font: 700 12px var(--fonte);
+  box-shadow: 0 2px 6px rgb(11 18 56 / 0.28);
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--ease-out), border-color var(--dur-rapida) var(--ease-out);
+}
+
+.pino.sel {
+  background: var(--primaria);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.pino.ja {
+  background: var(--ganho);
+  border-color: #ffffff;
+  color: #ffffff;
+  cursor: default;
+}
+
+.pino.mini {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin: 0 5px 0 12px;
+  border-width: 1.5px;
+  box-shadow: none;
+  vertical-align: -1px;
+  cursor: default;
+}
+
+.pino.mini:first-child {
+  margin-left: 0;
+}
+
+.legenda {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.nr {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--bg-3);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bc footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--borda);
+  background: var(--bg-topo);
+}
+
+.esp {
+  flex: 1;
+}
+
+.contatos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.contato {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.contatos .email {
+  overflow-wrap: anywhere;
+}
+
+.contatos .email .tag {
+  margin-left: 6px;
+}
+
+/* ---------- login ---------- */
+.tela-login {
+  display: grid;
+  place-items: center;
+  padding: 72px 16px;
+}
+
+.tela-login .cartao {
+  width: min(400px, 100%);
+  gap: 14px;
+  padding: 28px;
+}
+
+.tela-login:not([hidden]) .cartao {
+  animation: surgir var(--dur-media) var(--ease-out);
+}
+
+.tela-login .cartao p {
+  margin: 0;
+}
+
+.marca-login {
+  font-size: 19px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--borda);
+}
+
+
+/* ---------- skeleton e toast ---------- */
+.skel {
+  border-radius: var(--raio-p);
+  background: linear-gradient(90deg, var(--bg-3) 25%, color-mix(in srgb, var(--bg-3) 45%, var(--bg-2)) 50%, var(--bg-3) 75%);
+  background-size: 200% 100%;
+  animation: brilho 1.2s linear infinite;
+}
+
+.coluna .skel {
+  background-color: var(--bg-2);
+}
+
+.skel.titulo { height: 20px; width: 55%; }
+.skel.card { height: 76px; }
+.skel.linha { height: 16px; }
+.skel.bloco { height: 120px; }
+.skel.cartao-busca { height: 50px; border-radius: var(--raio); }
+
+.toast {
+  position: fixed;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  translate: -50% 12px;
+  opacity: 0;
+  pointer-events: none;
+  background: var(--fg);
+  color: #ffffff;
+  padding: 11px 18px 11px 14px;
+  border-radius: var(--raio-p);
+  font-size: 14px;
+  font-weight: 500;
+  max-width: min(520px, calc(100vw - 32px));
+  box-shadow: var(--sombra-alta);
+  transition: opacity var(--dur-rapida) var(--ease-in), translate var(--dur-rapida) var(--ease-in);
+  z-index: 50;
+}
+
+.toast .ico {
+  color: #9ccbdb;
+}
+
+.toast.visivel {
+  opacity: 1;
+  translate: -50% 0;
+  transition-duration: var(--dur-media);
+  transition-timing-function: var(--ease-out);
+}
+
+.toast[data-tipo="erro"] {
+  background: #8f1f18;
+}
+
+.toast[data-tipo="erro"] .ico {
+  color: #ffd1cc;
+}
+
+@keyframes aparecer {
+  from { opacity: 0; }
+}
+
+@keyframes surgir {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); filter: blur(4px); }
+}
+
+@keyframes sumir {
+  to { opacity: 0; transform: scale(0.98); }
+}
+
+@keyframes sumir-fundo {
+  to { opacity: 0; }
+}
+
+@keyframes deslizar-entra {
+  from { transform: translateX(36px); opacity: 0; filter: blur(4px); }
+}
+
+@keyframes deslizar-sai {
+  to { transform: translateX(16px); opacity: 0; }
+}
+
+@keyframes assentar {
+  from { transform: scale(1.03); box-shadow: var(--sombra-media); }
+}
+
+@keyframes brilho {
+  to { background-position: -200% 0; }
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes barra-entra {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+}
+
+@keyframes vai-e-volta {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+
+/* abaixo disso a ficha não cabe ao lado: o lead abre na gaveta (app.js, fichaAoLado) */
+@media (max-width: 1099px) {
+  .leads-layout:has(> .ficha-lado:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ficha-lado {
+    display: none;
+  }
+  /* o e-mail da conta só cabe inteiro no topo a partir de uns 1000px */
+  #usuario {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  /* marca, quatro abas e botões não cabem numa linha só: as abas descem */
+  .topo {
+    flex-wrap: wrap;
+    gap: 10px 16px;
+  }
+  .abas {
+    order: 3;
+    flex-basis: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .conta {
+    margin-left: auto;
+  }
+  .com-mapa {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .com-mapa .lado {
+    border-left: 0;
+    border-top: 1px solid var(--borda);
+  }
+  .mapa {
+    height: 300px;
+  }
+}
+
+@media (max-width: 720px) {
+  /* no celular o topo tem três linhas: fixo, tomaria um terço da tela */
+  .topo {
+    position: relative;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  main {
+    padding: 16px;
+  }
+  .aviso {
+    padding: 10px 16px;
+  }
+  .grade {
+    grid-template-columns: 1fr;
+  }
+  /* no celular cada coluna do kanban encaixa na tela ao rolar para o lado */
+  .kanban {
+    grid-auto-columns: 82%;
+    scroll-snap-type: x mandatory;
+  }
+  .coluna {
+    scroll-snap-align: start;
+  }
+  /* no celular o painel do grupo ocupa a largura da barra, logo abaixo do botão */
+  .grupo {
+    position: static;
+  }
+  .grupo-corpo,
+  .grupo:nth-last-of-type(-n + 2) .grupo-corpo {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+  #btn-buscar {
+    flex-basis: 100%;
+  }
+  .nova-linha {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  button,
+  .botao,
+  input,
+  select {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

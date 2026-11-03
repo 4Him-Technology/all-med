@@ -1,0 +1,31 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "scraper-falso",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["test/fake-scraper.js"],
+      "port": 8080
+    },
+    {
+      "name": "crm",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file-if-exists=.env", "src/index.js"],
+      "env": { "POLL_MS": "3000", "DATA_FILE": "data/demo.json", "CNPJ_DEMO": "1" },
+      "port": 3000
+    },
+    {
+      "name": "crm-supabase-falso",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["src/index.js"],
+      "env": { "DATA_FILE": "data/demo2.json", "CNPJ_DEMO": "1", "SUPABASE_URL": "https://exemplo-inexistente.supabase.co", "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_teste" },
+      "port": 3100
+    },
+    {
+      "name": "site-estatico",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "4100", "-d", "public"],
+      "port": 4100
+    }
+  ]
+}

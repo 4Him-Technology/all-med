@@ -1,0 +1,77 @@
+# Parte do PC: banco com a base de CNPJ, a tela de prospecção e, opcional, o scraper do Google Maps.
+# O CRM (leads, kanban, histórico) fica no Supabase; esta tela manda as empresas para lá.
+#   docker compose up -d --build                  sobe banco + tela em http://localhost:3000
+#   docker compose --profile maps up -d           sobe também o scraper do Google Maps
+#   docker compose run --rm app node importador/importar.js --ufs SP   carrega a base da Receita
+# As portas ficam presas em 127.0.0.1: nada fica exposto na rede enquanto não houver login.
+
+services:
+  db:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    # ajustes para carga em massa e criação de índice em dezenas de milhões de linhas; reduza se a máquina tiver menos de 8 GB de RAM
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - maintenance_work_mem=1GB
+      - -c
+      - max_wal_size=8GB
+      - -c
+      - checkpoint_timeout=15min
+    # o /dev/shm padrão do Docker (64 MB) derruba os joins paralelos da montagem da base
+    shm_size: 1gb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # roda as migrations só na primeira subida, com o volume vazio
+      - ./db-local/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATA_FILE: /app/data/local.json
+      SCRAPER_URL: http://scraper:8080
+      # CRM online: só a URL e a chave pública do Supabase; vazio deixa a prospecção funcionando sem envio ao kanban
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+      WEB_URL: ${WEB_URL:-}
+      CNPJ_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - crmdata:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scraper:
+    image: gosom/google-maps-scraper:v1.18.1
+    profiles: ["maps"]
+    command: ["-data-folder", "/gmapsdata"]
+    environment:
+      DISABLE_TELEMETRY: "1"
+    volumes:
+      - gmapsdata:/gmapsdata
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  crmdata:
+  gmapsdata:

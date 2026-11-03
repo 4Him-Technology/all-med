@@ -1,0 +1,765 @@
+import { camposLead, ultimoContato } from './campos.js'
+import * as crm from './crm.js'
+import { carregarProspeccao } from './prospeccao.js'
+import { ROTULOS as R, STATUS } from './rotulos.js'
+import { config, supabase } from './supa.js'
+import { $, api, carregando, esqueleto, estado, fecharDialogo, h, icone, prepararDialogos, toast } from './ui.js'
+
+const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+const fmtDia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
+const fmtData = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
+const horaCurta = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
+const quando = (iso) => fmt.format(new Date(iso))
+const nota = (n) => n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+const opcoes = (mapa, atual, vazio) => [vazio != null && h('option', { value: '' }, vazio), ...Object.entries(mapa).map(([v, r]) => h('option', { value: v, selected: v === atual }, r))].filter(Boolean)
+const campo = (rotulo, name, valor, attrs = {}) => h('label', { class: attrs.class }, rotulo, h('input', { name, value: valor ?? '', autocomplete: 'off', ...attrs, class: null }))
+const campoSelect = (rotulo, name, mapa, atual, vazio) => h('label', {}, rotulo, h('select', { name }, opcoes(mapa, atual, vazio)))
+const agoraLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+// a ficha pode estar na gaveta (<dialog>) ou ao lado da lista de leads
+const botaoFechar = (el) => h('button', { type: 'button', class: 'fechar', 'aria-label': 'Fechar', onclick: () => (el.tagName === 'DIALOG' ? fecharDialogo(el) : fecharFicha()) }, icone('x', 20))
+const avaliacao = (n, total) => h('span', { class: 'avaliacao' }, icone('estrela', 13), nota(n), total != null && h('span', { class: 'muted' }, `(${total})`))
+
+// ---------- abas ----------
+const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead }), buscas: carregarBuscas }
+let abaAtual = 'kanban'
+
+function abrirAba(nome) {
+  abaAtual = nome
+  for (const b of document.querySelectorAll('.aba')) {
+    b.setAttribute('aria-current', b.dataset.aba === nome ? 'page' : 'false')
+    // na tela estreita a barra de abas rola: a aba ativa não pode ficar escondida
+    if (b.dataset.aba === nome) b.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
+  for (const s of document.querySelectorAll('main > section')) s.hidden = s.id !== `aba-${nome}`
+  history.replaceState(null, '', `#${nome}`)
+  abas[nome]()
+}
+const recarregarAba = () => abas[abaAtual]()
+
+// ---------- kanban ----------
+async function carregarKanban({ focar, assentar } = {}) {
+  const el = $('#kanban')
+  if (!el.childElementCount) {
+    el.replaceChildren(...STATUS.map(() => h('div', { class: 'coluna' }, esqueleto('titulo'), esqueleto('card'), esqueleto('card'))))
+  }
+  el.setAttribute('aria-busy', 'true')
+  try {
+    const { colunas, cortado } = await crm.kanban()
+    const vazio = colunas.every((c) => c.total === 0)
+    $('#kanban-aviso').replaceChildren(
+      vazio
+        ? estado({
+            titulo: 'Seu kanban está vazio',
+            texto: config.local ? 'Mande empresas pela aba Prospecção ou pelo Google Maps, ou cadastre um lead em "Novo lead".' : 'Mande empresas pela prospecção no seu computador ou cadastre um lead em "Novo lead".',
+          })
+        : '',
+      cortado ? h('p', { class: 'muted pequeno' }, `Mostrando os ${crm.LIMITE_KANBAN} leads mexidos mais recentemente. Use a aba Leads para ver todos.`) : '',
+    )
+    el.replaceChildren(...colunas.map(coluna))
+    if (focar) {
+      const card = el.querySelector(`.card[data-id="${focar}"]`)
+      card?.focus()
+      if (assentar) card?.classList.add('assentou')
+    }
+  } catch (err) {
+    el.replaceChildren(estado({ tipo: 'erro', titulo: 'Não foi possível carregar o kanban', texto: err.message, acao: h('button', { type: 'button', onclick: () => carregarKanban() }, 'Tentar de novo') }))
+  }
+  el.setAttribute('aria-busy', 'false')
+}
+
+function coluna(col) {
+  return h(
+    'section',
+    {
+      class: `coluna st-${col.status}`,
+      'aria-label': `${R.status[col.status]}, ${col.total} leads`,
+      ondragover: (e) => {
+        e.preventDefault()
+        e.currentTarget.classList.add('alvo')
+      },
+      ondragleave: (e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('alvo')
+      },
+      ondrop: (e) => soltar(e, col.status),
+    },
+    h('header', {}, h('h2', {}, h('span', { class: 'marcador', 'aria-hidden': 'true' }), R.status[col.status]), h('span', { class: 'contador' }, String(col.total))),
+    h('ul', { class: 'cards', 'data-vazio': 'Arraste leads para cá' }, col.itens.map(cartao)),
+    col.total > col.itens.length && h('p', { class: 'muted pequeno' }, `+${col.total - col.itens.length} na aba Leads`),
+  )
+}
+
+function cartao(l) {
+  return h(
+    'li',
+    {
+      class: 'card',
+      draggable: 'true',
+      tabindex: '0',
+      role: 'button',
+      'data-id': l.id,
+      'aria-describedby': 'kanban-ajuda',
+      ondragstart: (e) => {
+        e.dataTransfer.setData('text/plain', l.id)
+        e.dataTransfer.effectAllowed = 'move'
+        e.currentTarget.classList.add('arrastando')
+        document.body.classList.add('arrastando-card')
+      },
+      ondragend: (e) => {
+        e.currentTarget.classList.remove('arrastando')
+        document.body.classList.remove('arrastando-card')
+      },
+      onclick: () => abrirLead(l.id),
+      onkeydown: (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          abrirLead(l.id)
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          // alternativa de teclado ao arrastar: setas movem para a coluna vizinha
+          e.preventDefault()
+          const destino = STATUS[STATUS.indexOf(l.status) + (e.key === 'ArrowRight' ? 1 : -1)]
+          if (destino) mover(l.id, destino, { teclado: true })
+        }
+      },
+    },
+    h('strong', {}, l.nome),
+    l.categoria && h('span', { class: 'muted' }, l.categoria),
+    h(
+      'span',
+      { class: 'card-meta' },
+      l.temperatura && h('span', { class: `tag t-${l.temperatura}` }, R.temperatura[l.temperatura]),
+      l.avaliacao != null && avaliacao(l.avaliacao),
+      h('span', { class: 'muted' }, l.ultimo_atendimento ? `Contato em ${fmtDia.format(new Date(l.ultimo_atendimento))}` : 'Sem contato'),
+    ),
+  )
+}
+
+async function mover(id, status, { teclado = false } = {}) {
+  try {
+    await crm.atualizarLead(id, { status })
+    toast(`Movido para ${R.status[status]}`)
+  } catch (err) {
+    toast(err.message, 'erro')
+  }
+  // movimento iniciado pelo teclado não anima; o arraste ganha um assentamento curto do card
+  await carregarKanban({ focar: id, assentar: !teclado })
+}
+
+function soltar(e, status) {
+  e.preventDefault()
+  e.currentTarget.classList.remove('alvo')
+  const id = e.dataTransfer.getData('text/plain')
+  if (id) mover(id, status)
+}
+
+// ---------- leads ----------
+const filtro = { q: '', status: '', temperatura: '', ordem: 'ultimo_atendimento', crescente: false, page: 1 }
+// coluna, rótulo e o sentido do primeiro clique (texto e etapa do começo; datas do mais recente)
+const COLUNAS_LEADS = [
+  ['nome', 'Nome', true],
+  ['status', 'Etapa', true],
+  ['temperatura', 'Temp.', true],
+  ['ultimo_atendimento', 'Último contato', false],
+  ['created_at', 'Criado em', false],
+]
+let leadAberto = null
+
+function cabecalhoLeads() {
+  $('#cabecalho-leads').replaceChildren(
+    ...COLUNAS_LEADS.map(([coluna, rotulo, crescente]) =>
+      h(
+        'th',
+        { scope: 'col', class: coluna === 'created_at' ? 'num' : null, 'aria-sort': filtro.ordem === coluna ? (filtro.crescente ? 'ascending' : 'descending') : null },
+        h('button', { type: 'button', class: 'ordenar', onclick: () => ordenarPor(coluna, crescente) }, rotulo, icone('seta', 14)),
+      ),
+    ),
+  )
+}
+
+function ordenarPor(coluna, crescente) {
+  filtro.crescente = filtro.ordem === coluna ? !filtro.crescente : crescente
+  filtro.ordem = coluna
+  filtro.page = 1
+  cabecalhoLeads()
+  // o cabeçalho foi redesenhado: o foco volta para a coluna clicada
+  $('#cabecalho-leads [aria-sort] button').focus()
+  carregarLeads()
+}
+
+async function carregarLeads() {
+  const corpo = $('#lista-leads')
+  if (!corpo.childElementCount) corpo.replaceChildren(...Array.from({ length: 5 }, () => h('tr', {}, h('td', { colspan: '5' }, esqueleto('linha')))))
+  try {
+    const p = await crm.listarLeads({ ...filtro, limit: 25 })
+    const filtrando = filtro.q || filtro.status || filtro.temperatura
+    corpo.replaceChildren(
+      ...(p.itens.length
+        ? p.itens.map(linhaLead)
+        : [h('tr', {}, h('td', { colspan: '5' }, estado(filtrando ? { titulo: 'Nenhum lead com esses filtros', texto: 'Tente outro termo ou limpe a etapa e a temperatura.' } : { titulo: 'Nenhum lead ainda', texto: 'Mande empresas pela prospecção ou cadastre um lead em "Novo lead".' })))]),
+    )
+    $('#paginacao').replaceChildren(
+      h('button', { type: 'button', disabled: p.pagina <= 1, onclick: () => irPagina(p.pagina - 1) }, 'Anterior'),
+      h('span', {}, `Página ${p.pagina} de ${p.paginas} · ${p.total} leads`),
+      h('button', { type: 'button', disabled: p.pagina >= p.paginas, onclick: () => irPagina(p.pagina + 1) }, 'Próxima'),
+    )
+  } catch (err) {
+    corpo.replaceChildren(h('tr', {}, h('td', { colspan: '5' }, estado({ tipo: 'erro', titulo: 'Não foi possível carregar os leads', texto: err.message, acao: h('button', { type: 'button', onclick: carregarLeads }, 'Tentar de novo') }))))
+  }
+}
+
+function irPagina(n) {
+  filtro.page = n
+  carregarLeads()
+}
+
+// a linha inteira abre a ficha; o botão no nome é o caminho pelo teclado (o clique nele sobe até a linha)
+const linhaLead = (l) =>
+  h(
+    'tr',
+    { 'data-id': l.id, class: l.id === leadAberto ? 'sel' : null, onclick: () => abrirLead(l.id) },
+    h('td', {}, h('button', { type: 'button', class: 'link' }, l.nome), l.categoria && h('div', { class: 'muted pequeno' }, l.categoria)),
+    h('td', {}, h('span', { class: `pill st-${l.status}` }, R.status[l.status])),
+    h('td', {}, l.temperatura && h('span', { class: `tag t-${l.temperatura}` }, R.temperatura[l.temperatura])),
+    h('td', {}, ultimoContato(l.ultimo_atendimento) ?? h('span', { class: 'muted' }, 'nunca')),
+    h('td', { class: 'num' }, fmtData.format(new Date(l.created_at))),
+  )
+
+// ---------- ficha do lead ----------
+// na aba Leads com tela larga a ficha abre ao lado da lista; no resto (kanban, celular) abre na gaveta
+const fichaAoLado = () => abaAtual === 'leads' && matchMedia('(min-width: 1100px)').matches
+
+function marcarLinha(id) {
+  leadAberto = id
+  for (const tr of document.querySelectorAll('#lista-leads tr[data-id]')) tr.classList.toggle('sel', tr.dataset.id === id)
+}
+
+async function abrirNaFicha(id) {
+  const ficha = $('#ficha-lead')
+  marcarLinha(id)
+  if (ficha.hidden) {
+    ficha.replaceChildren(h('div', { class: 'drawer-corpo' }, esqueleto('titulo'), esqueleto('bloco'), esqueleto('bloco')))
+    ficha.hidden = false
+  }
+  try {
+    const lead = await crm.lerLead(id)
+    // cliques rápidos em outras linhas: só desenha a resposta do último lead clicado
+    if (leadAberto === id) renderLead(ficha, lead)
+  } catch (err) {
+    toast(err.message, 'erro')
+    fecharFicha()
+  }
+}
+
+function fecharFicha() {
+  fecharDialogo($('#drawer'))
+  const ficha = $('#ficha-lead')
+  if (ficha.hidden) return
+  ficha.hidden = true
+  const linha = leadAberto && $(`#lista-leads tr[data-id="${leadAberto}"] button`)
+  marcarLinha(null)
+  linha?.focus()
+}
+
+async function abrirLead(id) {
+  if (fichaAoLado()) return abrirNaFicha(id)
+  // abrindo na gaveta (tela estreita), a ficha ao lado e o destaque da linha saem
+  $('#ficha-lead').hidden = true
+  marcarLinha(null)
+  const dlg = $('#drawer')
+  if (!dlg.open) {
+    dlg.replaceChildren(h('div', { class: 'drawer-corpo' }, esqueleto('titulo'), esqueleto('bloco'), esqueleto('bloco')))
+    dlg.showModal()
+  }
+  try {
+    renderLead(dlg, await crm.lerLead(id))
+  } catch (err) {
+    toast(err.message, 'erro')
+    fecharDialogo(dlg)
+  }
+}
+
+// envio de formulário com o botão principal em "andamento" até o servidor responder
+function enviar(fn, sucesso, textoAndamento = 'Salvando…') {
+  return async (e) => {
+    e.preventDefault()
+    const form = e.currentTarget
+    const restaurar = carregando(form.querySelector('button.primario'), textoAndamento)
+    try {
+      await fn(Object.fromEntries(new FormData(form)), form)
+      toast(sucesso)
+    } catch (err) {
+      toast(err.message, 'erro')
+    } finally {
+      restaurar()
+    }
+  }
+}
+
+const ORIGENS = { maps: 'Importado do Google Maps', manual: 'Cadastrado manualmente', receita: 'Vindo da prospecção por CNPJ' }
+
+function renderLead(dlg, l) {
+  const digitos = (l.telefone ?? '').replace(/\D/g, '')
+  // shortcut: assume DDI 55 quando o número tem 10 ou 11 dígitos; revisar se prospectar fora do Brasil
+  const whats = digitos.length >= 10 ? (digitos.length <= 11 ? `55${digitos}` : digitos) : null
+  const externo = { target: '_blank', rel: 'noopener noreferrer', class: 'botao' }
+  const tiposManuais = Object.fromEntries(Object.entries(R.tipo).filter(([k]) => k !== 'status'))
+  const agoraPadrao = agoraLocal()
+
+  dlg.replaceChildren(
+    h(
+      'div',
+      { class: 'drawer-corpo' },
+      h(
+        'header',
+        { class: 'drawer-topo' },
+        h('div', {}, h('h2', { id: `${dlg.id}-titulo` }, l.nome), h('p', { class: 'muted' }, `${ORIGENS[l.origem] ?? 'Cadastrado'} em ${quando(l.created_at)}${l.cnpj ? ` · CNPJ ${l.cnpj}` : ''}`)),
+        botaoFechar(dlg),
+      ),
+      h(
+        'div',
+        { class: 'atalhos' },
+        l.telefone && h('a', { href: `tel:${digitos}`, class: 'botao' }, icone('telefone'), 'Ligar'),
+        whats && h('a', { href: `https://wa.me/${whats}`, ...externo }, icone('conversa'), 'WhatsApp'),
+        l.emails[0] && h('a', { href: `mailto:${l.emails[0]}`, class: 'botao' }, icone('email'), 'E-mail'),
+        l.site && h('a', { href: l.site, ...externo }, icone('site'), 'Site'),
+        l.link_maps && h('a', { href: l.link_maps, ...externo }, icone('mapa'), 'Ver no Maps'),
+        l.avaliacao != null && h('span', { class: 'muted' }, avaliacao(l.avaliacao), ` em ${l.total_avaliacoes ?? 0} avaliações`),
+      ),
+
+      h('h3', {}, 'Registrar atendimento'),
+      h(
+        'form',
+        {
+          class: 'grade',
+          onsubmit: enviar(
+            async (d, form) => {
+              // campo sem alteração vira o instante exato, senão o histórico perde a ordem dentro do mesmo minuto
+              d.data = !d.data || d.data === agoraPadrao ? new Date().toISOString() : new Date(d.data).toISOString()
+              await crm.registrarAtendimento(l.id, d)
+              form.reset()
+              await abrirLead(l.id)
+              recarregarAba()
+            },
+            'Atendimento registrado',
+            'Registrando…',
+          ),
+        },
+        campoSelect('Tipo', 'tipo', tiposManuais, 'ligacao'),
+        campo('Quando', 'data', agoraPadrao, { type: 'datetime-local', required: true }),
+        h('label', { class: 'largo' }, 'O que aconteceu', h('textarea', { name: 'descricao', rows: '3', required: true, maxlength: '5000', placeholder: 'Ex.: falei com a dona, pediu proposta até sexta…' })),
+        h('div', { class: 'acoes largo' }, h('button', { class: 'primario' }, 'Registrar atendimento')),
+      ),
+
+      h('h3', {}, `Histórico (${l.atendimentos.length})`),
+      l.atendimentos.length
+        ? h('ol', { class: 'timeline' }, l.atendimentos.map((a) => h('li', { class: `ev ev-${a.tipo}` }, h('div', { class: 'ev-topo' }, h('strong', {}, R.tipo[a.tipo]), h('time', { datetime: a.data }, quando(a.data))), h('p', {}, a.descricao))))
+        : h('p', { class: 'muted' }, 'Nenhum atendimento ainda. O primeiro contato que você registrar aparece aqui, junto com cada mudança de coluna.'),
+
+      h('h3', {}, 'Dados do lead'),
+      h(
+        'form',
+        {
+          class: 'grade',
+          onsubmit: enviar(async (d) => {
+            await crm.atualizarLead(l.id, camposLead(d))
+            await abrirLead(l.id)
+            recarregarAba()
+          }, 'Lead salvo'),
+        },
+        campo('Nome', 'nome', l.nome, { required: true, maxlength: '200', class: 'largo' }),
+        campoSelect('Status', 'status', R.status, l.status),
+        campoSelect('Temperatura', 'temperatura', R.temperatura, l.temperatura, 'Sem classificação'),
+        campo('Categoria', 'categoria', l.categoria, { maxlength: '200' }),
+        campo('Telefone', 'telefone', l.telefone, { type: 'tel', inputmode: 'tel', maxlength: '50' }),
+        campo('Site', 'site', l.site, { type: 'url', inputmode: 'url', placeholder: 'https://…', maxlength: '500', spellcheck: 'false' }),
+        campo('E-mails (separados por vírgula)', 'emails', l.emails.join(', '), { inputmode: 'email', spellcheck: 'false' }),
+        campo('Endereço', 'endereco', l.endereco, { maxlength: '500', class: 'largo' }),
+        h('label', { class: 'largo' }, 'Observações', h('textarea', { name: 'observacoes', rows: '3', maxlength: '5000' }, l.observacoes ?? '')),
+        h('div', { class: 'acoes largo' }, h('button', { class: 'primario' }, 'Salvar alterações'), h('button', { type: 'button', class: 'perigo', onclick: (e) => arquivar(l, e.currentTarget) }, icone('arquivar'), 'Arquivar lead')),
+      ),
+    ),
+  )
+}
+
+async function arquivar(l, botao) {
+  if (!confirm(`Arquivar "${l.nome}"? Ele sai do kanban e da lista, e não volta em novas buscas.`)) return
+  const restaurar = carregando(botao, 'Arquivando…')
+  try {
+    await crm.arquivarLead(l.id)
+    fecharFicha()
+    toast('Lead arquivado')
+    recarregarAba()
+  } catch (err) {
+    restaurar()
+    toast(err.message, 'erro')
+  }
+}
+
+function abrirNovoLead() {
+  const dlg = $('#dlg-novo')
+  dlg.replaceChildren(
+    h(
+      'form',
+      {
+        class: 'grade',
+        onsubmit: enviar(
+          async (d) => {
+            const lead = await crm.criarLead(camposLead(d))
+            fecharDialogo(dlg)
+            recarregarAba()
+            abrirLead(lead.id)
+          },
+          'Lead criado',
+          'Criando…',
+        ),
+      },
+      h('header', { class: 'drawer-topo largo' }, h('h2', { id: 'novo-titulo' }, 'Novo lead'), botaoFechar(dlg)),
+      campo('Nome', 'nome', '', { required: true, maxlength: '200', class: 'largo', autofocus: true }),
+      campo('Categoria', 'categoria', '', { maxlength: '200', placeholder: 'Ex.: clínica odontológica…' }),
+      campo('Telefone', 'telefone', '', { type: 'tel', inputmode: 'tel', maxlength: '50', placeholder: '(11) 91234-5678' }),
+      campo('Site', 'site', '', { type: 'url', inputmode: 'url', placeholder: 'https://…', maxlength: '500', spellcheck: 'false' }),
+      campo('E-mails (separados por vírgula)', 'emails', '', { inputmode: 'email', spellcheck: 'false', placeholder: 'contato@empresa.com.br' }),
+      campo('Endereço', 'endereco', '', { maxlength: '500', class: 'largo' }),
+      campoSelect('Temperatura', 'temperatura', R.temperatura, '', 'Sem classificação'),
+      h('div', { class: 'acoes largo' }, h('button', { class: 'primario' }, icone('mais'), 'Criar lead')),
+    ),
+  )
+  dlg.showModal()
+}
+
+// ---------- buscas no Google Maps ----------
+// Cada busca é um cartão; a pronta abre com a lista do que achou e o mapa, numerados igual, para escolher o que vai ao kanban.
+let timerBuscas
+const cartoes = new Map() // id da busca -> <section>; o cartão sobrevive à atualização da lista, aberto ou não
+const abertas = new Map() // id -> { id, leads, marcadas: Set de place_id, mapa, pinos: Map place_id -> marcador, corpo, ui }
+
+async function carregarBuscas() {
+  clearTimeout(timerBuscas)
+  const lista = $('#lista-buscas')
+  if (!lista.childElementCount) lista.replaceChildren(...Array.from({ length: 3 }, () => esqueleto('cartao-busca')))
+  try {
+    const p = await api('/api/buscas?limit=50')
+    if (!p.itens.length) {
+      lista.replaceChildren(estado({ titulo: 'Nenhuma busca ainda', texto: 'Escreva o que procurar acima, como "dentistas em Campinas", e clique em Iniciar busca.' }))
+    } else {
+      const els = p.itens.map(cartaoBusca)
+      // só remonta a lista quando entra busca nova: mexer no DOM tira o foco de quem está marcando empresas
+      if (els.length !== lista.children.length || els.some((el, i) => lista.children[i] !== el)) lista.replaceChildren(...els)
+    }
+    const ativa = p.itens.some((b) => b.status === 'pendente' || b.status === 'executando')
+    if (ativa && abaAtual === 'buscas') timerBuscas = setTimeout(carregarBuscas, 5000)
+  } catch (err) {
+    lista.replaceChildren(estado({ tipo: 'erro', titulo: 'Não foi possível carregar as buscas', texto: err.message, acao: h('button', { type: 'button', onclick: carregarBuscas }, 'Tentar de novo') }))
+  }
+}
+
+function cartaoBusca(b) {
+  let el = cartoes.get(b.id)
+  const assinatura = JSON.stringify([b.status, b.encontrados, b.enviados, b.erro])
+  if (el?.dataset.assinatura === assinatura) return el
+  if (!el) {
+    el = h('section', { class: 'bc', 'aria-labelledby': `bc-${b.id}-nome` })
+    cartoes.set(b.id, el)
+  }
+  el.dataset.assinatura = assinatura
+  const tinhaFoco = el.querySelector('.bc-topo')?.contains(document.activeElement)
+  el.querySelector(':scope > .bc-topo')?.remove()
+  el.prepend(topoBusca(b))
+  if (tinhaFoco) el.querySelector('.bc-topo button')?.focus()
+  return el
+}
+
+function topoBusca(b) {
+  const abre = b.status === 'importado' && b.encontrados > 0
+  const meta = {
+    pendente: 'esperando a vez',
+    executando: `começou às ${horaCurta.format(new Date(b.created_at))}`,
+    importado: b.encontrados ? `${b.encontrados} ${b.encontrados === 1 ? 'encontrada' : 'encontradas'}${b.enviados ? ` · ${b.enviados} no kanban` : ''}` : 'nenhuma empresa encontrada',
+    falhou: b.erro ?? 'a busca parou com erro',
+  }[b.status]
+  const conteudo = [
+    abre && icone('baixo', 16),
+    h('strong', { id: `bc-${b.id}-nome` }, b.nome),
+    h('span', { class: `pill sb-${b.status}` }, R.status_busca[b.status]),
+    h('span', { class: b.status === 'falhou' ? 'pequeno erro' : 'muted pequeno' }, meta),
+    b.status === 'executando' && h('span', { class: 'prog', role: 'progressbar', 'aria-label': `Buscando ${b.nome}` }, h('span')),
+  ]
+  return abre
+    ? h('h2', { class: 'bc-topo' }, h('button', { type: 'button', 'aria-expanded': String(abertas.has(b.id)), 'aria-controls': `bc-${b.id}-corpo`, onclick: () => alternarBusca(b.id) }, conteudo))
+    : h('div', { class: 'bc-topo' }, conteudo)
+}
+
+async function alternarBusca(id) {
+  const el = cartoes.get(id)
+  const botao = el.querySelector('.bc-topo button')
+  const aberta = abertas.get(id)
+  if (aberta) {
+    aberta.mapa?.remove()
+    aberta.corpo.remove()
+    abertas.delete(id)
+    botao.setAttribute('aria-expanded', 'false')
+    return
+  }
+  const a = { id, leads: [], marcadas: new Set(), mapa: null, pinos: new Map(), corpo: h('div', { class: 'bc-corpo', id: `bc-${id}-corpo` }, esqueleto('bloco')) }
+  abertas.set(id, a)
+  el.append(a.corpo)
+  botao.setAttribute('aria-expanded', 'true')
+  try {
+    a.leads = await api(`/api/buscas/${id}/leads`)
+    if (abertas.get(id) === a) desenharBusca(a)
+  } catch (err) {
+    a.corpo.replaceChildren(estado({ tipo: 'erro', titulo: 'Não foi possível abrir a busca', texto: err.message, acao: h('button', { type: 'button', onclick: () => (alternarBusca(id), alternarBusca(id)) }, 'Tentar de novo') }))
+  }
+}
+
+const estadoPino = (a, l) => (l.enviado ? 'ja' : a.marcadas.has(l.place_id) ? 'sel' : '')
+
+function desenharBusca(a) {
+  const podeMandar = Boolean(supabase)
+  a.ui = {
+    tbody: h('tbody', {}, a.leads.map((l, i) => linhaMaps(a, l, i, podeMandar))),
+    todas: h('input', { type: 'checkbox', 'aria-label': 'Marcar todas as empresas desta busca', hidden: !podeMandar, onchange: (e) => marcarTodasMaps(a, e.currentTarget.checked) }),
+    contagem: h('span', { class: 'muted', 'aria-live': 'polite' }),
+    mandar: h('button', { type: 'button', class: 'primario', hidden: !podeMandar, onclick: (e) => mandarDaBusca(a, e.currentTarget) }),
+  }
+  const mapa = h('div', { class: 'mapa', role: 'region', 'aria-label': 'Mapa das empresas encontradas, com o mesmo número da lista' })
+  a.corpo.replaceChildren(
+    h(
+      'div',
+      { class: 'com-mapa' },
+      h('div', { class: 'bc-lista' }, h('table', { class: 'tabela' }, h('thead', {}, h('tr', {}, h('th', { scope: 'col', class: 'col-marcar' }, a.ui.todas), ...['Empresa', 'Telefone', 'Nota no Google', 'Endereço'].map((t) => h('th', { scope: 'col' }, t)))), a.ui.tbody)),
+      h(
+        'div',
+        { class: 'lado' },
+        mapa,
+        h('p', { class: 'legenda' }, h('span', { class: 'pino mini sel' }), 'Marcada', h('span', { class: 'pino mini ja' }), 'Já no kanban', h('span', { class: 'pino mini' }), 'Não marcada'),
+      ),
+    ),
+    h('footer', {}, podeMandar ? a.ui.contagem : h('span', { class: 'muted' }, 'Ligue o CRM online neste computador para mandar empresas ao kanban.'), h('span', { class: 'esp' }), a.ui.mandar),
+  )
+  atualizarBusca(a)
+  montarMapa(a, mapa)
+}
+
+const linhaMaps = (a, l, i, podeMandar) =>
+  h(
+    'tr',
+    { 'data-place': l.place_id },
+    h('td', { class: 'col-marcar' }, l.enviado ? h('span', { class: 'ja' }, 'No kanban') : podeMandar && h('input', { type: 'checkbox', 'aria-label': `Marcar ${l.nome}`, onchange: (e) => marcarMaps(a, l.place_id, e.currentTarget.checked) })),
+    h('td', {}, h('span', { class: 'nr', 'aria-hidden': 'true' }, String(i + 1)), h('strong', {}, l.nome), l.categoria && h('div', { class: 'muted pequeno' }, l.categoria)),
+    h('td', { class: 'tel' }, l.telefone ?? h('span', { class: 'muted' }, 'sem telefone')),
+    h('td', {}, l.avaliacao != null ? avaliacao(l.avaliacao, l.total_avaliacoes ?? 0) : h('span', { class: 'muted' }, 'sem nota')),
+    h('td', { class: 'endereco' }, l.endereco ?? ''),
+  )
+
+function marcarMaps(a, placeId, sim) {
+  if (sim) a.marcadas.add(placeId)
+  else a.marcadas.delete(placeId)
+  atualizarBusca(a)
+}
+
+function marcarTodasMaps(a, sim) {
+  a.marcadas = new Set(sim ? a.leads.filter((l) => !l.enviado).map((l) => l.place_id) : [])
+  atualizarBusca(a)
+}
+
+// linhas, caixa "todas", contagem, botão e pinos do mapa seguem a mesma seleção
+function atualizarBusca(a) {
+  const livres = a.leads.filter((l) => !l.enviado).length
+  const n = a.marcadas.size
+  for (const tr of a.ui.tbody.rows) {
+    const sim = a.marcadas.has(tr.dataset.place)
+    tr.classList.toggle('sel', sim)
+    const caixa = tr.querySelector('input')
+    if (caixa) caixa.checked = sim
+  }
+  a.ui.todas.disabled = !livres
+  a.ui.todas.checked = n > 0 && n === livres
+  a.ui.todas.indeterminate = n > 0 && n < livres
+  a.ui.contagem.textContent = livres ? `${n} de ${livres} marcadas` : 'Todas as empresas desta busca já estão no kanban'
+  a.ui.mandar.disabled = !n
+  a.ui.mandar.replaceChildren(icone('enviar', 15), n ? `Mandar ${n} para o kanban` : 'Mandar para o kanban')
+  for (const l of a.leads) a.pinos.get(l.place_id)?.getElement()?.firstElementChild?.setAttribute('class', `pino ${estadoPino(a, l)}`)
+}
+
+// Leaflet só baixa quando a primeira busca abre; versão fixa com SRI (hash conferido no jsDelivr em 28/10/2026)
+let leaflet
+function carregarLeaflet() {
+  const base = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/'
+  const baixar = (tag, attrs) => new Promise((ok, falha) => document.head.append(h(tag, { ...attrs, crossorigin: 'anonymous', onload: ok, onerror: () => falha(new Error(`não carregou ${attrs.href ?? attrs.src}`)) })))
+  leaflet ??= Promise.all([
+    baixar('link', { rel: 'stylesheet', href: `${base}leaflet.css`, integrity: 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=' }),
+    baixar('script', { src: `${base}leaflet.js`, integrity: 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=' }),
+  ]).then(
+    () => window.L,
+    (err) => {
+      leaflet = null
+      throw err
+    },
+  )
+  return leaflet
+}
+
+async function montarMapa(a, el) {
+  const comLugar = a.leads.map((l, i) => [l, i]).filter(([l]) => l.latitude != null && l.longitude != null)
+  if (!comLugar.length) return el.replaceChildren(h('p', { class: 'sem-mapa' }, 'Esta busca não trouxe a localização das empresas.'))
+  let L
+  try {
+    L = await carregarLeaflet()
+  } catch (err) {
+    console.error('mapa:', err.message)
+    return el.replaceChildren(h('p', { class: 'sem-mapa' }, 'Não foi possível carregar o mapa agora. A lista ao lado continua funcionando.'))
+  }
+  if (abertas.get(a.id) !== a || a.mapa) return // fechou enquanto o Leaflet baixava
+  a.mapa = L.map(el, { scrollWheelZoom: false, keyboard: false })
+  // a página manda sem Referer (no-referrer); a política dos tiles do OpenStreetMap pede o Referer, então só o tile envia a origem
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, referrerPolicy: 'strict-origin', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(a.mapa)
+  for (const [l, i] of comLugar) {
+    // o HTML do pino só leva o número e uma classe fixa; o nome da empresa vai como texto no title
+    const pino = L.marker([l.latitude, l.longitude], { keyboard: false, title: l.nome, icon: L.divIcon({ className: '', html: `<span class="pino ${estadoPino(a, l)}">${i + 1}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] }) })
+    pino.on('click', () => !l.enviado && supabase && marcarMaps(a, l.place_id, !a.marcadas.has(l.place_id)))
+    a.pinos.set(l.place_id, pino.addTo(a.mapa))
+  }
+  a.mapa.fitBounds(
+    comLugar.map(([l]) => [l.latitude, l.longitude]),
+    { padding: [28, 28], maxZoom: 16 },
+  )
+}
+
+// Manda as empresas marcadas para o CRM online; repetidas (mesmo lugar do Maps) o banco ignora
+async function mandarDaBusca(a, botao) {
+  const leads = a.leads.filter((l) => a.marcadas.has(l.place_id))
+  const restaurar = carregando(botao, 'Mandando…')
+  try {
+    const novos = await crm.enviarLeads(leads.map(({ enviado, ...l }) => ({ ...l, origem: 'maps' })))
+    await api(`/api/buscas/${a.id}`, { method: 'PATCH', body: { place_ids: leads.map((l) => l.place_id), novos } })
+    const repetidas = leads.length - novos
+    toast(`${novos} ${novos === 1 ? 'lead novo' : 'leads novos'} na coluna Novo do kanban${repetidas ? `; ${repetidas} já ${repetidas === 1 ? 'estava' : 'estavam'} no CRM` : ''}`)
+    for (const l of leads) l.enviado = true
+    a.marcadas.clear()
+    a.ui.tbody.replaceChildren(...a.leads.map((l, i) => linhaMaps(a, l, i, true)))
+  } catch (err) {
+    toast(err.message, 'erro')
+  }
+  restaurar()
+  atualizarBusca(a)
+  // o botão fica desabilitado sem marcadas: o foco vai para a caixa "todas" ou para o título do cartão
+  ;(a.ui.todas.disabled ? cartoes.get(a.id).querySelector('.bc-topo button') : a.ui.todas).focus()
+  carregarBuscas()
+}
+
+// ---------- login ----------
+function mostrarLogin() {
+  for (const el of document.querySelectorAll('.abas, [data-crm], main')) el.hidden = true
+  $('#tela-login').hidden = false
+  $('#form-login').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.currentTarget
+    const restaurar = carregando(form.querySelector('button'), 'Entrando…')
+    const { error } = await supabase.auth.signInWithPassword({ email: form.elements.email.value.trim(), password: form.elements.senha.value })
+    if (error) {
+      restaurar()
+      // mensagem única para não revelar se o e-mail existe
+      console.error('login:', error.status, error.code)
+      const msg =
+        error.status === 429
+          ? 'Muitas tentativas. Espere um pouco e tente de novo.'
+          : !error.status || error.status >= 500
+            ? 'Não foi possível conectar ao servidor. Confira sua conexão e tente de novo.'
+            : 'E-mail ou senha incorretos. Confira e tente de novo.'
+      toast(msg, 'erro')
+      form.elements.senha.select()
+      return
+    }
+    location.reload()
+  })
+  $('#tela-login input[name=email]').focus()
+}
+
+function aviso(texto) {
+  const el = $('#aviso')
+  el.replaceChildren(icone('alerta'), h('span', {}, texto))
+  el.hidden = false
+}
+
+// ---------- início ----------
+async function iniciar() {
+  prepararDialogos()
+  // ícones dos botões fixos do HTML (o texto continua sendo o nome acessível)
+  $('#btn-novo-lead').prepend(icone('mais'))
+  $('#btn-sair').prepend(icone('sair'))
+  $('#link-web').append(icone('externo', 14))
+  $('#btn-iniciar-busca').prepend(icone('buscar'))
+  // abas de prospecção e Google Maps só existem no PC com Docker
+  for (const el of document.querySelectorAll('[data-local]')) el.hidden = !config.local
+  if (!config.local) {
+    delete abas.prospeccao
+    delete abas.buscas
+  }
+
+  let logado = false
+  if (supabase) {
+    const { data } = await supabase.auth.getSession()
+    if (!data.session) return mostrarLogin()
+    logado = true
+    $('#usuario').textContent = data.session.user.email
+    $('#btn-sair').hidden = false
+    $('#btn-sair').addEventListener('click', async (e) => {
+      carregando(e.currentTarget, 'Saindo…')
+      await supabase.auth.signOut()
+      location.reload()
+    })
+    supabase.auth.onAuthStateChange((evento) => evento === 'SIGNED_OUT' && location.reload())
+  } else if (config.local) {
+    aviso('O CRM online não está ligado neste computador. A prospecção funciona, mas o envio ao kanban fica desativado até a configuração ser concluída.')
+  } else {
+    aviso('Sistema indisponível no momento: configuração incompleta.')
+    return
+  }
+  if (!logado) {
+    for (const nome of ['kanban', 'leads']) delete abas[nome]
+    for (const el of document.querySelectorAll('[data-crm]')) el.hidden = true
+  }
+  if (config.local && config.urlWeb) {
+    $('#link-web').href = config.urlWeb
+    $('#link-web').hidden = false
+  }
+
+  $('#filtro-status').append(...opcoes(R.status, '', 'Todas'))
+  $('#filtro-temperatura').append(...opcoes(R.temperatura, '', 'Todas'))
+  cabecalhoLeads()
+  // Esc fecha a ficha também com o foco na lista; no campo de busca o Esc só apaga o texto
+  $('.leads-layout').addEventListener('keydown', (e) => e.key === 'Escape' && !e.target.closest('#filtros') && fecharFicha())
+
+  for (const b of document.querySelectorAll('.aba')) b.addEventListener('click', () => abrirAba(b.dataset.aba))
+  $('#btn-novo-lead').addEventListener('click', abrirNovoLead)
+
+  let debounce
+  $('#filtros').addEventListener('input', () => {
+    clearTimeout(debounce)
+    debounce = setTimeout(() => {
+      Object.assign(filtro, Object.fromEntries(new FormData($('#filtros'))), { page: 1 })
+      carregarLeads()
+    }, 250)
+  })
+  $('#filtros').addEventListener('submit', (e) => e.preventDefault())
+
+  $('#form-busca').addEventListener(
+    'submit',
+    enviar(
+      async (d, form) => {
+        d.email = form.elements.email.checked
+        await api('/api/buscas', { method: 'POST', body: d })
+        form.elements.keywords.value = ''
+        carregarBuscas()
+      },
+      'Busca enviada. Quando ela ficar pronta, envie os leads ao kanban.',
+      'Enviando…',
+    ),
+  )
+
+  const inicial = location.hash.slice(1)
+  abrirAba(Object.hasOwn(abas, inicial) ? inicial : Object.keys(abas)[0])
+}
+
+iniciar()

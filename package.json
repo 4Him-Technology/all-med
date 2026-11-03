@@ -1,0 +1,23 @@
+{
+  "name": "leads-maps-crm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "test": "node --test \"test/*.test.js\"",
+    "scraper:fake": "node test/fake-scraper.js",
+    "importar:cnpj": "node --env-file-if-exists=.env importador/importar.js",
+    "conferir:supabase": "node --env-file-if-exists=.env scripts/conferir-supabase.js"
+  },
+  "dependencies": {
+    "postgres": "3.4.9"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.9"
+  }
+}
