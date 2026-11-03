@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { consultaPglite, consultaPostgres, criarCnpj } from './cnpj.js'
 import { createScraperClient } from './scraper.js'
-import { validarConfigSupabase } from './seguranca.js'
+import { criarVerificadorSupabase, validarConfigSupabase } from './seguranca.js'
 import { createApp } from './server.js'
 import { createStore } from './store.js'
 
@@ -32,6 +32,12 @@ const { server, poller } = createApp({
   publicDir: fileURLToPath(new URL('../public', import.meta.url)),
   log: console,
   hostsPermitidos: (env.ALLOWED_HOSTS ?? 'localhost,127.0.0.1').split(',').map((h) => h.trim()),
+  // com o CRM online ligado, a API do PC só atende quem está logado nele (vale também para o túnel)
+  autenticar: supabase && criarVerificadorSupabase(supabase),
+  origensWeb: (env.ORIGENS_WEB || env.WEB_URL || '')
+    .split(',')
+    .filter(Boolean)
+    .map((u) => new URL(u.trim()).origin),
 })
 
 poller.start(Number(env.POLL_MS ?? 15_000))

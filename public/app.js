@@ -51,7 +51,7 @@ async function carregarKanban({ focar, assentar } = {}) {
       vazio
         ? estado({
             titulo: 'Seu kanban está vazio',
-            texto: config.local ? 'Mande empresas pela aba Prospecção ou pelo Google Maps, ou cadastre um lead em "Novo lead".' : 'Mande empresas pela prospecção no seu computador ou cadastre um lead em "Novo lead".',
+            texto: config.local || config.urlPc ? 'Mande empresas pela aba Prospecção ou pelo Google Maps, ou cadastre um lead em "Novo lead".' : 'Mande empresas pela prospecção no seu computador ou cadastre um lead em "Novo lead".',
           })
         : '',
       cortado ? h('p', { class: 'muted pequeno' }, `Mostrando os ${crm.LIMITE_KANBAN} leads mexidos mais recentemente. Use a aba Leads para ver todos.`) : '',
@@ -690,9 +690,10 @@ async function iniciar() {
   $('#btn-sair').prepend(icone('sair'))
   $('#link-web').append(icone('externo', 14))
   $('#btn-iniciar-busca').prepend(icone('buscar'))
-  // abas de prospecção e Google Maps só existem no PC com Docker
-  for (const el of document.querySelectorAll('[data-local]')) el.hidden = !config.local
-  if (!config.local) {
+  // prospecção e Google Maps rodam no PC com Docker; no site da internet aparecem quando há o túnel até ele (urlPc)
+  const temPc = config.local || Boolean(config.urlPc)
+  for (const el of document.querySelectorAll('[data-local]')) el.hidden = !temPc
+  if (!temPc) {
     delete abas.prospeccao
     delete abas.buscas
   }

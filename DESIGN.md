@@ -140,7 +140,7 @@ Bege quente de fundo, cartões brancos, texto azul-marinho e um petróleo para a
 
 ## Layout
 
-Página com margem de 28px (16px no celular), topo fixo com a marca, as abas e a conta. Listas ocupam a largura toda; quando há algo para ler ao lado (ficha do lead, mapa da busca) a tela vira duas colunas: lista flexível e painel fixo de 470px (ficha) ou 440px (mapa).
+Página com margem de 28px (16px no celular), topo fixo com a marca, as abas e a conta. Listas ocupam a largura toda; quando há algo para ler ao lado (ficha do lead, mapa da busca) a tela vira duas colunas: lista flexível e painel fixo de 470px (ficha) ou 440px (mapa). Na Prospecção, os filtros ficam num menu de 300px à esquerda da lista.
 
 Abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo; abaixo de 900px o mapa desce para baixo da lista e as abas descem para uma segunda linha do topo; abaixo de 720px tudo vira uma coluna e botões e campos ganham 44px de altura. Tabelas largas rolam para o lado dentro do próprio cartão, nunca a página.
 
@@ -149,9 +149,9 @@ Abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo;
 Profundidade por sombra em camadas, sempre suave e azulada (rgb 11 18 56), sem borda nos cartões.
 
 ### Shadow Vocabulary
-- **Fina** (`0 0 0 1px rgb(11 18 56 / .06), 0 1px 2px -1px rgb(11 18 56 / .08), 0 2px 4px rgb(11 18 56 / .04)`): cartões, tabelas, barra de filtros, ficha ao lado.
+- **Fina** (`0 0 0 1px rgb(11 18 56 / .06), 0 1px 2px -1px rgb(11 18 56 / .08), 0 2px 4px rgb(11 18 56 / .04)`): cartões, tabelas, menu de filtros, ficha ao lado.
 - **Média** (`0 6px 18px rgb(11 18 56 / .1)`): lista de sugestões dos campos de busca.
-- **Alta** (`0 18px 48px rgb(11 18 56 / .18)`): o que flutua por cima (painel do grupo de filtro, barra de lote, gaveta, aviso).
+- **Alta** (`0 18px 48px rgb(11 18 56 / .18)`): o que flutua por cima (barra de lote, gaveta, aviso).
 
 ## Shapes
 
@@ -165,9 +165,14 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - **Padrão:** fundo branco, borda areia forte; no hover fundo bege e borda petróleo.
 - **Em andamento:** desabilitado com ícone girando e o texto da ação ("Mandando…").
 
-### Barra de filtros (Prospecção)
-- Cada grupo é um botão com contagem dos filtros ligados e seta; abre um painel de 360px por cima da lista, um grupo por vez. Fecha ao clicar fora ou com Esc, e o foco volta ao botão.
-- Logo abaixo, o total da busca e uma etiqueta por filtro ligado; o x tira o filtro e refaz a busca na hora.
+### Menu de filtros (Prospecção)
+- Menu lateral de 300px à esquerda, fixo ao rolar a página e com rolagem própria. Cada grupo é uma seção que abre e fecha, com a contagem dos filtros ligados e a seta; Localização e Ramo começam abertos, e vários podem ficar abertos juntos.
+- O Buscar fica preso no pé do menu, com o aviso de erro logo acima dele.
+- Na coluna da lista, o total da busca e uma etiqueta por filtro ligado; o x tira o filtro e refaz a busca na hora.
+- Abaixo de 900px o menu sobe para cima da lista, sem ficar fixo.
+
+### Nova busca (Google Maps)
+- Campos separados na mesma linha: Ramo (vários separados por vírgula), Cidade, Bairro opcional e o botão Iniciar busca. Cada ramo vira um termo "ramo em cidade" para o scraper.
 
 ### Barra de lote
 - Barra marinho fixa no centro de baixo, com a contagem, "Limpar" e o botão branco "Mandar N para o kanban". Aparece com a primeira empresa marcada, entra subindo 12px em 220ms. Enquanto está na tela o aviso flutuante sobe para não ficar por baixo.

@@ -1,3 +1,5 @@
+import { config, supabase } from './supa.js'
+
 export const $ = (s) => document.querySelector(s)
 
 // Monta DOM sem innerHTML: texto vira text node, então dado do usuário ou do scraper nunca é interpretado como HTML
@@ -50,8 +52,16 @@ export function icone(nome, tamanho = 16) {
   return s
 }
 
+// No PC a API é o próprio servidor; no site da internet, o PC pelo túnel (config.urlPc). Vai sempre com o login do CRM.
 export async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(path, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body && JSON.stringify(body) })
+  const token = supabase && (await supabase.auth.getSession()).data.session?.access_token
+  const headers = { ...(body && { 'content-type': 'application/json' }), ...(token && { authorization: `Bearer ${token}` }) }
+  let res
+  try {
+    res = await fetch((config.local ? '' : config.urlPc) + path, { method, headers, body: body && JSON.stringify(body) })
+  } catch {
+    throw new Error(config.local ? 'O servidor do PC não respondeu. Confira se o Docker está rodando.' : 'O PC da prospecção está desligado ou sem internet. Prospecção e Google Maps voltam quando ele ligar.')
+  }
   if (res.status === 204) return null
   const json = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(json.erro ?? `Erro ${res.status}`)

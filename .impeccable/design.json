@@ -14,9 +14,9 @@
       "rotulo-coluna": { "displayName": "Rótulo de coluna", "purpose": "Cabeçalho de tabela e títulos de seção da ficha, em maiúsculas." }
     },
     "shadows": [
-      { "name": "fina", "value": "0 0 0 1px rgb(11 18 56 / 0.06), 0 1px 2px -1px rgb(11 18 56 / 0.08), 0 2px 4px rgb(11 18 56 / 0.04)", "purpose": "Cartões, tabelas, barra de filtros e ficha ao lado." },
+      { "name": "fina", "value": "0 0 0 1px rgb(11 18 56 / 0.06), 0 1px 2px -1px rgb(11 18 56 / 0.08), 0 2px 4px rgb(11 18 56 / 0.04)", "purpose": "Cartões, tabelas, menu de filtros e ficha ao lado." },
       { "name": "media", "value": "0 6px 18px rgb(11 18 56 / 0.1)", "purpose": "Lista de sugestões dos campos." },
-      { "name": "alta", "value": "0 18px 48px rgb(11 18 56 / 0.18)", "purpose": "O que flutua: painel de filtro, barra de lote, gaveta, aviso." }
+      { "name": "alta", "value": "0 18px 48px rgb(11 18 56 / 0.18)", "purpose": "O que flutua: barra de lote, gaveta, aviso." }
     ],
     "motion": [
       { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Entrada e mudança de estado." },

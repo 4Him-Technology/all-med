@@ -37,11 +37,28 @@ const uuid = (id) => {
   return id
 }
 
+const LOCAIS = new Set(['localhost', '127.0.0.1'])
+const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, PATCH', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
+
 // config: { supabaseUrl, supabaseKey, urlWeb } (só a chave pública; ver validarConfigSupabase)
-export function createApp({ store, scraper, cnpj, publicDir, log, config = null, hostsPermitidos = ['localhost', '127.0.0.1'] }) {
+// autenticar: (token) => usuário ou null; com ele, toda chamada da API exige o login do CRM (é o que deixa abrir o PC pelo túnel)
+// origensWeb: endereços do site na internet que podem chamar a API do PC (CORS)
+export function createApp({ store, scraper, cnpj, publicDir, log, config = null, hostsPermitidos = ['localhost', '127.0.0.1'], autenticar = null, origensWeb = [], limite = { max: 300, janelaMs: 60_000 } }) {
   const poller = createPoller({ store, scraper, log })
   const seguranca = cabecalhosSeguranca(config?.supabaseUrl)
   const configJs = `export default ${JSON.stringify({ ...config, local: true })}\n`
+
+  // janela fixa por endereço; quem chega pelo túnel traz o IP de verdade em cf-connecting-ip
+  const chamadas = new Map()
+  function excedeu(req) {
+    const ip = String(req.headers['cf-connecting-ip'] ?? req.socket.remoteAddress)
+    const agora = Date.now()
+    const c = chamadas.get(ip)
+    if (c && c.inicio + limite.janelaMs > agora) return ++c.n > limite.max
+    if (chamadas.size >= 10_000) chamadas.clear()
+    chamadas.set(ip, { inicio: agora, n: 1 })
+    return false
+  }
 
   const rotas = [
     ['GET', /^\/api\/buscas$/, (_req, url) => [200, store.listBuscas(Object.fromEntries(url.searchParams))]],
@@ -89,26 +106,44 @@ export function createApp({ store, scraper, cnpj, publicDir, log, config = null,
     }
   }
 
-  const responder = (res, status, body) => {
-    if (body === undefined || status === 204) return res.writeHead(status, seguranca).end()
-    res.writeHead(status, { ...seguranca, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(body))
+  const responder = (res, status, body, extra = {}) => {
+    if (body === undefined || status === 204) return res.writeHead(status, { ...seguranca, ...extra }).end()
+    res.writeHead(status, { ...seguranca, ...extra, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(body))
+  }
+
+  // null quando pode seguir; senão a resposta de recusa
+  async function barrar(req, host) {
+    if (excedeu(req)) return [429, { erro: 'Muitas chamadas seguidas. Espere um minuto e tente de novo.' }]
+    if (!autenticar) return LOCAIS.has(host) ? null : [403, { erro: 'Sem o CRM online configurado, só o próprio PC usa a prospecção.' }]
+    const token = String(req.headers.authorization ?? '').replace(/^Bearer /, '')
+    try {
+      return (await autenticar(token)) ? null : [401, { erro: 'Sua sessão expirou. Entre de novo para usar a prospecção.' }]
+    } catch (err) {
+      log.error(`conferir login: ${err.message}`)
+      return [503, { erro: 'Não consegui conferir o seu login agora. Tente de novo em instantes.' }]
+    }
   }
 
   const server = createServer(async (req, res) => {
-    // protege contra DNS rebinding: o servidor local não tem login e só deve atender o próprio PC
+    // protege contra DNS rebinding: só atende pelos nomes conhecidos (o próprio PC e, com túnel, o endereço dele)
     const host = String(req.headers.host ?? '').replace(/:\d+$/, '')
     if (!hostsPermitidos.includes(host)) return responder(res, 403, { erro: 'Host não permitido' })
 
     const url = new URL(req.url, 'http://localhost')
+    const api = url.pathname.startsWith('/api/')
+    const cors = api && origensWeb.includes(req.headers.origin) ? { 'access-control-allow-origin': req.headers.origin, vary: 'Origin' } : {}
     try {
-      if (url.pathname.startsWith('/api/')) {
+      if (api) {
+        if (req.method === 'OPTIONS') return cors['access-control-allow-origin'] ? res.writeHead(204, { ...seguranca, ...cors, ...PREFLIGHT }).end() : responder(res, 403, { erro: 'Origem não permitida' })
+        const recusa = await barrar(req, host)
+        if (recusa) return responder(res, ...recusa, cors)
         for (const [metodo, padrao, handler] of rotas) {
           const m = url.pathname.match(padrao)
           if (!m || metodo !== req.method) continue
           const [status, body] = await handler(req, url, m[1])
-          return responder(res, status, body)
+          return responder(res, status, body, cors)
         }
-        return responder(res, 404, { erro: 'Rota não encontrada' })
+        return responder(res, 404, { erro: 'Rota não encontrada' }, cors)
       }
       // config gerada a partir do .env; tem prioridade sobre um config.js de build que esteja na pasta
       if (req.method === 'GET' && url.pathname === '/config.js') {
@@ -117,11 +152,11 @@ export function createApp({ store, scraper, cnpj, publicDir, log, config = null,
       if (req.method === 'GET' && (await estatico(res, url.pathname))) return
       return responder(res, 404, { erro: 'Não encontrado' })
     } catch (err) {
-      if (err instanceof ValidationError) return responder(res, 422, { erro: err.message })
-      if (err instanceof NotFoundError) return responder(res, 404, { erro: err.message })
-      if (err instanceof HttpError) return responder(res, err.status, { erro: err.message })
+      if (err instanceof ValidationError) return responder(res, 422, { erro: err.message }, cors)
+      if (err instanceof NotFoundError) return responder(res, 404, { erro: err.message }, cors)
+      if (err instanceof HttpError) return responder(res, err.status, { erro: err.message }, cors)
       log.error(`${req.method} ${url.pathname}: ${err.stack}`)
-      return responder(res, 500, { erro: 'Erro interno' })
+      return responder(res, 500, { erro: 'Erro interno' }, cors)
     }
   })
 
