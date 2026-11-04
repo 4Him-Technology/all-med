@@ -123,6 +123,32 @@ test('anon não executa as funções; authenticated executa', async () => {
   await db.exec('reset role')
 })
 
+test('montagem descarta linhas repetidas da Receita (estabelecimento, empresa e Simples)', async () => {
+  const banco = await criarBancoCnpj()
+  const repetir = (tabela, onde) => banco.query(`insert into cnpj_carga.${tabela} select * from cnpj_carga.${tabela} where ${onde}`)
+  await repetir('estabelecimentos_raw', `cnpj_basico = '11111111' and cnpj_ordem = '0002'`)
+  await repetir('empresas_raw', `cnpj_basico = '22222222'`)
+  await repetir('simples_raw', `cnpj_basico = '33333333'`)
+  await repetir('socios_raw', `cnpj_basico = '11111111'`)
+  await banco.query(`select cnpj_carga.montar('cnpj_novo', null, 2)`)
+  await banco.query(`select cnpj_carga.publicar('cnpj_novo', '2026-11')`)
+  const linhas = (await banco.query('select cnpj, razao_social, mei from cnpj.estabelecimentos order by cnpj')).rows
+  assert.deepEqual(linhas.map((l) => l.cnpj), [SORRISO, SORRISO_FILIAL, BOM_PRATO, MEI, INDUSTRIA])
+  assert.equal(linhas.find((l) => l.cnpj === MEI).mei, true)
+  assert.equal((await banco.query(`select count(*)::int as n from cnpj.socios where cnpj_basico = '11111111'`)).rows[0].n, 2)
+  // toda tabela da base nasce com RLS ligada (o acesso é só pelas funções public.*)
+  const semRls = (await banco.query(`select relname from pg_class where relnamespace = 'cnpj'::regnamespace and relkind = 'r' and not relrowsecurity`)).rows
+  assert.deepEqual(semRls, [])
+})
+
+test('com estados escolhidos, empresas de fora não entram na montagem', async () => {
+  const banco = await criarBancoCnpj()
+  await banco.query(`insert into cnpj_carga.empresas_raw values ('55555555', 'EMPRESA SEM ESTABELECIMENTO EM SP', '2062', '49', '1,00', '01', '')`)
+  await banco.query(`select cnpj_carga.montar('cnpj_novo', array['SP'], 2)`)
+  await banco.query(`select cnpj_carga.publicar('cnpj_novo', '2026-11')`)
+  assert.equal((await banco.query('select count(*)::int as n from cnpj.estabelecimentos')).rows[0].n, 5)
+})
+
 test('nova carga troca a base e guarda a anterior para rollback', async () => {
   await db.query(`select cnpj_carga.montar('cnpj_novo', array['RJ'], 2)`)
   await db.query(`select cnpj_carga.publicar('cnpj_novo', '2026-11')`)

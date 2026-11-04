@@ -1,6 +1,7 @@
 // Carga mensal da base de CNPJ da Receita num Postgres (Supabase ou outro) que já tenha a migration aplicada.
 //
 //   DATABASE_URL=postgres://... node importador/importar.js [--mes 2026-10] [--ufs SP,RJ] [--min-empresas-email 5]
+//   --retomar (com --mes): não baixa nada; monta e publica a partir dos arquivos que já estão nas tabelas de chegada
 //
 // Use a conexão direta ou o session pooler (porta 5432): o transaction pooler não aceita COPY.
 // Baixa e descompacta em streaming, sem gravar em disco. Os dados descompactados passam de 25 GB,
@@ -13,7 +14,7 @@ import postgres from 'postgres'
 import { BASE_URL, PLANO, conteudoZip, filtroUf, semNulos, ultimoMes } from './receita.js'
 
 const { values } = parseArgs({
-  options: { mes: { type: 'string' }, ufs: { type: 'string' }, 'min-empresas-email': { type: 'string', default: '5' } },
+  options: { mes: { type: 'string' }, ufs: { type: 'string' }, 'min-empresas-email': { type: 'string', default: '5' }, retomar: { type: 'boolean', default: false } },
 })
 
 function falhar(msg) {
@@ -27,12 +28,15 @@ if (ufs?.some((u) => !/^[A-Z]{2}$/.test(u))) falhar('--ufs deve ser uma lista de
 const minEmail = Number(values['min-empresas-email'])
 if (!Number.isInteger(minEmail) || minEmail < 2) falhar('--min-empresas-email deve ser um inteiro a partir de 2')
 
+// ao retomar, o mês é o dos arquivos já gravados, não o mais recente publicado pela Receita
+if (values.retomar && !values.mes) falhar('Com --retomar, informe também --mes (o mês dos arquivos que já estão no banco), ex.: --mes 2026-10')
 const mes = values.mes ?? (await ultimoMes())
 if (!/^\d{4}-\d{2}$/.test(mes)) falhar('--mes deve estar no formato AAAA-MM')
 
 const sql = postgres(process.env.DATABASE_URL, {
   max: 1,
-  onnotice: () => {},
+  // dos avisos do banco, só interessa o de CNPJs repetidos; o resto é "não existe, pulando"
+  onnotice: (n) => n.message.startsWith('CNPJs repetidos') && console.info(n.message),
   connection: { statement_timeout: 0, application_name: 'importador-cnpj' },
 })
 
@@ -57,12 +61,18 @@ async function carregar({ arquivo, tabela }, tentativas = 3) {
 }
 
 try {
-  console.info(`Carga de ${mes}, ${ufs ? `UFs ${ufs.join(', ')}` : 'Brasil inteiro'}`)
-  await sql`select cnpj_carga.criar_staging()`
-  for (const item of PLANO) {
-    const inicio = Date.now()
-    await carregar(item)
-    console.info(`${item.arquivo} carregado em ${Math.round((Date.now() - inicio) / 1000)} s`)
+  console.info(`Carga de ${mes}, ${ufs ? `UFs ${ufs.join(', ')}` : 'Brasil inteiro'}${values.retomar ? ', retomando dos arquivos já gravados' : ''}`)
+  if (values.retomar) {
+    // sem arquivos guardados, montar publicaria uma base vazia por cima da atual
+    const [{ tem }] = await sql`select exists (select 1 from cnpj_carga.estabelecimentos_raw) as tem`
+    if (!tem) throw new Error('não há arquivos guardados para retomar; rode a carga completa, sem --retomar')
+  } else {
+    await sql`select cnpj_carga.criar_staging()`
+    for (const item of PLANO) {
+      const inicio = Date.now()
+      await carregar(item)
+      console.info(`${item.arquivo} carregado em ${Math.round((Date.now() - inicio) / 1000)} s`)
+    }
   }
   console.info('Montando a base final (pode levar horas no Brasil inteiro)...')
   const [{ linhas }] = await sql`select cnpj_carga.montar('cnpj_novo', ${ufs}::text[], ${minEmail}) as linhas`

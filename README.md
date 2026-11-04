@@ -57,7 +57,7 @@ docker compose --profile maps up -d
 
 Detalhes:
 
-- A migration da base de CNPJ ([db-local/migrations/](db-local/migrations/)) roda sozinha na primeira subida, com o volume do banco vazio. Uma migration nova depois disso: `docker compose exec -T db psql -U postgres < db-local/migrations/<arquivo>.sql`.
+- A migration da base de CNPJ ([db-local/migrations/](db-local/migrations/)) roda sozinha na primeira subida, com o volume do banco vazio. Uma migration nova depois disso: `docker compose cp db-local/migrations/<arquivo>.sql db:/tmp/m.sql` e `docker compose exec db psql -U postgres -v ON_ERROR_STOP=1 -f /tmp/m.sql` (o `<` do bash não funciona no PowerShell).
 - Backup: o que importa está no Supabase (faça o backup por lá). No PC ficam só a base de CNPJ, que dá para recarregar da Receita, e as buscas do Maps ainda não enviadas, no volume `crmdata`.
 - Para voltar a base de CNPJ ao mês anterior: `docker compose exec db psql -U postgres -c "select cnpj_carga.reverter()"`.
 - As portas ficam presas em `127.0.0.1`: a tela local não tem login próprio e não deve ser aberta na rede.
