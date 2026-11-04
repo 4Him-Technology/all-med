@@ -1256,9 +1256,10 @@ dialog.saindo::backdrop {
   gap: 8px 10px;
 }
 
+/* um embaixo do outro: no menu de 300px o campo de data não cabe pela metade e cortava o segundo campo do par */
 .par {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
