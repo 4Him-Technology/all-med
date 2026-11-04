@@ -18,13 +18,17 @@ A mesma pasta `public/` serve as duas partes. No PC, o servidor local entrega a 
 3. Em Authentication > Users, crie o seu usuário com e-mail e senha. Depois, em Authentication > Sign In / Providers, desligue o cadastro aberto ("Allow new users to sign up").
 4. Copie a URL do projeto e a chave pública (Project Settings > API) para o `.env` (veja o `.env.example`). Nunca use a chave secreta: ela vai para o navegador e passa por cima da RLS. O código recusa a chave secreta se ela for colocada no lugar errado.
 
-O que a migration garante no banco, testado em [test/crm-sql.test.js](test/crm-sql.test.js):
+Depois, as migrations seguintes da mesma pasta, em ordem, e a função de cadastro de usuários ([INSTALAR.md](INSTALAR.md), "Usuários da equipe").
 
-- cada usuário só vê e altera os próprios leads e atendimentos (RLS); visitante sem login não lê nada;
-- dono, origem, CNPJ e datas não podem ser alterados depois de criados (permissão por coluna);
+O que as migrations garantem no banco, testado em [test/crm-sql.test.js](test/crm-sql.test.js):
+
+- a equipe (membros ativos) vê e trabalha os mesmos leads e atendimentos (RLS); conta fora da equipe, membro desativado e visitante sem login não leem nada;
+- só a função `usuarios`, com a chave secreta, cadastra e desativa membros, e só a pedido de um admin ([test/usuarios.test.js](test/usuarios.test.js));
+- quem criou, origem, CNPJ e datas não podem ser alterados depois de criados (permissão por coluna);
 - nada é apagado de verdade: arquivar preenche `deleted_at`, e o histórico de atendimentos é imutável;
 - mudança de coluna no kanban grava sozinha no histórico, e o usuário não consegue forjar esse registro;
-- a mesma empresa (CNPJ ou lugar do Maps) não entra duas vezes para o mesmo usuário, nem depois de arquivada;
+- a mesma empresa (CNPJ ou lugar do Maps) não entra duas vezes na equipe, nem depois de arquivada;
+- a conta de quem criou um lead não pode ser apagada (o trabalho é da equipe); para tirar alguém, desativa-se;
 - site, e-mails, CNPJ, avaliação e tamanhos de texto são validados por CHECK.
 
 ## 2. Rodar a parte do PC (Docker)

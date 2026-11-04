@@ -135,6 +135,20 @@ Use um subdomínio de um nível só (`allmed-pc.4him.com.br`, e não `pc.allmed.
 
 Daí em diante, o dia a dia usa `--profile maps --profile tunel` nos comandos de subir, parar e atualizar.
 
+## Usuários da equipe
+
+Todos os usuários cadastrados trabalham nos mesmos leads e no mesmo kanban. Quem é **Administrador** vê a aba **Usuários**, onde cadastra, desativa e reativa pessoas. Cada um troca a própria senha no botão **Senha**, no topo.
+
+Instalação (uma vez), no painel do CRM online, nesta ordem e de uma vez só:
+
+1. **Regras da equipe:** em **SQL Editor**, abra uma consulta nova, cole o conteúdo de `supabase/migrations/20261103180000_equipe.sql` e clique em **Run**. Quem já tem conta (você) vira Administrador.
+2. **Função de cadastro:** em **Edge Functions**, clique em **Deploy a new function** > **Via Editor**. Dê o nome `usuarios`, apague o código de exemplo, cole o conteúdo de `supabase/functions/usuarios/index.ts` e clique em **Deploy**. Deixe ligada a opção de verificar o JWT (vem ligada).
+3. **Tela:** aprove o PR no GitHub (o site atualiza sozinho) e, neste PC, rode `git pull` e `docker compose up -d --build app`.
+
+Entre os passos 1 e 3 o envio de empresas ao kanban dá erro, porque a regra de "empresa repetida" muda de "por usuário" para "da equipe". Por isso, faça os três em sequência.
+
+Para desfazer: o script de volta está no topo de `supabase/migrations/20261103180000_equipe.sql`; a função se apaga em **Edge Functions**; e o código volta revertendo o PR.
+
 ## Dia a dia
 
 - Com o Docker Desktop abrindo no login, o sistema sobe sozinho com o PC. É só abrir http://localhost:3000.
