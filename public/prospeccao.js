@@ -272,7 +272,7 @@ function montarFormulario(form) {
     grupo(
       'abertura',
       'Abertura e capital',
-      h('div', { class: 'par' }, h('label', {}, 'Aberta de', h('input', { type: 'date', name: 'abertura_de' })), h('label', {}, 'até', h('input', { type: 'date', name: 'abertura_ate' }))),
+      h('div', { class: 'par' }, h('label', {}, 'Aberta de', h('input', { type: 'date', name: 'abertura_de' })), h('label', {}, 'Aberta até', h('input', { type: 'date', name: 'abertura_ate' }))),
       h('div', { class: 'par' }, h('label', {}, 'Capital mínimo (R$)', h('input', { type: 'number', inputmode: 'numeric', name: 'capital_min', min: '0', step: '1000' })), h('label', {}, 'Capital máximo (R$)', h('input', { type: 'number', inputmode: 'numeric', name: 'capital_max', min: '0', step: '1000' }))),
     ),
     grupo('contato', 'Contato e sócios', caixas('contato', CONTATO), h('p', { class: 'muted pequeno' }, 'Idade do sócio principal (a Receita informa só a faixa)'), caixas('faixas_socio', FAIXAS)),
