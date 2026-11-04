@@ -31,10 +31,12 @@
         <button type="button" class="aba" data-aba="leads" data-crm>Leads</button>
         <button type="button" class="aba" data-aba="prospeccao" data-local hidden>Prospecção</button>
         <button type="button" class="aba" data-aba="buscas" data-local hidden>Google Maps</button>
+        <button type="button" class="aba" data-aba="usuarios" hidden>Usuários</button>
       </nav>
       <div class="conta">
         <a id="link-web" class="botao" target="_blank" rel="noopener noreferrer" hidden>CRM online</a>
         <span id="usuario" class="muted pequeno"></span>
+        <button type="button" id="btn-senha" hidden>Senha</button>
         <button type="button" id="btn-sair" hidden>Sair</button>
         <button type="button" id="btn-novo-lead" class="primario" data-crm>Novo lead</button>
       </div>
@@ -123,6 +125,33 @@
           <p class="muted pequeno">Cada busca leva alguns minutos. Vá com calma no volume: muitas buscas seguidas fazem o Google bloquear.</p>
         </form>
         <div id="lista-buscas" class="buscas"></div>
+      </section>
+
+      <section id="aba-usuarios" aria-label="Usuários da equipe" hidden>
+        <form id="form-usuario" class="nova-busca" aria-labelledby="novo-usuario-titulo">
+          <h2 id="novo-usuario-titulo" class="titulo-bloco">Novo usuário</h2>
+          <div class="linha-usuario">
+            <label>Nome <input name="nome" required maxlength="100" autocomplete="off" /></label>
+            <label>E-mail <input name="email" type="email" inputmode="email" required maxlength="200" autocomplete="off" spellcheck="false" /></label>
+            <label>Senha inicial <input name="senha" type="password" required minlength="8" maxlength="72" autocomplete="new-password" /></label>
+            <label>Papel
+              <select name="papel">
+                <option value="membro">Membro</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </label>
+            <button class="primario">Cadastrar</button>
+          </div>
+          <p class="muted pequeno">Todos da equipe veem e trabalham os mesmos leads. Administrador também cadastra e desativa usuários. Passe o e-mail e a senha inicial para a pessoa; ela troca a senha depois, no botão Senha do topo.</p>
+        </form>
+        <div class="tabela-wrap">
+          <table class="tabela">
+            <thead>
+              <tr><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Papel</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
+            </thead>
+            <tbody id="lista-usuarios"></tbody>
+          </table>
+        </div>
       </section>
     </main>
 

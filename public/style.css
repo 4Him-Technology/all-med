@@ -1479,6 +1479,40 @@ th[aria-sort="ascending"] .ordenar .ico {
   margin: 0;
 }
 
+/* ---------- usuários da equipe ---------- */
+.titulo-bloco {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.linha-usuario {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.9fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+#aba-usuarios .tabela-wrap {
+  margin-top: 0;
+}
+
+.pill.membro-ativo {
+  --cor: var(--ganho);
+}
+
+.pill.membro-inativo {
+  --cor: var(--perdido);
+}
+
+#lista-usuarios tr.inativo td:not(:last-child) {
+  color: var(--muted);
+}
+
+.acoes-linha {
+  text-align: right;
+}
+
 .buscas {
   display: flex;
   flex-direction: column;
@@ -1983,6 +2017,9 @@ th[aria-sort="ascending"] .ordenar .ico {
   .conta {
     margin-left: auto;
   }
+  .linha-usuario {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
   /* o menu de filtros sobe para cima da lista */
   #aba-prospeccao:not([hidden]) {
     grid-template-columns: minmax(0, 1fr);
@@ -2017,7 +2054,8 @@ th[aria-sort="ascending"] .ordenar .ico {
   .coluna {
     scroll-snap-align: start;
   }
-  .nova-linha {
+  .nova-linha,
+  .linha-usuario {
     grid-template-columns: minmax(0, 1fr);
   }
   .mapa {

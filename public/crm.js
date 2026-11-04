@@ -1,4 +1,4 @@
-// Leads, kanban e histórico no Supabase. Quem é dono de quê a RLS decide; aqui é só leitura e gravação.
+// Leads, kanban, histórico e equipe no Supabase. Quem vê o quê a RLS decide; aqui é só leitura e gravação.
 import { mensagemErro, termoBusca } from './campos.js'
 import { STATUS } from './rotulos.js'
 import { supabase } from './supa.js'
@@ -74,12 +74,33 @@ export const atualizarLead = async (id, campos) => ok(await cliente().from('lead
 export const arquivarLead = async (id) => ok(await cliente().from('leads').update({ deleted_at: new Date().toISOString() }).eq('id', id).select('id').single())
 export const registrarAtendimento = async (leadId, a) => ok(await cliente().from('atendimentos').insert({ lead_id: leadId, ...a }).select('id').single())
 
-// Manda leads em lotes; os que já estão no CRM (mesmo place_id do Maps ou mesmo CNPJ) o banco ignora
+// Manda leads em lotes; os que já estão no CRM da equipe (mesmo place_id do Maps ou mesmo CNPJ) o banco ignora
 export async function enviarLeads(leads, chave = 'place_id') {
   let novos = 0
   for (let i = 0; i < leads.length; i += 500) {
-    const { data } = ok(await cliente().from('leads').upsert(leads.slice(i, i + 500), { onConflict: `user_id,${chave}`, ignoreDuplicates: true }).select('id'))
+    const { data } = ok(await cliente().from('leads').upsert(leads.slice(i, i + 500), { onConflict: chave, ignoreDuplicates: true }).select('id'))
     novos += data.length
   }
   return novos
+}
+
+// ---------- equipe ----------
+// a linha de quem está logado diz se ele entra nos leads (ativo) e se cadastra usuários (admin)
+export const meuPerfil = async (userId) => ok(await cliente().from('membros').select('nome,papel,ativo').eq('user_id', userId).maybeSingle()).data
+export const listarMembros = async () => ok(await cliente().from('membros').select('user_id,nome,email,papel,ativo').order('nome')).data
+
+// cadastrar, desativar e reativar passam pela função "usuarios", a única com a chave secreta
+export async function gerirUsuario(corpo) {
+  const { data, error } = await cliente().functions.invoke('usuarios', { body: corpo })
+  if (!error) return data
+  console.error('usuarios:', error.message)
+  const motivo = await error.context?.json?.().then((j) => j.erro, () => null)
+  throw new Error(motivo ?? 'O cadastro de usuários não respondeu. Confira se a função "usuarios" está instalada no CRM online.')
+}
+
+export async function trocarSenha(senha) {
+  const { error } = await cliente().auth.updateUser({ password: senha })
+  if (!error) return
+  console.error('senha:', error.code)
+  throw new Error({ same_password: 'A senha nova é igual à atual.', weak_password: 'Senha fraca: use pelo menos 8 caracteres.' }[error.code] ?? 'Não foi possível trocar a senha.')
 }

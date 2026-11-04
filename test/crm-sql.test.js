@@ -1,26 +1,38 @@
-// Roda a migration do CRM (supabase/migrations) num Postgres em memória com o esquema auth simulado como no Supabase
+// Roda as migrations do CRM (supabase/migrations) num Postgres em memória com o esquema auth simulado como no Supabase
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { before, test } from 'node:test'
 import { PGlite } from '@electric-sql/pglite'
 
 const MIGRATIONS = new URL('../supabase/migrations/', import.meta.url)
-const ANA = '11111111-1111-4111-8111-111111111111'
-const BRUNO = '22222222-2222-4222-8222-222222222222'
+const ANA = '11111111-1111-4111-8111-111111111111' // admin da equipe
+const BRUNO = '22222222-2222-4222-8222-222222222222' // membro
+const CARLA = '33333333-3333-4333-8333-333333333333' // tem conta, mas não é da equipe
+const DANI = '44444444-4444-4444-8444-444444444444' // membro desativado
 let db
+
+const AUTH_SUPABASE = `
+  create role anon nologin; create role authenticated nologin;
+  create schema auth;
+  create table auth.users (id uuid primary key, email text);
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  grant usage on schema auth to anon, authenticated;
+  grant usage on schema public to anon, authenticated;
+`
+const migrar = async (banco) => {
+  for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()) await banco.exec(readFileSync(new URL(f, MIGRATIONS), 'utf8'))
+}
 
 before(async () => {
   db = new PGlite()
-  await db.exec(`
-    create role anon nologin; create role authenticated nologin;
-    create schema auth;
-    create table auth.users (id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-    grant usage on schema auth to anon, authenticated;
-    grant usage on schema public to anon, authenticated;
-  `)
-  for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()) await db.exec(readFileSync(new URL(f, MIGRATIONS), 'utf8'))
-  await db.query('insert into auth.users values ($1), ($2)', [ANA, BRUNO])
+  await db.exec(AUTH_SUPABASE)
+  await migrar(db)
+  for (const [id, email] of [[ANA, 'ana@x.com'], [BRUNO, 'bruno@x.com'], [CARLA, 'carla@x.com'], [DANI, 'dani@x.com']]) await db.query('insert into auth.users values ($1, $2)', [id, email])
+  await db.query(
+    `insert into public.membros (user_id, email, nome, papel, ativo) values
+      ($1, 'ana@x.com', 'Ana', 'admin', true), ($2, 'bruno@x.com', 'Bruno', 'membro', true), ($3, 'dani@x.com', 'Dani', 'membro', false)`,
+    [ANA, BRUNO, DANI],
+  )
 })
 
 // executa como um usuário logado do Supabase (papel authenticated + sub do JWT)
@@ -39,16 +51,21 @@ const novoLead = async (uid, campos = {}) => {
   return (await como(uid, `insert into public.leads (${cols.join(',')}) values (${cols.map((_, i) => `$${i + 1}`).join(',')}) returning *`, Object.values(c)))[0]
 }
 
-test('cada usuário vê só os próprios leads', async () => {
+test('a equipe vê e trabalha os mesmos leads; quem está fora ou foi desativado não vê nada', async () => {
   const l = await novoLead(ANA, { nome: 'Clínica da Ana' })
   assert.equal(l.user_id, ANA)
   assert.equal(l.status, 'novo')
   assert.equal(l.origem, 'manual')
-  assert.equal((await como(BRUNO, 'select * from public.leads where id = $1', [l.id])).length, 0)
-  assert.equal((await como(BRUNO, `update public.leads set nome = 'roubado' where id = $1 returning id`, [l.id])).length, 0)
+  assert.equal((await como(BRUNO, 'select * from public.leads where id = $1', [l.id])).length, 1)
+  assert.equal((await como(BRUNO, `update public.leads set temperatura = 'quente' where id = $1 returning id`, [l.id])).length, 1)
+  for (const fora of [CARLA, DANI]) {
+    assert.equal((await como(fora, 'select * from public.leads where id = $1', [l.id])).length, 0)
+    assert.equal((await como(fora, `update public.leads set nome = 'roubado' where id = $1 returning id`, [l.id])).length, 0)
+    await assert.rejects(novoLead(fora, { nome: 'intruso' }), /row-level security/)
+  }
 })
 
-test('não dá para criar lead em nome de outro nem trocar o dono', async () => {
+test('não dá para criar lead em nome de outro nem trocar quem criou', async () => {
   await assert.rejects(como(ANA, `insert into public.leads (nome, user_id) values ('x', $1)`, [BRUNO]), /permission denied|row-level security/)
   const l = await novoLead(ANA)
   await assert.rejects(como(ANA, 'update public.leads set user_id = $1 where id = $2', [BRUNO, l.id]), /permission denied/)
@@ -58,39 +75,39 @@ test('não dá para criar lead em nome de outro nem trocar o dono', async () => 
 test('lead não é apagado de verdade; arquivar é preencher deleted_at', async () => {
   const l = await novoLead(ANA)
   await assert.rejects(como(ANA, 'delete from public.leads where id = $1', [l.id]), /permission denied/)
-  await como(ANA, 'update public.leads set deleted_at = now() where id = $1', [l.id])
+  await como(BRUNO, 'update public.leads set deleted_at = now() where id = $1', [l.id])
   assert.equal((await como(ANA, 'select * from public.leads_kanban where id = $1', [l.id])).length, 0)
   // arquivado não é mais editável
   assert.equal((await como(ANA, `update public.leads set nome = 'volta' where id = $1 returning id`, [l.id])).length, 0)
 })
 
-test('mudança de status entra sozinha no histórico, só quando muda', async () => {
+test('mudança de status entra sozinha no histórico, em nome de quem mudou, só quando muda', async () => {
   const l = await novoLead(ANA)
-  await como(ANA, `update public.leads set status = 'proposta' where id = $1`, [l.id])
-  await como(ANA, `update public.leads set status = 'proposta', observacoes = 'x' where id = $1`, [l.id])
-  const h = await como(ANA, 'select tipo, descricao from public.atendimentos where lead_id = $1', [l.id])
-  assert.deepEqual(h, [{ tipo: 'status', descricao: 'Status alterado de Novo para Proposta' }])
+  await como(BRUNO, `update public.leads set status = 'proposta' where id = $1`, [l.id])
+  await como(BRUNO, `update public.leads set status = 'proposta', observacoes = 'x' where id = $1`, [l.id])
+  const h = await como(ANA, 'select tipo, descricao, user_id from public.atendimentos where lead_id = $1', [l.id])
+  assert.deepEqual(h, [{ tipo: 'status', descricao: 'Status alterado de Novo para Proposta', user_id: BRUNO }])
   const [atual] = await como(ANA, 'select created_at, updated_at from public.leads where id = $1', [l.id])
   assert.ok(atual.updated_at > atual.created_at)
 })
 
-test('atendimento manual só no próprio lead e nunca forjando mudança de status', async () => {
+test('atendimento manual em qualquer lead da equipe, nunca forjando mudança de status', async () => {
   const l = await novoLead(ANA)
-  const [a] = await como(ANA, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'Falei com a dona') returning *`, [l.id])
-  assert.equal(a.user_id, ANA)
+  const [a] = await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'Falei com a dona') returning *`, [l.id])
+  assert.equal(a.user_id, BRUNO)
   await assert.rejects(como(ANA, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'status', 'forjado')`, [l.id]), /row-level security/)
-  await assert.rejects(como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'intruso')`, [l.id]), /row-level security/)
+  await assert.rejects(como(CARLA, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'intruso')`, [l.id]), /row-level security/)
+  assert.equal((await como(CARLA, 'select * from public.atendimentos where lead_id = $1', [l.id])).length, 0)
   await assert.rejects(como(ANA, `update public.atendimentos set descricao = 'editado' where id = $1`, [a.id]), /permission denied/)
   await assert.rejects(como(ANA, 'delete from public.atendimentos where id = $1', [a.id]), /permission denied/)
 })
 
-test('a mesma empresa não entra duas vezes para o mesmo usuário, mas outro usuário pode ter', async () => {
+test('a mesma empresa não entra duas vezes na equipe, nem depois de arquivada', async () => {
   await novoLead(ANA, { nome: 'A', cnpj: '11111111000101', origem: 'receita' })
-  await assert.rejects(novoLead(ANA, { nome: 'A de novo', cnpj: '11111111000101' }), (err) => err.code === '23505')
-  assert.equal((await novoLead(BRUNO, { nome: 'A', cnpj: '11111111000101' })).user_id, BRUNO)
+  await assert.rejects(novoLead(BRUNO, { nome: 'A de novo', cnpj: '11111111000101' }), (err) => err.code === '23505')
   // importação do Maps ignora o que já existe
   await novoLead(ANA, { nome: 'P', place_id: 'ChIJ1' })
-  const r = await como(ANA, `insert into public.leads (nome, place_id) values ('P', 'ChIJ1'), ('Q', 'ChIJ2') on conflict (user_id, place_id) do nothing returning nome`)
+  const r = await como(BRUNO, `insert into public.leads (nome, place_id) values ('P', 'ChIJ1'), ('Q', 'ChIJ2') on conflict (place_id) do nothing returning nome`)
   assert.deepEqual(r.map((x) => x.nome), ['Q'])
 })
 
@@ -107,27 +124,53 @@ test('visitante sem login não lê nem grava', async () => {
     await assert.rejects(db.query('select * from public.leads'), /permission denied/)
     await assert.rejects(db.query(`insert into public.leads (nome) values ('x')`), /permission denied/)
     await assert.rejects(db.query('select * from public.leads_kanban'), /permission denied/)
+    await assert.rejects(db.query('select * from public.membros'), /permission denied/)
   } finally {
     await db.exec('reset role')
   }
 })
 
-test('kanban traz o último contato sem contar mudança de status', async () => {
+test('kanban traz o último contato sem contar mudança de status, para a equipe toda', async () => {
   const l = await novoLead(BRUNO, { nome: 'Kanban do Bruno' })
   await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao, data) values ($1, 'whatsapp', 'oi', '2026-10-01T10:00:00Z')`, [l.id])
   await como(BRUNO, `update public.leads set status = 'contato' where id = $1`, [l.id])
-  const [k] = await como(BRUNO, 'select status, ultimo_atendimento from public.leads_kanban where id = $1', [l.id])
+  const [k] = await como(ANA, 'select status, ultimo_atendimento from public.leads_kanban where id = $1', [l.id])
   assert.equal(k.status, 'contato')
   assert.equal(new Date(k.ultimo_atendimento).toISOString(), '2026-10-01T10:00:00.000Z')
-  assert.equal((await como(ANA, 'select * from public.leads_kanban where id = $1', [l.id])).length, 0)
+  assert.equal((await como(CARLA, 'select * from public.leads_kanban where id = $1', [l.id])).length, 0)
 })
 
 test('lista de leads ordena pelo último contato e o envio em lote por CNPJ ignora os repetidos', async () => {
   const a = await novoLead(ANA, { nome: 'Lista A', cnpj: '33333333000101', origem: 'receita' })
   await como(ANA, `insert into public.atendimentos (lead_id, tipo, descricao, data) values ($1, 'ligacao', 'oi', '2026-10-02T10:00:00Z')`, [a.id])
-  const lote = await como(ANA, `insert into public.leads (nome, cnpj, origem) values ('Lista A de novo', '33333333000101', 'receita'), ('Lista B', '44444444000101', 'receita') on conflict (user_id, cnpj) do nothing returning nome`)
+  const lote = await como(BRUNO, `insert into public.leads (nome, cnpj, origem) values ('Lista A de novo', '33333333000101', 'receita'), ('Lista B', '44444444000101', 'receita') on conflict (cnpj) do nothing returning nome`)
   assert.deepEqual(lote.map((l) => l.nome), ['Lista B'])
   const lista = await como(ANA, `select nome, origem, created_at, total_avaliacoes from public.leads_kanban where nome like 'Lista %' order by ultimo_atendimento asc nulls first`)
   assert.deepEqual(lista.map((l) => l.nome), ['Lista B', 'Lista A'])
   assert.ok(lista.every((l) => l.created_at && l.origem === 'receita'))
+})
+
+test('a equipe vê quem faz parte dela, mas ninguém se cadastra nem muda o próprio papel pelo app', async () => {
+  const nomes = (await como(BRUNO, 'select nome from public.membros order by nome')).map((m) => m.nome)
+  assert.deepEqual(nomes, ['Ana', 'Bruno', 'Dani'])
+  assert.equal((await como(CARLA, 'select nome from public.membros')).length, 0)
+  // desativado ainda enxerga a própria linha, para a tela explicar por que está sem acesso
+  assert.deepEqual((await como(DANI, 'select nome, ativo from public.membros')), [{ nome: 'Dani', ativo: false }])
+  await assert.rejects(como(CARLA, `insert into public.membros (user_id, email, nome) values ($1, 'carla@x.com', 'Carla')`, [CARLA]), /permission denied/)
+  await assert.rejects(como(BRUNO, `update public.membros set papel = 'admin' where user_id = $1`, [BRUNO]), /permission denied/)
+})
+
+test('conta que criou leads não pode ser apagada: desativa-se o membro', async () => {
+  await novoLead(BRUNO, { nome: 'Do Bruno' })
+  // 23001 = restrict_violation
+  await assert.rejects(db.query('delete from auth.users where id = $1', [BRUNO]), (err) => err.code === '23001')
+})
+
+test('quem já tinha conta quando a equipe foi criada vira admin', async () => {
+  const banco = new PGlite()
+  await banco.exec(AUTH_SUPABASE)
+  // a primeira migration já cria tabelas ligadas a auth.users; a conta existe antes da migration da equipe
+  await banco.query(`insert into auth.users values ($1, 'dono@exemplo.com')`, [ANA])
+  await migrar(banco)
+  assert.deepEqual((await banco.query('select nome, papel, ativo from public.membros')).rows, [{ nome: 'dono', papel: 'admin', ativo: true }])
 })

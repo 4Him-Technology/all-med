@@ -694,6 +694,72 @@ async function mandarDaBusca(a, botao) {
   carregarBuscas()
 }
 
+// ---------- usuários da equipe (só admin) ----------
+const PAPEL = { admin: 'Administrador', membro: 'Membro' }
+
+async function carregarUsuarios() {
+  const corpo = $('#lista-usuarios')
+  if (!corpo.childElementCount) corpo.replaceChildren(...Array.from({ length: 3 }, () => h('tr', {}, h('td', { colspan: '5' }, esqueleto('linha')))))
+  try {
+    const [membros, { data }] = await Promise.all([crm.listarMembros(), supabase.auth.getSession()])
+    corpo.replaceChildren(...membros.map((m) => linhaUsuario(m, data.session?.user.id)))
+  } catch (err) {
+    corpo.replaceChildren(h('tr', {}, h('td', { colspan: '5' }, estado({ tipo: 'erro', titulo: 'Não foi possível carregar a equipe', texto: err.message, acao: h('button', { type: 'button', onclick: carregarUsuarios }, 'Tentar de novo') }))))
+  }
+}
+
+const linhaUsuario = (m, eu) =>
+  h(
+    'tr',
+    { class: m.ativo ? '' : 'inativo' },
+    h('td', {}, h('strong', {}, m.nome), m.user_id === eu && h('span', { class: 'muted pequeno' }, ' (você)')),
+    h('td', {}, m.email),
+    h('td', {}, PAPEL[m.papel]),
+    h('td', {}, h('span', { class: `pill ${m.ativo ? 'membro-ativo' : 'membro-inativo'}` }, m.ativo ? 'Ativo' : 'Desativado')),
+    // a própria conta não se desativa (a função também recusa): ninguém fica trancado fora sem querer
+    h('td', { class: 'acoes-linha' }, m.user_id !== eu && h('button', { type: 'button', onclick: (e) => alternarUsuario(m, e.currentTarget) }, m.ativo ? 'Desativar' : 'Reativar')),
+  )
+
+async function alternarUsuario(m, botao) {
+  if (m.ativo && !confirm(`Desativar ${m.nome}? A pessoa perde o acesso na hora. Os leads e o histórico dela continuam com a equipe.`)) return
+  const restaurar = carregando(botao, m.ativo ? 'Desativando…' : 'Reativando…')
+  try {
+    await crm.gerirUsuario({ acao: m.ativo ? 'desativar' : 'reativar', user_id: m.user_id })
+    toast(m.ativo ? `${m.nome} desativado` : `${m.nome} reativado`)
+    carregarUsuarios()
+  } catch (err) {
+    toast(err.message, 'erro')
+    restaurar()
+  }
+}
+
+function abrirTrocaSenha() {
+  const dlg = $('#dlg-novo')
+  const senha = (rotulo, name, attrs = {}) => campo(rotulo, name, '', { type: 'password', required: true, minlength: '8', maxlength: '72', autocomplete: 'new-password', class: 'largo', ...attrs })
+  dlg.replaceChildren(
+    h(
+      'form',
+      {
+        class: 'grade',
+        onsubmit: enviar(
+          async (d) => {
+            if (d.senha !== d.confirmar) throw new Error('As duas senhas não estão iguais.')
+            await crm.trocarSenha(d.senha)
+            fecharDialogo(dlg)
+          },
+          'Senha trocada',
+          'Salvando…',
+        ),
+      },
+      h('header', { class: 'drawer-topo largo' }, h('h2', { id: 'novo-titulo' }, 'Trocar senha'), botaoFechar(dlg)),
+      senha('Senha nova (8 caracteres ou mais)', 'senha', { autofocus: true }),
+      senha('Repita a senha nova', 'confirmar'),
+      h('div', { class: 'acoes largo' }, h('button', { class: 'primario' }, 'Trocar senha')),
+    ),
+  )
+  dlg.showModal()
+}
+
 // ---------- login ----------
 function mostrarLogin() {
   for (const el of document.querySelectorAll('.abas, [data-crm], main')) el.hidden = true
@@ -757,6 +823,23 @@ async function iniciar() {
       location.reload()
     })
     supabase.auth.onAuthStateChange((evento) => evento === 'SIGNED_OUT' && location.reload())
+    $('#btn-senha').hidden = false
+    $('#btn-senha').addEventListener('click', abrirTrocaSenha)
+
+    // equipe: só membro ativo entra nos leads; admin ganha a aba Usuários
+    try {
+      const perfil = await crm.meuPerfil(data.session.user.id)
+      if (!perfil?.ativo) {
+        logado = false
+        aviso(perfil ? 'Sua conta foi desativada. Fale com o administrador do sistema.' : 'Sua conta ainda não faz parte da equipe. Peça ao administrador para cadastrar você.')
+      } else if (perfil.papel === 'admin') {
+        abas.usuarios = carregarUsuarios
+        $('.aba[data-aba="usuarios"]').hidden = false
+      }
+    } catch (err) {
+      // sem conseguir ler a equipe, segue com o que a RLS deixar ver; só a aba Usuários não aparece
+      console.error('equipe:', err.message)
+    }
   } else if (config.local) {
     aviso('O CRM online não está ligado neste computador. A prospecção funciona, mas o envio ao kanban fica desativado até a configuração ser concluída.')
   } else {
@@ -791,6 +874,19 @@ async function iniciar() {
   })
   $('#filtros').addEventListener('submit', (e) => e.preventDefault())
 
+  $('#form-usuario').addEventListener(
+    'submit',
+    enviar(
+      async (d, form) => {
+        await crm.gerirUsuario({ acao: 'criar', ...d })
+        form.reset()
+        carregarUsuarios()
+      },
+      'Usuário cadastrado. Passe o e-mail e a senha inicial para a pessoa.',
+      'Cadastrando…',
+    ),
+  )
+
   $('#form-busca').addEventListener(
     'submit',
     enviar(
@@ -805,7 +901,8 @@ async function iniciar() {
   )
 
   const inicial = location.hash.slice(1)
-  abrirAba(Object.hasOwn(abas, inicial) ? inicial : Object.keys(abas)[0])
+  // sem nenhuma aba (conta fora da equipe, no site) fica só o aviso
+  if (Object.keys(abas).length) abrirAba(Object.hasOwn(abas, inicial) ? inicial : Object.keys(abas)[0])
 }
 
 iniciar()
