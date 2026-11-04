@@ -26,8 +26,16 @@ services:
       - max_wal_size=8GB
       - -c
       - checkpoint_timeout=15min
+      # sem diário de replicação: a montagem cria e enche a base na mesma transação e grava direto, sem o WAL dobrar
+      # a escrita (esta base se recarrega da Receita; o PC não replica para lugar nenhum)
+      - -c
+      - wal_level=minimal
+      - -c
+      - max_wal_senders=0
     # o /dev/shm padrão do Docker (64 MB) derruba os joins paralelos da montagem da base
     shm_size: 1gb
+    # tempo para o Postgres fechar direito; derrubado à força, ele perde as tabelas de chegada da carga (unlogged)
+    stop_grace_period: 2m
     volumes:
       - pgdata:/var/lib/postgresql/data
       # roda as migrations só na primeira subida, com o volume vazio

@@ -77,18 +77,42 @@ docker compose ps
 
 ## 6. Carregar a base da Receita
 
-Comece por um estado para medir o tempo nesta máquina:
+Comece por um estado para medir o tempo nesta máquina. A carga roda solta da janela (o PowerShell pode ser fechado):
 
 ```powershell
-docker compose run --rm app node importador/importar.js --ufs SP
+docker compose run -d --name carga-cnpj app node importador/importar.js --ufs SP
+docker logs -f carga-cnpj
 ```
 
-- Deixe a janela aberta até aparecer `Publicado: N estabelecimentos`. Pode levar horas.
+- O `docker logs -f` mostra o andamento; `Ctrl+C` só para de mostrar. Pode levar horas, principalmente com o Docker num HD comum.
+- **Não apague o `carga-cnpj` (`docker rm`) antes de aparecer `Publicado: N estabelecimentos`**: apagar no meio derruba a montagem.
 - Desligue a suspensão do Windows enquanto roda (Configurações > Sistema > Energia).
 - Mais de um estado: `--ufs SP,MG,RJ`. Sem `--ufs` vai o Brasil inteiro.
-- Se cair no meio, rode o mesmo comando de novo. A base que estava publicada continua valendo até a nova terminar.
+- Depois de `Publicado`, apague o registro: `docker rm carga-cnpj`.
+- Se cair no meio do download, apague o registro e rode de novo. A base que estava publicada continua valendo até a nova terminar.
 
 A Receita publica uma edição nova por mês. Para atualizar, rode o mesmo comando; ele pega a edição mais recente.
+
+### Se a carga parar na montagem
+
+Se os arquivos já foram baixados (no log aparecem os 34 `carregado em`) e ela parou depois, em `Montando a base final`, não precisa baixar de novo. Retome informando o mês da carga:
+
+```powershell
+docker rm carga-cnpj
+docker compose run -d --name carga-cnpj app node importador/importar.js --ufs SP --mes 2026-10 --retomar
+docker logs -f carga-cnpj
+```
+
+Para os arquivos baixados sobreviverem, o banco precisa ser parado com calma (o `docker-compose.yml` já dá 2 minutos para isso). Se for preciso parar só o banco à mão: `docker compose stop -t 120 db`.
+
+### Migration nova da base de CNPJ num PC que já tem a base
+
+As migrations de `db-local/migrations/` rodam sozinhas só na primeira subida. Uma migration nova, depois disso:
+
+```powershell
+docker compose cp db-local/migrations/<arquivo>.sql db:/tmp/m.sql
+docker compose exec db psql -U postgres -v ON_ERROR_STOP=1 -f /tmp/m.sql
+```
 
 ## 7. Ligar o Google Maps
 
