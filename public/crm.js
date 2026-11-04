@@ -87,7 +87,7 @@ export async function enviarLeads(leads, chave = 'place_id') {
 // ---------- equipe ----------
 // a linha de quem está logado diz se ele entra nos leads (ativo) e se cadastra usuários (admin)
 export const meuPerfil = async (userId) => ok(await cliente().from('membros').select('nome,papel,ativo').eq('user_id', userId).maybeSingle()).data
-export const listarMembros = async () => ok(await cliente().from('membros').select('user_id,nome,email,papel,ativo').order('nome')).data
+export const listarMembros = async () => ok(await cliente().from('membros').select('user_id,nome,email,papel,ativo,ativado_em').order('nome')).data
 
 // cadastrar, desativar e reativar passam pela função "usuarios", a única com a chave secreta
 export async function gerirUsuario(corpo) {
@@ -97,6 +97,9 @@ export async function gerirUsuario(corpo) {
   const motivo = await error.context?.json?.().then((j) => j.erro, () => null)
   throw new Error(motivo ?? 'O cadastro de usuários não respondeu. Confira se a função "usuarios" está instalada no CRM online.')
 }
+
+// sem login: quem o admin cadastrou digita o e-mail e cria a própria senha, uma vez só
+export const primeiroAcesso = (email, senha) => gerirUsuario({ acao: 'primeiro_acesso', email, senha })
 
 export async function trocarSenha(senha) {
   const { error } = await cliente().auth.updateUser({ password: senha })

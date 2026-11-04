@@ -694,8 +694,14 @@ async function mandarDaBusca(a, botao) {
   carregarBuscas()
 }
 
-// ---------- usuários da equipe (só admin) ----------
+// ---------- usuários da equipe (só admin, num popup) ----------
 const PAPEL = { admin: 'Administrador', membro: 'Membro' }
+
+function abrirUsuarios() {
+  $('#menu-conta').hidePopover()
+  $('#dlg-usuarios').showModal()
+  carregarUsuarios()
+}
 
 async function carregarUsuarios() {
   const corpo = $('#lista-usuarios')
@@ -715,10 +721,18 @@ const linhaUsuario = (m, eu) =>
     h('td', {}, h('strong', {}, m.nome), m.user_id === eu && h('span', { class: 'muted pequeno' }, ' (você)')),
     h('td', {}, m.email),
     h('td', {}, PAPEL[m.papel]),
-    h('td', {}, h('span', { class: `pill ${m.ativo ? 'membro-ativo' : 'membro-inativo'}` }, m.ativo ? 'Ativo' : 'Desativado')),
+    h('td', {}, situacaoUsuario(m)),
     // a própria conta não se desativa (a função também recusa): ninguém fica trancado fora sem querer
     h('td', { class: 'acoes-linha' }, m.user_id !== eu && h('button', { type: 'button', onclick: (e) => alternarUsuario(m, e.currentTarget) }, m.ativo ? 'Desativar' : 'Reativar')),
   )
+
+// "Aguardando primeiro acesso" deixa à vista quem ainda pode ter a senha criada por quem souber o e-mail
+const situacaoUsuario = (m) =>
+  !m.ativo
+    ? h('span', { class: 'pill membro-inativo' }, 'Desativado')
+    : m.ativado_em
+      ? h('span', { class: 'pill membro-ativo' }, 'Ativo')
+      : h('span', { class: 'pill membro-pendente' }, 'Aguardando primeiro acesso')
 
 async function alternarUsuario(m, botao) {
   if (m.ativo && !confirm(`Desativar ${m.nome}? A pessoa perde o acesso na hora. Os leads e o histórico dela continuam com a equipe.`)) return
@@ -734,6 +748,7 @@ async function alternarUsuario(m, botao) {
 }
 
 function abrirTrocaSenha() {
+  $('#menu-conta').hidePopover()
   const dlg = $('#dlg-novo')
   const senha = (rotulo, name, attrs = {}) => campo(rotulo, name, '', { type: 'password', required: true, minlength: '8', maxlength: '72', autocomplete: 'new-password', class: 'largo', ...attrs })
   dlg.replaceChildren(
@@ -764,6 +779,32 @@ function abrirTrocaSenha() {
 function mostrarLogin() {
   for (const el of document.querySelectorAll('.abas, [data-crm], main')) el.hidden = true
   $('#tela-login').hidden = false
+  // entrar e primeiro acesso dividem a tela; o e-mail digitado passa de um para o outro
+  const trocar = (de, para) => {
+    para.elements.email.value = de.elements.email.value
+    de.hidden = true
+    para.hidden = false
+    para.elements[para.elements.email.value ? 1 : 0].focus()
+  }
+  $('#ir-primeiro').addEventListener('click', () => trocar($('#form-login'), $('#form-primeiro')))
+  $('#voltar-login').addEventListener('click', () => trocar($('#form-primeiro'), $('#form-login')))
+  $('#form-primeiro').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.currentTarget
+    const email = form.elements.email.value.trim()
+    const senha = form.elements.senha.value
+    if (senha !== form.elements.confirmar.value) return toast('As duas senhas não estão iguais.', 'erro')
+    const restaurar = carregando(form.querySelector('button.primario'), 'Criando…')
+    try {
+      await crm.primeiroAcesso(email, senha)
+      const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
+      if (error) throw new Error('Senha criada. Entre com o e-mail e a senha nova.')
+      location.reload()
+    } catch (err) {
+      restaurar()
+      toast(err.message, 'erro')
+    }
+  })
   $('#form-login').addEventListener('submit', async (e) => {
     e.preventDefault()
     const form = e.currentTarget
@@ -799,7 +840,12 @@ async function iniciar() {
   prepararDialogos()
   // ícones dos botões fixos do HTML (o texto continua sendo o nome acessível)
   $('#btn-novo-lead').prepend(icone('mais'))
-  $('#btn-sair').prepend(icone('sair'))
+  $('#btn-conta').append(icone('usuario', 20))
+  $('#menu-usuarios').prepend(icone('equipe'))
+  $('#menu-senha').prepend(icone('chave'))
+  $('#menu-sair').prepend(icone('sair'))
+  $('#fechar-usuarios').append(icone('x', 20))
+  $('#fechar-usuarios').addEventListener('click', () => fecharDialogo($('#dlg-usuarios')))
   $('#link-web').append(icone('externo', 14))
   $('#btn-iniciar-busca').prepend(icone('buscar'))
   // prospecção e Google Maps rodam no PC com Docker; no site da internet aparecem quando há o túnel até ele (urlPc)
@@ -815,29 +861,30 @@ async function iniciar() {
     const { data } = await supabase.auth.getSession()
     if (!data.session) return mostrarLogin()
     logado = true
-    $('#usuario').textContent = data.session.user.email
-    $('#btn-sair').hidden = false
-    $('#btn-sair').addEventListener('click', async (e) => {
+    // ícone de usuário no topo: nome, e-mail, Trocar senha, Usuários da equipe (admin) e Sair
+    $('#btn-conta').hidden = false
+    $('#conta-email').textContent = data.session.user.email
+    $('#menu-senha').addEventListener('click', abrirTrocaSenha)
+    $('#menu-usuarios').addEventListener('click', abrirUsuarios)
+    $('#menu-sair').addEventListener('click', async (e) => {
       carregando(e.currentTarget, 'Saindo…')
       await supabase.auth.signOut()
       location.reload()
     })
     supabase.auth.onAuthStateChange((evento) => evento === 'SIGNED_OUT' && location.reload())
-    $('#btn-senha').hidden = false
-    $('#btn-senha').addEventListener('click', abrirTrocaSenha)
 
-    // equipe: só membro ativo entra nos leads; admin ganha a aba Usuários
+    // equipe: só membro ativo entra nos leads; admin cadastra e desativa usuários
     try {
       const perfil = await crm.meuPerfil(data.session.user.id)
+      if (perfil) $('#conta-nome').textContent = perfil.nome
       if (!perfil?.ativo) {
         logado = false
         aviso(perfil ? 'Sua conta foi desativada. Fale com o administrador do sistema.' : 'Sua conta ainda não faz parte da equipe. Peça ao administrador para cadastrar você.')
       } else if (perfil.papel === 'admin') {
-        abas.usuarios = carregarUsuarios
-        $('.aba[data-aba="usuarios"]').hidden = false
+        $('#menu-usuarios').hidden = false
       }
     } catch (err) {
-      // sem conseguir ler a equipe, segue com o que a RLS deixar ver; só a aba Usuários não aparece
+      // sem conseguir ler a equipe, segue com o que a RLS deixar ver; só o cadastro de usuários não aparece
       console.error('equipe:', err.message)
     }
   } else if (config.local) {
@@ -882,7 +929,7 @@ async function iniciar() {
         form.reset()
         carregarUsuarios()
       },
-      'Usuário cadastrado. Passe o e-mail e a senha inicial para a pessoa.',
+      'Usuário cadastrado. Avise a pessoa para entrar em "Primeiro acesso" com este e-mail.',
       'Cadastrando…',
     ),
   )

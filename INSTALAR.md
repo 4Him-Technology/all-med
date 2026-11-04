@@ -137,17 +137,19 @@ Daí em diante, o dia a dia usa `--profile maps --profile tunel` nos comandos de
 
 ## Usuários da equipe
 
-Todos os usuários cadastrados trabalham nos mesmos leads e no mesmo kanban. Quem é **Administrador** vê a aba **Usuários**, onde cadastra, desativa e reativa pessoas. Cada um troca a própria senha no botão **Senha**, no topo.
+Todos os usuários cadastrados trabalham nos mesmos leads e no mesmo kanban. No ícone de usuário, no canto do topo, cada um troca a própria senha e sai. Quem é **Administrador** também abre por ali **Usuários da equipe**, onde cadastra (nome, e-mail e papel), desativa e reativa pessoas.
 
-Instalação (uma vez), no painel do CRM online, nesta ordem e de uma vez só:
+Quem foi cadastrado cria a própria senha: abre o sistema, clica em **Primeiro acesso? Crie sua senha**, digita o e-mail cadastrado e escolhe a senha. Isso vale uma vez só; depois, a senha muda pelo ícone de usuário. Escolha consciente: quem souber o e-mail de alguém que ainda não fez o primeiro acesso consegue criar a senha antes dele. A lista de usuários mostra quem está **Aguardando primeiro acesso**; se alguém ativar uma conta que não devia, desative a pessoa e cadastre de novo com outro e-mail.
 
-1. **Regras da equipe:** em **SQL Editor**, abra uma consulta nova, cole o conteúdo de `supabase/migrations/20261103180000_equipe.sql` e clique em **Run**. Quem já tem conta (você) vira Administrador.
-2. **Função de cadastro:** em **Edge Functions**, clique em **Deploy a new function** > **Via Editor**. Dê o nome `usuarios`, apague o código de exemplo, cole o conteúdo de `supabase/functions/usuarios/index.ts` e clique em **Deploy**. Deixe ligada a opção de verificar o JWT (vem ligada).
+Instalação, no painel do CRM online:
+
+1. **Regras da equipe:** em **SQL Editor**, rode `supabase/migrations/20261103180000_equipe.sql` (se ainda não rodou) e depois `supabase/migrations/20261103210000_primeiro_acesso.sql`, cada um numa consulta nova (cole o conteúdo e clique em **Run**). Quem já tem conta vira Administrador.
+2. **Função `usuarios`:** em **Edge Functions**, crie com **Deploy a new function** > **Via Editor** (ou abra a `usuarios`, se ela já existir), cole o conteúdo de `supabase/functions/usuarios/index.ts` no lugar do código e clique em **Deploy function** (ou **Deploy updates**). Nas configurações da função, **desligue a verificação de JWT**: o primeiro acesso é feito sem login, e a própria função confere o login de quem cadastra e desativa usuários.
 3. **Tela:** aprove o PR no GitHub (o site atualiza sozinho) e, neste PC, rode `git pull` e `docker compose up -d --build app`.
 
-Entre os passos 1 e 3 o envio de empresas ao kanban dá erro, porque a regra de "empresa repetida" muda de "por usuário" para "da equipe". Por isso, faça os três em sequência.
+Faça os três em sequência: com só uma parte no ar, o cadastro e o primeiro acesso dão erro.
 
-Para desfazer: o script de volta está no topo de `supabase/migrations/20261103180000_equipe.sql`; a função se apaga em **Edge Functions**; e o código volta revertendo o PR.
+Para desfazer: os scripts de volta estão no topo das duas migrations; a função se apaga em **Edge Functions**; e o código volta revertendo o PR.
 
 ## Dia a dia
 

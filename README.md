@@ -23,7 +23,7 @@ Depois, as migrations seguintes da mesma pasta, em ordem, e a função de cadast
 O que as migrations garantem no banco, testado em [test/crm-sql.test.js](test/crm-sql.test.js):
 
 - a equipe (membros ativos) vê e trabalha os mesmos leads e atendimentos (RLS); conta fora da equipe, membro desativado e visitante sem login não leem nada;
-- só a função `usuarios`, com a chave secreta, cadastra e desativa membros, e só a pedido de um admin ([test/usuarios.test.js](test/usuarios.test.js));
+- só a função `usuarios`, com a chave secreta, cadastra e desativa membros, e só a pedido de um admin; o primeiro acesso (a pessoa cadastrada cria a própria senha digitando o e-mail) vale uma vez só, com tentativas limitadas ([test/usuarios.test.js](test/usuarios.test.js));
 - quem criou, origem, CNPJ e datas não podem ser alterados depois de criados (permissão por coluna);
 - nada é apagado de verdade: arquivar preenche `deleted_at`, e o histórico de atendimentos é imutável;
 - mudança de coluna no kanban grava sozinha no histórico, e o usuário não consegue forjar esse registro;
