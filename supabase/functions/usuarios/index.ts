@@ -2,6 +2,7 @@
 // Só um admin ativo usa. A chave secreta vem do ambiente da função (SUPABASE_SECRET_KEYS) e nunca vai para o navegador;
 // o login de quem chama é conferido pela plataforma (verify_jwt) e de novo aqui, no Auth.
 // Instalação: INSTALAR.md, "Usuários da equipe". Regras testadas em test/usuarios.test.js.
+import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 
 const ORIGENS = ['https://allmed.4him.com.br', 'https://all-med.pages.dev', 'http://localhost:3000']
 const EMAIL = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/
@@ -107,10 +108,9 @@ export function criarTratador(deps: Deps, origens = ORIGENS) {
 // No CRM online (Deno). Fora dele (testes no Node) só as regras acima são usadas.
 const deno = (globalThis as { Deno?: { env: { get(n: string): string | undefined }; serve(h: (r: Request) => Promise<Response>): unknown } }).Deno
 if (deno) {
-  const { createClient } = await import('npm:@supabase/supabase-js@2.117.3')
   const secretas = JSON.parse(deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')
-  const chave = secretas.default ?? deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const admin = createClient(deno.env.get('SUPABASE_URL'), chave, { auth: { persistSession: false, autoRefreshToken: false } })
+  const chave: string = secretas.default ?? deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const admin = createClient(deno.env.get('SUPABASE_URL') ?? '', chave, { auth: { persistSession: false, autoRefreshToken: false } })
   const ok = ({ data, error }: { data: unknown; error: { message: string } | null }) => {
     if (error) throw new Error(error.message)
     return data

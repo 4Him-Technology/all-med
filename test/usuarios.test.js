@@ -1,7 +1,17 @@
 // Regras da função "usuarios" (supabase/functions/usuarios), com o CRM online trocado por dados em memória
 import assert from 'node:assert/strict'
+import { register } from 'node:module'
 import { test } from 'node:test'
-import { criarTratador, Erro } from '../supabase/functions/usuarios/index.ts'
+
+// a função importa o supabase-js como "npm:...", que só o Deno do CRM online resolve; aqui ele vira um módulo vazio
+register(
+  `data:text/javascript,${encodeURIComponent(`
+    export async function resolve(especificador, contexto, proximo) {
+      if (especificador.startsWith('npm:')) return { url: 'data:text/javascript,export const createClient = () => null', shortCircuit: true }
+      return proximo(especificador, contexto)
+    }`)}`,
+)
+const { criarTratador, Erro } = await import('../supabase/functions/usuarios/index.ts')
 
 const ADMIN = '11111111-1111-4111-8111-111111111111'
 const MEMBRO = '22222222-2222-4222-8222-222222222222'
