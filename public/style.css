@@ -1599,6 +1599,27 @@ th[aria-sort="ascending"] .ordenar .ico {
   min-width: 200px;
 }
 
+.bc-lista tr.clicavel {
+  cursor: pointer;
+}
+
+.bc-lista tr.clicavel:hover td {
+  background: var(--bg-3);
+}
+
+/* o número da lista é um botão (leva ao mapa), mas com cara de etiqueta */
+button.nr {
+  min-height: 0;
+  border: 0;
+  padding: 0 4px;
+  font: 700 11.5px var(--fonte);
+}
+
+button.nr:hover:not(:disabled) {
+  background: var(--destaque-suave);
+  color: var(--primaria);
+}
+
 /* linha da empresa cuja ficha está aberta no mapa */
 .bc-lista tr.foco td {
   background: var(--destaque-suave);

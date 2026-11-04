@@ -541,12 +541,13 @@ function desenharBusca(a) {
   montarMapa(a, mapa)
 }
 
+// clicar na linha (ou no número, pelo teclado) leva o mapa até a empresa; a caixa de marcar e os links seguem como estão
 const linhaMaps = (a, l, i, podeMandar) =>
   h(
     'tr',
-    { 'data-place': l.place_id },
+    { 'data-place': l.place_id, class: 'clicavel', onclick: (e) => !e.target.closest('input, a, button') && mostrarNoMapa(a, l) },
     h('td', { class: 'col-marcar' }, l.enviado ? h('span', { class: 'ja' }, 'No kanban') : podeMandar && h('input', { type: 'checkbox', 'aria-label': `Marcar ${l.nome}`, onchange: (e) => marcarMaps(a, l.place_id, e.currentTarget.checked) })),
-    h('td', {}, h('span', { class: 'nr', 'aria-hidden': 'true' }, String(i + 1)), h('strong', {}, l.nome), l.categoria && h('div', { class: 'muted pequeno' }, l.categoria)),
+    h('td', {}, h('button', { type: 'button', class: 'nr', 'aria-label': `Mostrar ${l.nome} no mapa`, onclick: () => mostrarNoMapa(a, l) }, String(i + 1)), h('strong', {}, l.nome), l.categoria && h('div', { class: 'muted pequeno' }, l.categoria)),
     h('td', { class: 'tel' }, l.telefone ?? h('span', { class: 'muted' }, 'sem telefone')),
     h('td', {}, l.avaliacao != null ? avaliacao(l.avaliacao, l.total_avaliacoes ?? 0) : h('span', { class: 'muted' }, 'sem nota')),
     h('td', { class: 'endereco' }, l.endereco ?? ''),
@@ -663,6 +664,17 @@ function fichaPino(a, l, i) {
     h('p', { class: 'fp-links' }, l.site && h('a', { href: l.site, ...externo }, 'Site'), l.link_maps && h('a', { href: l.link_maps, ...externo }, 'Abrir no Google Maps')),
     acao,
   )
+}
+
+function mostrarNoMapa(a, l) {
+  const pino = a.pinos.get(l.place_id)
+  if (!pino) return toast(a.mapa ? 'Esta empresa veio sem a localização no mapa.' : 'O mapa ainda está carregando.', 'erro')
+  const suave = !matchMedia('(prefers-reduced-motion: reduce)').matches
+  // a ficha abre antes de centralizar: o setView vem depois e ganha do ajuste automático do balão
+  pino.openPopup()
+  a.mapa.setView(pino.getLatLng(), Math.max(a.mapa.getZoom(), 16), { animate: suave })
+  // com o mapa em cima da lista (tela estreita), ele pode estar fora da tela
+  a.mapa.getContainer().scrollIntoView({ block: 'nearest', behavior: suave ? 'smooth' : 'auto' })
 }
 
 function destacarLinha(a, placeId, sim) {
