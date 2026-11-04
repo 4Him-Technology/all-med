@@ -181,6 +181,11 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - Cabeçalho bege do topo com rótulo de coluna; linha marcada com petróleo a 10%; "No kanban" em verde no lugar da caixa de marcar.
 - Leads: o título da coluna ordena; a coluna ordenada mostra a seta em petróleo e aria-sort.
 
+### Conta e usuários
+- Ícone de usuário redondo no canto direito do topo. Abre um menu (popover nativo, fecha com Esc e clique fora) com nome e e-mail, Trocar senha, Usuários da equipe (só admin) e Sair.
+- Usuários da equipe é um popup largo (860px): formulário de uma linha (Nome, E-mail, Papel, Cadastrar) e a lista com a situação em pílula: Ativo (verde), Aguardando primeiro acesso (âmbar), Desativado (vermelho).
+- Login com dois cartões que se alternam: Entrar e Primeiro acesso (o e-mail digitado passa de um para o outro).
+
 ### Ficha ao lado (Leads)
 - Painel branco fixo de 470px que entra deslizando, rola por dentro e fecha no x ou com Esc. É o mesmo conteúdo da gaveta do kanban.
 

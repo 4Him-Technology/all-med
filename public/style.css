@@ -232,11 +232,54 @@ textarea {
   white-space: nowrap;
 }
 
-#usuario {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* ícone de usuário no topo; o menu abre logo abaixo, preso no canto direito */
+.btn-conta {
+  min-width: 38px;
+  padding: 0;
+  border-radius: 99px;
+  color: var(--primaria);
+}
+
+.menu-conta {
+  position: fixed;
+  inset: auto;
+  top: 64px;
+  right: max(28px, env(safe-area-inset-right));
+  margin: 0;
+  width: 260px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--raio);
+  background: var(--bg-2);
+  color: var(--fg);
+  box-shadow: var(--sombra-alta);
+}
+
+.menu-conta:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: surgir var(--dur-rapida) var(--ease-out);
+}
+
+.menu-conta-quem {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 6px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--borda);
+  overflow-wrap: anywhere;
+}
+
+.item-menu {
+  justify-content: flex-start;
+  width: 100%;
+  border: 0;
+  background: none;
+}
+
+.item-menu .ico {
+  color: var(--muted);
 }
 
 .aviso {
@@ -1480,21 +1523,45 @@ th[aria-sort="ascending"] .ordenar .ico {
 }
 
 /* ---------- usuários da equipe ---------- */
-.titulo-bloco {
+/* popup largo: cabeçalho, formulário de novo usuário e a lista da equipe, um embaixo do outro */
+.modal-largo {
+  width: min(860px, calc(100vw - 32px));
+  padding: 22px 24px;
+}
+
+.modal-largo[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-largo form {
+  padding: 0;
+}
+
+.novo-usuario {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.novo-usuario > p {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
 }
 
 .linha-usuario {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.9fr) auto;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) minmax(0, 1fr) auto;
   gap: 10px;
   align-items: end;
 }
 
-#aba-usuarios .tabela-wrap {
-  margin-top: 0;
+#dlg-usuarios .tabela {
+  min-width: 620px;
+}
+
+.pill.membro-pendente {
+  --cor: var(--proposta);
 }
 
 .pill.membro-ativo {
@@ -1984,10 +2051,6 @@ th[aria-sort="ascending"] .ordenar .ico {
   .ficha-lado {
     display: none;
   }
-  /* o e-mail da conta só cabe inteiro no topo a partir de uns 1000px */
-  #usuario {
-    display: none;
-  }
   /* lista e mapa não cabem lado a lado: o mapa sobe para cima da lista */
   .com-mapa {
     grid-template-columns: minmax(0, 1fr);
@@ -2057,6 +2120,9 @@ th[aria-sort="ascending"] .ordenar .ico {
   .nova-linha,
   .linha-usuario {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .menu-conta {
+    right: 16px;
   }
   .mapa {
     height: 380px;

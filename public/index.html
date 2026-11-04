@@ -31,14 +31,18 @@
         <button type="button" class="aba" data-aba="leads" data-crm>Leads</button>
         <button type="button" class="aba" data-aba="prospeccao" data-local hidden>Prospecção</button>
         <button type="button" class="aba" data-aba="buscas" data-local hidden>Google Maps</button>
-        <button type="button" class="aba" data-aba="usuarios" hidden>Usuários</button>
       </nav>
       <div class="conta">
         <a id="link-web" class="botao" target="_blank" rel="noopener noreferrer" hidden>CRM online</a>
-        <span id="usuario" class="muted pequeno"></span>
-        <button type="button" id="btn-senha" hidden>Senha</button>
-        <button type="button" id="btn-sair" hidden>Sair</button>
         <button type="button" id="btn-novo-lead" class="primario" data-crm>Novo lead</button>
+        <!-- popover nativo: abre e fecha no clique, fecha com Esc e com clique fora -->
+        <button type="button" id="btn-conta" class="btn-conta" popovertarget="menu-conta" aria-label="Minha conta" hidden></button>
+        <div id="menu-conta" class="menu-conta" popover>
+          <p class="menu-conta-quem"><strong id="conta-nome"></strong><span id="conta-email" class="muted pequeno"></span></p>
+          <button type="button" id="menu-usuarios" class="item-menu" hidden>Usuários da equipe</button>
+          <button type="button" id="menu-senha" class="item-menu">Trocar senha</button>
+          <button type="button" id="menu-sair" class="item-menu">Sair</button>
+        </div>
       </div>
     </header>
     <p id="aviso" class="aviso" role="status" hidden></p>
@@ -50,7 +54,18 @@
         <label>E-mail <input type="email" name="email" required autocomplete="username" inputmode="email" spellcheck="false" maxlength="200" placeholder="voce@empresa.com.br" /></label>
         <label>Senha <input type="password" name="senha" required autocomplete="current-password" maxlength="200" /></label>
         <button class="primario">Entrar</button>
-        <p class="muted pequeno">Acesso restrito. Peça seu usuário ao administrador.</p>
+        <button type="button" id="ir-primeiro" class="link">Primeiro acesso? Crie sua senha</button>
+        <p class="muted pequeno">Acesso restrito. Peça seu cadastro ao administrador.</p>
+      </form>
+      <form id="form-primeiro" class="cartao" aria-labelledby="primeiro-titulo" hidden>
+        <p class="marca marca-login" translate="no" aria-hidden="true">Leads <span>Maps</span></p>
+        <h2 id="primeiro-titulo">Primeiro acesso</h2>
+        <p class="muted pequeno">Use o e-mail que o administrador cadastrou para você e crie a sua senha.</p>
+        <label>E-mail <input type="email" name="email" required autocomplete="username" inputmode="email" spellcheck="false" maxlength="200" placeholder="voce@empresa.com.br" /></label>
+        <label>Crie uma senha (8 caracteres ou mais) <input type="password" name="senha" required minlength="8" maxlength="72" autocomplete="new-password" /></label>
+        <label>Repita a senha <input type="password" name="confirmar" required minlength="8" maxlength="72" autocomplete="new-password" /></label>
+        <button class="primario">Criar senha e entrar</button>
+        <button type="button" id="voltar-login" class="link">Já tenho senha</button>
       </form>
     </section>
 
@@ -126,37 +141,38 @@
         </form>
         <div id="lista-buscas" class="buscas"></div>
       </section>
-
-      <section id="aba-usuarios" aria-label="Usuários da equipe" hidden>
-        <form id="form-usuario" class="nova-busca" aria-labelledby="novo-usuario-titulo">
-          <h2 id="novo-usuario-titulo" class="titulo-bloco">Novo usuário</h2>
-          <div class="linha-usuario">
-            <label>Nome <input name="nome" required maxlength="100" autocomplete="off" /></label>
-            <label>E-mail <input name="email" type="email" inputmode="email" required maxlength="200" autocomplete="off" spellcheck="false" /></label>
-            <label>Senha inicial <input name="senha" type="password" required minlength="8" maxlength="72" autocomplete="new-password" /></label>
-            <label>Papel
-              <select name="papel">
-                <option value="membro">Membro</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </label>
-            <button class="primario">Cadastrar</button>
-          </div>
-          <p class="muted pequeno">Todos da equipe veem e trabalham os mesmos leads. Administrador também cadastra e desativa usuários. Passe o e-mail e a senha inicial para a pessoa; ela troca a senha depois, no botão Senha do topo.</p>
-        </form>
-        <div class="tabela-wrap">
-          <table class="tabela">
-            <thead>
-              <tr><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Papel</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
-            </thead>
-            <tbody id="lista-usuarios"></tbody>
-          </table>
-        </div>
-      </section>
     </main>
 
     <dialog id="drawer" class="drawer" aria-labelledby="drawer-titulo"></dialog>
     <dialog id="dlg-novo" class="modal" aria-labelledby="novo-titulo"></dialog>
+    <dialog id="dlg-usuarios" class="modal modal-largo" aria-labelledby="usuarios-titulo">
+      <header class="drawer-topo">
+        <h2 id="usuarios-titulo">Usuários da equipe</h2>
+        <button type="button" class="fechar" id="fechar-usuarios" aria-label="Fechar"></button>
+      </header>
+      <form id="form-usuario" class="novo-usuario" aria-label="Novo usuário">
+        <div class="linha-usuario">
+          <label>Nome <input name="nome" required maxlength="100" autocomplete="off" /></label>
+          <label>E-mail <input name="email" type="email" inputmode="email" required maxlength="200" autocomplete="off" spellcheck="false" /></label>
+          <label>Papel
+            <select name="papel">
+              <option value="membro">Membro</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </label>
+          <button class="primario">Cadastrar</button>
+        </div>
+        <p class="muted pequeno">Depois de cadastrada, a pessoa abre o sistema, clica em "Primeiro acesso", digita este e-mail e cria a própria senha. Todos da equipe veem e trabalham os mesmos leads; administrador também cadastra e desativa usuários.</p>
+      </form>
+      <div class="tabela-wrap">
+        <table class="tabela">
+          <thead>
+            <tr><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Papel</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
+          </thead>
+          <tbody id="lista-usuarios"></tbody>
+        </table>
+      </div>
+    </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </body>
 </html>

@@ -153,6 +153,9 @@ test('lista de leads ordena pelo último contato e o envio em lote por CNPJ igno
 test('a equipe vê quem faz parte dela, mas ninguém se cadastra nem muda o próprio papel pelo app', async () => {
   const nomes = (await como(BRUNO, 'select nome from public.membros order by nome')).map((m) => m.nome)
   assert.deepEqual(nomes, ['Ana', 'Bruno', 'Dani'])
+  // a lista de usuários mostra quem ainda não fez o primeiro acesso
+  assert.equal((await como(ANA, 'select ativado_em from public.membros where user_id = $1', [BRUNO]))[0].ativado_em, null)
+  await assert.rejects(como(BRUNO, 'update public.membros set ativado_em = now() where user_id = $1', [BRUNO]), /permission denied/)
   assert.equal((await como(CARLA, 'select nome from public.membros')).length, 0)
   // desativado ainda enxerga a própria linha, para a tela explicar por que está sem acesso
   assert.deepEqual((await como(DANI, 'select nome, ativo from public.membros')), [{ nome: 'Dani', ativo: false }])
@@ -173,4 +176,6 @@ test('quem já tinha conta quando a equipe foi criada vira admin', async () => {
   await banco.query(`insert into auth.users values ($1, 'dono@exemplo.com')`, [ANA])
   await migrar(banco)
   assert.deepEqual((await banco.query('select nome, papel, ativo from public.membros')).rows, [{ nome: 'dono', papel: 'admin', ativo: true }])
+  // quem já entrava com senha conta como primeiro acesso feito
+  assert.ok((await banco.query('select ativado_em from public.membros')).rows[0].ativado_em)
 })
