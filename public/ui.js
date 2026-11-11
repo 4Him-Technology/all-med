@@ -128,8 +128,8 @@ export function estado({ titulo, texto, acao, tipo = 'vazio' }) {
 }
 
 export const esqueleto = (cls) => h('div', { class: `skel ${cls}`, 'aria-hidden': 'true' })
-export const norm = (s) =>
-  String(s ?? '')
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
+export { norm } from './campos.js'
+
+// nota do Google com a estrela; total é a quantidade de avaliações, quando a origem informa
+const notaBr = (n) => n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+export const avaliacao = (n, total) => h('span', { class: 'avaliacao' }, icone('estrela', 13), notaBr(n), total != null && h('span', { class: 'muted' }, `(${total})`))

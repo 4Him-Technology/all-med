@@ -46,6 +46,14 @@
       "description": "Um filtro ligado; o x desliga só ele.",
       "html": "<span class=\"ds-chip\">Campinas - SP <button aria-label=\"Tirar o filtro Campinas - SP\">x</button></span>",
       "css": ".ds-chip{display:inline-flex;align-items:center;gap:2px;font:500 12px Montserrat,system-ui,sans-serif;background:#dbeaf0;color:#0b1238;border-radius:99px;padding:2px 2px 2px 11px}.ds-chip button{border:0;background:none;color:#545b78;min-width:26px;min-height:26px;border-radius:99px}"
+    },
+    {
+      "name": "Botão de segmento",
+      "kind": "chip",
+      "refersTo": "botao-segmento",
+      "description": "Liga e desliga um segmento no mapa das empresas; a bolinha é a cor do pino e o número é quantas empresas ele traria.",
+      "html": "<button class=\"ds-seg\" aria-pressed=\"true\"><span class=\"ds-ponto\"></span>Construção Civil <span class=\"ds-n\">1.041</span></button>",
+      "css": ".ds-seg{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:3px 10px 3px 9px;border:1px solid #c4bcb5;border-radius:99px;background:#fff;color:#0b1238;font:500 13px Montserrat,system-ui,sans-serif}.ds-seg[aria-pressed=\"true\"]{background:#dbeaf0;border-color:#4e90a7}.ds-ponto{width:10px;height:10px;border-radius:99px;background:#c2571a}.ds-n{color:#545b78;font-size:12px}"
     }
   ]
 }

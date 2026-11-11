@@ -1912,6 +1912,601 @@ th[aria-sort="ascending"] .ordenar .ico {
   margin-left: 6px;
 }
 
+/* ---------- Google Maps: mapa das empresas com painel ao lado ---------- */
+/* o mapa é a tela: ocupa a altura que sobra abaixo do topo (69px) e das margens do main (24px em cima e embaixo) */
+main:has(> #aba-buscas:not([hidden]) > .mapa-tela:not([hidden])) {
+  padding-bottom: 24px;
+}
+
+.mapa-tela {
+  display: grid;
+  grid-template-columns: clamp(360px, 32vw, 460px) minmax(0, 1fr);
+  gap: 16px;
+  height: calc(100dvh - 117px);
+  min-height: 460px;
+}
+
+.painel-mapa {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+  overflow: hidden;
+}
+
+.pm-topo {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.pm-filtros-caixa {
+  position: relative;
+}
+
+.pm-topo:empty {
+  display: none;
+}
+
+.pm-topo > .skel {
+  height: 34px;
+}
+
+.pm-busca {
+  position: relative;
+  display: block;
+}
+
+.pm-busca .ico {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.pm-busca input {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.pm-segmentos,
+.pm-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seg-chip,
+.pm-filtros button {
+  min-height: 30px;
+  padding: 3px 10px;
+  font-size: 13px;
+}
+
+/* segmento ligado e filtro aberto usam o mesmo petróleo suave da aba atual e das etiquetas */
+.seg-chip {
+  padding-left: 9px;
+  border-radius: 99px;
+}
+
+.seg-chip[aria-pressed="true"],
+.pm-filtros button[aria-expanded="true"] {
+  background: var(--destaque-suave);
+  border-color: var(--destaque);
+}
+
+.pm-filtros .ico-baixo {
+  color: var(--muted);
+  transition: transform var(--dur-rapida) var(--ease-out);
+}
+
+.pm-filtros button[aria-expanded="true"] .ico-baixo {
+  transform: rotate(180deg);
+}
+
+.seg-chip .n,
+.check .n {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.check .n {
+  margin-left: auto;
+}
+
+.check.sem-nada {
+  color: var(--muted);
+}
+
+/* cor de cada segmento no mapa e na lista, na ordem alfabética dos segmentos.
+   O verde fica de fora: no mapa ele já quer dizer "no kanban". */
+.ponto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--seg, var(--novo));
+}
+
+/* a ardósia fica por último: no círculo de um grupo ela se parece com o anel marinho de "marcada" */
+.seg-0 { --seg: #c2571a; }
+.seg-1 { --seg: #2a6fb0; }
+.seg-2 { --seg: #a8508c; }
+.seg-3 { --seg: #6b3f8f; }
+.seg-4 { --seg: #12808f; }
+.seg-5 { --seg: #9a6a12; }
+.seg-6 { --seg: #3d4663; }
+
+/* o filtro aberto desce por cima da lista em vez de empurrá-la: num notebook baixo a lista sumiria */
+.pm-painel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(330px, 46dvh);
+  padding: 12px;
+  border-radius: var(--raio-p);
+  background: var(--bg-2);
+  box-shadow: var(--sombra-fina), var(--sombra-media);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* nasce do botão que o abriu, logo acima dele */
+.pm-painel.entra {
+  transform-origin: top center;
+  animation: descer var(--dur-rapida) var(--ease-out);
+}
+
+@keyframes descer {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+
+.pm-grupo {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pm-grupo legend {
+  margin-bottom: 7px;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pm-painel .check,
+.pm-linha .check {
+  align-items: center;
+  font-size: 13px;
+}
+
+.pm-painel .check input,
+.pm-linha .check input,
+.lm-marcar input {
+  margin: 0;
+}
+
+.pm-opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pm-opcoes p {
+  margin: 0;
+}
+
+.pm-resumo {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--borda);
+  border-bottom: 1px solid var(--borda);
+  background: var(--bg-topo);
+}
+
+.pm-linha {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pm-total {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-linha select {
+  min-height: 30px;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+
+.pm-lista {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.pm-lista > li > .estado {
+  margin: 14px;
+}
+
+/* linha da lista: marcar, nome com a cor do segmento, nota; embaixo, categoria e telefone */
+.lm {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: start;
+  padding: 9px 14px 9px 12px;
+  border-bottom: 1px solid var(--borda);
+  cursor: pointer;
+  transition: background-color var(--dur-rapida) var(--ease-out);
+}
+
+.lm:hover {
+  background: color-mix(in srgb, var(--destaque) 6%, var(--bg-2));
+}
+
+.lm.sel {
+  background: color-mix(in srgb, var(--destaque) 10%, var(--bg-2));
+}
+
+/* linha da empresa cuja ficha está aberta no mapa */
+.lm.aberta {
+  background: var(--destaque-suave);
+}
+
+/* a área de marcar cobre a margem esquerda da linha inteira: acertar só a caixinha é difícil no toque */
+.lm-marcar {
+  grid-row: 1 / span 2;
+  align-self: stretch;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  margin: -9px 0 -9px -12px;
+  padding: 11px 0 9px 12px;
+}
+
+label.lm-marcar {
+  cursor: pointer;
+}
+
+.lm-ja {
+  display: grid;
+  color: var(--ganho);
+}
+
+.lm-nome {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 7px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--raio-p);
+  background: none;
+  color: var(--fg);
+  font: 600 14px/1.4 var(--fonte);
+  text-align: left;
+}
+
+button.lm-nome:hover:not(:disabled) {
+  background: none;
+}
+
+button.lm-nome:hover .lm-texto {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* nome comprido ocupa até duas linhas; o resto fica no title */
+.lm-texto {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.lm-nota {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.lm-linha2 {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.lm-cat {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lm-tel {
+  flex: none;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-cat + .lm-tel::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--muted);
+}
+
+.lm-linha2 .tag {
+  flex: none;
+}
+
+.lm-linha2 .ja {
+  flex: none;
+  margin-left: auto;
+}
+
+.skel.lm-skel {
+  height: 38px;
+  margin: 12px 14px;
+}
+
+/* botão por cima do mapa, no canto de baixo à esquerda (o de cima é dos botões de zoom) */
+.botao-mapa {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 1;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-color: transparent;
+  box-shadow: var(--sombra-fina), var(--sombra-media);
+  font-size: 13px;
+}
+
+/* com empresas marcadas, o pé do mapa é da barra de envio: num mapa estreito os dois se encostariam */
+.mapa-area:has(.barra-lote:not([hidden])) .botao-mapa {
+  display: none;
+}
+
+.mapa-area {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--raio);
+  background: var(--bg-3);
+  box-shadow: var(--sombra-fina);
+  overflow: hidden;
+}
+
+#mapa-geral {
+  height: 100%;
+  border-radius: 0;
+}
+
+/* enquanto o mapa baixa, a área dele mostra o mesmo brilho dos outros carregamentos */
+#mapa-geral:empty {
+  background: linear-gradient(90deg, var(--bg-3) 25%, color-mix(in srgb, var(--bg-3) 45%, var(--bg-2)) 50%, var(--bg-3) 75%);
+  background-size: 200% 100%;
+  animation: brilho 1.2s linear infinite;
+}
+
+/* a barra de envio fica no pé do mapa: presa embaixo da janela ela cobriria o fim da lista */
+.mapa-area .barra-lote {
+  position: absolute;
+  bottom: 16px;
+  z-index: 2;
+  max-width: calc(100% - 24px);
+}
+
+.legenda-mapa {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  /* deixa livre o canto dos botões de zoom */
+  max-width: calc(100% - 74px);
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--raio-p);
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+  box-shadow: var(--sombra-fina);
+  font-size: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.legenda-mapa > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* pino de uma empresa: a cor é a do segmento; o anel marinho diz marcada, e o aro verde, já no kanban */
+.pe {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border: 2px solid #ffffff;
+  border-radius: 99px;
+  background: var(--seg, var(--novo));
+  box-shadow: 0 1px 4px rgb(11 18 56 / 0.4);
+  cursor: pointer;
+  transition: transform var(--dur-rapida) var(--ease-out);
+}
+
+.pe.sel {
+  outline: 3px solid var(--fg);
+  transform: scale(1.1);
+}
+
+.pe.ja {
+  border: 4px solid var(--ganho);
+  background: #ffffff;
+}
+
+.leaflet-marker-icon:hover > .pe {
+  transform: scale(1.25);
+}
+
+/* várias empresas juntas: círculo com a contagem, na cor do segmento quando todas são do mesmo */
+.pg {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--seg, var(--borda-forte));
+  border-radius: 99px;
+  background: #ffffff;
+  color: var(--fg);
+  font: 700 12px var(--fonte);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px rgb(11 18 56 / 0.28);
+  cursor: pointer;
+  transition: transform var(--dur-rapida) var(--ease-out);
+}
+
+.pg.ja {
+  border-color: var(--ganho);
+}
+
+.pg.sel {
+  outline: 3px solid var(--fg);
+}
+
+.leaflet-marker-icon:hover > .pg {
+  transform: scale(1.08);
+}
+
+.legenda-mapa .pe,
+.legenda-mapa .pg {
+  flex: none;
+  margin: 0;
+  box-shadow: none;
+}
+
+.legenda-mapa .pe {
+  width: 14px;
+  height: 14px;
+}
+
+/* o anel de "marcada" passa da borda do pino: a folga não deixa ele encostar no vizinho */
+.legenda-mapa .pe.sel {
+  margin: 0 3px;
+}
+
+.legenda-mapa .pg {
+  width: 26px;
+  height: 26px;
+  border-width: 2px;
+  font-size: 11px;
+}
+
+/* anel sobre o lugar da empresa apontada na lista ou da ficha aberta; vale também quando o pino está dentro de um grupo */
+.anel {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--fg);
+  border-radius: 99px;
+  background: rgb(11 18 56 / 0.1);
+}
+
+/* ao abrir a ficha com o clique, o anel chega fechando sobre o lugar, uma vez só */
+.anel.chega {
+  animation: anel-chega var(--dur-media) var(--ease-out);
+}
+
+@keyframes anel-chega {
+  from { opacity: 0; transform: scale(1.7); }
+}
+
+/* pinos se juntando e se separando ao mudar o zoom: as duas transições que o CSS do leaflet.markercluster traria */
+.leaflet-cluster-anim .leaflet-marker-icon {
+  transition: transform 0.3s var(--ease-out), opacity 0.3s var(--ease-in);
+}
+
+.leaflet-cluster-spider-leg {
+  transition: stroke-dashoffset 0.3s var(--ease-out), stroke-opacity 0.3s var(--ease-in);
+}
+
+.fp-seg {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.fp-tel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fp-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fp-origem {
+  font-size: 12px;
+}
+
+.voltar-mapa {
+  margin: 0 0 12px;
+}
+
+/* a seta do ícone aponta para baixo; deitada, aponta para a volta */
+.voltar-mapa .ico {
+  transform: rotate(90deg);
+}
+
+body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not([hidden])) .toast {
+  bottom: 92px;
+}
+
 /* ---------- login ---------- */
 .tela-login {
   display: grid;
@@ -2092,6 +2687,28 @@ th[aria-sort="ascending"] .ordenar .ico {
     position: static;
     max-height: none;
   }
+  /* mapa das empresas: o mapa sobe para cima do painel, e quem rola é a página, não a lista */
+  .mapa-tela {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+  .mapa-area {
+    order: -1;
+    height: 56dvh;
+    min-height: 300px;
+  }
+  /* o mapa sai da tela ao rolar a lista: a barra volta a ficar presa embaixo da janela */
+  .mapa-area .barra-lote {
+    position: fixed;
+    bottom: max(22px, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 32px);
+  }
+  .pm-lista {
+    flex: none;
+    overflow: visible;
+  }
 }
 
 @media (max-width: 720px) {
@@ -2133,6 +2750,34 @@ th[aria-sort="ascending"] .ordenar .ico {
   input,
   select {
     min-height: 44px;
+  }
+  /* os botões compactos do painel do mapa também crescem para o toque; o nome da empresa não, a linha inteira já abre a ficha */
+  .seg-chip,
+  .pm-filtros button,
+  .pm-linha select,
+  .botao-mapa {
+    min-height: 44px;
+  }
+  .lm-nome {
+    min-height: 0;
+  }
+  /* com 44px de altura, os segmentos em várias linhas tomariam a tela: ficam numa linha só, que rola para o lado */
+  .pm-segmentos,
+  .pm-filtros {
+    flex-wrap: nowrap;
+    /* a folga em cima e embaixo é para o contorno de foco não ser cortado pela rolagem */
+    margin: -4px -14px;
+    padding: 4px 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .seg-chip,
+  .pm-filtros button {
+    flex: none;
+  }
+  /* no mapa estreito a legenda fica só com os dois estados */
+  .legenda-mapa .lg-grupo {
+    display: none;
   }
 }
 
