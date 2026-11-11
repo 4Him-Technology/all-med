@@ -1,7 +1,9 @@
 import { buscaMaps, camposLead, resumoBusca, ultimoContato } from './campos.js'
+import { clienteDe, prepararClientes } from './clientes.js'
 import * as crm from './crm.js'
 import { abrirMapa, carregarLeaflet } from './mapa.js'
 import { carregarProspeccao } from './prospeccao.js'
+import { carregarClientes } from './tela-clientes.js'
 import { ROTULOS as R, STATUS } from './rotulos.js'
 import { config, supabase } from './supa.js'
 import { $, api, avaliacao, carregando, esqueleto, estado, fecharDialogo, h, icone, prepararDialogos, toast } from './ui.js'
@@ -19,7 +21,7 @@ const agoraLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 
 const botaoFechar = (el) => h('button', { type: 'button', class: 'fechar', 'aria-label': 'Fechar', onclick: () => (el.tagName === 'DIALOG' ? fecharDialogo(el) : fecharFicha()) }, icone('x', 20))
 
 // ---------- abas ----------
-const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead }), buscas: abrirGoogleMaps }
+const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead }), buscas: abrirGoogleMaps, clientes: carregarClientes }
 let abaAtual = 'kanban'
 
 function abrirAba(nome) {
@@ -521,7 +523,11 @@ async function alternarBusca(id) {
   el.append(a.corpo)
   botao.setAttribute('aria-expanded', 'true')
   try {
-    a.leads = await api(`/api/buscas/${id}/leads`)
+    const [leads, clientes] = await Promise.all([api(`/api/buscas/${id}/leads`), supabase ? crm.clientesAtivos().catch(() => null) : []])
+    // quem já é cliente ativo não aparece (public/clientes.js); sem a lista, aparece todo mundo e o rodapé avisa
+    const preparados = prepararClientes(clientes ?? [])
+    a.leads = leads.filter((l) => !clienteDe(l.nome, preparados))
+    a.clientes = clientes && leads.length - a.leads.length
     if (abertas.get(id) === a) desenharBusca(a)
   } catch (err) {
     a.corpo.replaceChildren(estado({ tipo: 'erro', titulo: 'Não foi possível abrir a busca', texto: err.message, acao: h('button', { type: 'button', onclick: () => (alternarBusca(id), alternarBusca(id)) }, 'Tentar de novo') }))
@@ -551,7 +557,16 @@ function desenharBusca(a) {
         h('p', { class: 'legenda' }, h('span', { class: 'pino mini sel' }), 'Marcada', h('span', { class: 'pino mini ja' }), 'Já no kanban', h('span', { class: 'pino mini' }), 'Não marcada'),
       ),
     ),
-    h('footer', {}, podeMandar ? a.ui.contagem : h('span', { class: 'muted' }, 'Ligue o CRM online neste computador para mandar empresas ao kanban.'), h('span', { class: 'esp' }), a.ui.mandar),
+    h(
+      'footer',
+      {},
+      podeMandar ? a.ui.contagem : h('span', { class: 'muted' }, 'Ligue o CRM online neste computador para mandar empresas ao kanban.'),
+      a.clientes === null
+        ? h('span', { class: 'pequeno aviso-clientes' }, 'A lista de clientes ativos não carregou: eles podem aparecer aqui.')
+        : a.clientes > 0 && h('span', { class: 'muted pequeno' }, `${a.clientes} ${a.clientes === 1 ? 'cliente ativo ficou' : 'clientes ativos ficaram'} de fora da lista`),
+      h('span', { class: 'esp' }),
+      a.ui.mandar,
+    ),
   )
   atualizarBusca(a)
   montarMapa(a, mapa)
@@ -890,7 +905,7 @@ async function iniciar() {
     return
   }
   if (!logado) {
-    for (const nome of ['kanban', 'leads']) delete abas[nome]
+    for (const nome of ['kanban', 'leads', 'clientes']) delete abas[nome]
     for (const el of document.querySelectorAll('[data-crm]')) el.hidden = true
   }
   // a aba Google Maps mostra o mapa das empresas guardadas no CRM online, que não depende do PC

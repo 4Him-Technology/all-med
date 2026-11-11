@@ -2489,6 +2489,87 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   bottom: 92px;
 }
 
+/* aviso de quantos clientes ativos ficaram fora do mapa; vermelho quando a lista não carregou */
+.pm-clientes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pm-clientes.erro,
+.aviso-clientes {
+  color: var(--perigo);
+}
+
+/* ---------- clientes ativos ---------- */
+.clientes-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1100px;
+}
+
+.cartao-cliente {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+}
+
+.cartao-cliente p {
+  margin: 0;
+  max-width: 92ch;
+}
+
+.linha-cliente {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.clientes-resumo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.clientes-resumo .resumo {
+  flex: 1;
+}
+
+#busca-clientes {
+  width: min(320px, 100%);
+}
+
+.tabela-clientes td:first-child {
+  min-width: 240px;
+}
+
+.tabela-clientes .no-mapa {
+  font-size: 13px;
+}
+
+.tabela-clientes .acao {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tabela-clientes .acao button {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
 /* ---------- login ---------- */
 .tela-login {
   display: grid;
@@ -2718,8 +2799,16 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
     scroll-snap-align: start;
   }
   .nova-linha,
-  .linha-usuario {
+  .linha-usuario,
+  .linha-cliente {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* a tabela rola para o lado dentro do cartão, em vez de espremer o nome do cliente */
+  .tabela-clientes {
+    min-width: 560px;
+  }
+  .tabela-clientes .acao button {
+    min-height: 44px;
   }
   .menu-conta {
     right: 16px;

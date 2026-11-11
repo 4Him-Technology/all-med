@@ -14,7 +14,8 @@
       FIRST VIEWPORT: Prospecção = menu lateral de grupos de filtro + etiquetas do que está ligado + lista ao lado (pedido do Filipe em 03/11/2026, no lugar da barra no topo);
         Leads = tabela ordenável com a ficha do lead ao lado;
         Google Maps = o mapa ocupa a tela, com o painel de busca, segmentos, filtros e lista à esquerda; a lista mostra o que está na área do mapa
-        (pedido do Filipe em 11/11/2026, no lugar de um cartão por local e segmento).
+        (pedido do Filipe em 11/11/2026, no lugar de um cartão por local e segmento);
+        Clientes ativos = cadastro numa linha e a tabela com o que cada cliente esconde no mapa (pedido do Filipe em 11/11/2026).
       FORM: Prospecção barra no topo (seed bb63c07d), Leads tabela com ficha ao lado (seed 5d3c6ead),
         Google Maps mapa com painel ao lado (2 de 7, seed 00ad34c9); os cartões que abrem com mapa (seed d9b4c1ec) ficaram só nas buscas do PC.
       FINISH: barra escura de lote fixa embaixo, movimento só para mudança de estado (140 a 220 ms, ease-out), teclado e leitor de tela em tudo, contraste AA.
@@ -34,6 +35,7 @@
         <button type="button" class="aba" data-aba="leads" data-crm>Leads</button>
         <button type="button" class="aba" data-aba="prospeccao" data-local hidden>Prospecção</button>
         <button type="button" class="aba" data-aba="buscas" data-local hidden>Google Maps</button>
+        <button type="button" class="aba" data-aba="clientes" data-crm>Clientes ativos</button>
       </nav>
       <div class="conta">
         <a id="link-web" class="botao" target="_blank" rel="noopener noreferrer" hidden>CRM online</a>
@@ -167,6 +169,30 @@
           <p class="muted pequeno">Cada busca leva alguns minutos. Vá com calma no volume: muitas buscas seguidas fazem o Google bloquear.</p>
         </form>
         <div id="lista-buscas" class="buscas"></div>
+        </div>
+      </section>
+
+      <section id="aba-clientes" aria-label="Clientes ativos" hidden>
+        <div class="clientes-layout">
+          <form id="form-cliente" class="cartao-cliente" aria-label="Cadastrar cliente ativo">
+            <div class="linha-cliente">
+              <label>Cadastrar cliente <input name="nome" required maxlength="300" autocomplete="off" placeholder="Razão social ou nome fantasia" /></label>
+              <button class="primario">Cadastrar</button>
+            </div>
+            <p class="muted pequeno">Quem está nesta lista não aparece no mapa do Google Maps nem nas buscas novas pelo PC, e fica marcado na Prospecção, para não ser prospectado de novo. O sistema reconhece o cliente pelo nome, sem contar acento, Ltda, S.A., CNPJ e a unidade depois do traço; a coluna "Escondidas no mapa" mostra o que ele reconheceu.</p>
+          </form>
+          <div class="clientes-resumo">
+            <p id="resumo-clientes" class="resumo" role="status"></p>
+            <input type="search" id="busca-clientes" aria-label="Buscar na lista de clientes" placeholder="Buscar na lista" autocomplete="off" maxlength="100" />
+          </div>
+          <div class="tabela-wrap">
+            <table class="tabela tabela-clientes">
+              <thead>
+                <tr><th scope="col">Cliente</th><th scope="col">Escondidas no mapa</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
+              </thead>
+              <tbody id="lista-clientes"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>

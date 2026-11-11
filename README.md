@@ -123,6 +123,19 @@ O mapa não depende do PC, então a aba também aparece no site para quem está 
 
 A equipe só lê essa tabela. A carga roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar. A quantidade de avaliações fica vazia nessa carga: na planilha de origem a coluna trazia a nota vezes 10, não a quantidade. Para tirar tudo: `delete from public.maps_lugares;`. Para voltar atrás na tabela, veja o rollback no começo da migration. Para voltar à tela anterior (um cartão por local e segmento), reverta no git o commit do mapa das empresas.
 
+## Clientes ativos
+
+A aba Clientes ativos guarda quem já contrata, para não ser prospectado de novo (tabela `clientes_ativos`, migration `20261111120000_clientes_ativos.sql`). Toda a equipe cadastra e tira; tirar não apaga, preenche `deleted_at`, e o cliente volta a aparecer nas pesquisas.
+
+Quem está na lista:
+
+- some do mapa das empresas do Google Maps (o painel diz quantas ficaram de fora) e das buscas novas pelo PC;
+- aparece na Prospecção com a etiqueta "Cliente ativo" no lugar da caixa de marcar, e a ficha não oferece mandar ao kanban. Lá ela não some porque a busca vem paginada do PC: esconder deixaria a contagem e as páginas erradas.
+
+O reconhecimento é pelo nome, porque a lista de clientes não tem CNPJ, telefone nem endereço ([public/clientes.js](public/clientes.js), testado em [test/clientes.test.js](test/clientes.test.js)). Os nomes são comparados sem acento, caixa, pontuação, Ltda, S.A., CNPJ e a unidade depois do traço. A empresa é reconhecida quando tem as mesmas palavras do cliente, quando tem o nome do cliente inteiro, ou quando o cliente tem o nome dela inteiro com pelo menos duas palavras próprias (palavras de ramo, como "Construtora" ou "Transportes", sozinhas não bastam). Na tela, a coluna "Escondidas no mapa" mostra o que foi reconhecido para cada cliente. Quando uma filial aparece com outro nome (por exemplo, a marca seguida do bairro), cadastre o nome curto da marca: cliente de uma palavra só esconde as empresas cujo nome começa por ela.
+
+A carga inicial é um arquivo SQL gerado da planilha, rodado no SQL Editor e fora do git (é a lista de clientes); pode rodar de novo sem duplicar. Os testes usam nomes inventados pelo mesmo motivo. Para tirar a tabela: o rollback está no começo da migration.
+
 ## Segurança
 
 - Tela local: presa em `127.0.0.1`, checagem do cabeçalho Host (contra DNS rebinding), POST só com `application/json`, CSP restrita, DOM montado sem `innerHTML`, sem stack trace nas respostas.
@@ -142,7 +155,7 @@ Os termos do Google Maps proíbem raspagem automatizada; o risco prático é blo
 | `db-local/migrations/` | Base de CNPJ no PC: esquema, montagem mensal, funções de busca |
 | `importador/` | Download, descompactação e carga mensal dos arquivos da Receita |
 | `src/` | Servidor local: tela, ponte para a base de CNPJ (`/api/rpc/<função>`), buscas do Maps, `config.js` |
-| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local, `mapa.js` é o mapa das empresas do Google Maps) |
+| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local, `mapa.js` é o mapa das empresas do Google Maps, `tela-clientes.js` a aba Clientes ativos e `clientes.js` o reconhecimento do cliente pelo nome) |
 | `scripts/gerar-config.js` | Build do site: `config.js` e `_headers` |
 | `test/` | Testes (`node:test`; PGlite roda as duas migrations de verdade), scraper falso e dados fictícios |
 

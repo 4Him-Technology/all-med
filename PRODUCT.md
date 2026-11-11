@@ -26,7 +26,7 @@ Junta, num lugar só e sem IA, a pesquisa profunda de empresas que ferramentas c
 
 ## Capabilities and Constraints
 
-- Funciona hoje: prospecção com todos os filtros (dados de demonstração até a base real ser carregada), envio ao kanban sem duplicar, kanban com arrastar e teclado, lista de leads, ficha com histórico imutável, arquivamento, buscas no Google Maps (só com Docker), mapa das empresas do Google Maps guardadas no CRM online (abre também no site).
+- Funciona hoje: prospecção com todos os filtros (dados de demonstração até a base real ser carregada), envio ao kanban sem duplicar, kanban com arrastar e teclado, lista de leads, ficha com histórico imutável, arquivamento, buscas no Google Maps (só com Docker), mapa das empresas do Google Maps guardadas no CRM online (abre também no site), lista de clientes ativos que some das pesquisas (reconhecida pelo nome, porque a lista do cliente só tem a razão social).
 - Restrições: o fornecedor do banco não pode aparecer em nenhum texto da interface. Sessão de login no sessionStorage (site estático). Dados de sócios e contatos de empresário individual são dado pessoal (LGPD).
 - Decisões em aberto: nome do produto (ideias: Garimpo, Radar, Prospecta, Rota, Lastro); se a equipe vai precisar ver leads uns dos outros; exportação de listas para Excel/CSV.
 
