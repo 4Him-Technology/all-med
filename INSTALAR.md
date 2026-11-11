@@ -120,7 +120,7 @@ docker compose exec db psql -U postgres -v ON_ERROR_STOP=1 -f /tmp/m.sql
 docker compose --profile maps up -d
 ```
 
-Depois disso a aba Google Maps aceita buscas: clique em "Nova busca pelo PC", no canto de baixo do mapa. Vá com calma no volume: muitas buscas seguidas fazem o Google bloquear o IP.
+Depois disso a aba Google Maps aceita buscas: clique em "Nova busca pelo PC", no topo, ao lado de "Novo lead". Vá com calma no volume: muitas buscas seguidas fazem o Google bloquear o IP.
 
 ## 8. Abrir Prospecção e Google Maps no site da internet (opcional)
 

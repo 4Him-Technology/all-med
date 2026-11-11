@@ -2289,24 +2289,6 @@ button.lm-nome:hover .lm-texto {
   margin: 12px 14px;
 }
 
-/* botão por cima do mapa, no canto de baixo à esquerda (o de cima é dos botões de zoom) */
-.botao-mapa {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  z-index: 1;
-  min-height: 32px;
-  padding: 4px 12px;
-  border-color: transparent;
-  box-shadow: var(--sombra-fina), var(--sombra-media);
-  font-size: 13px;
-}
-
-/* com empresas marcadas, o pé do mapa é da barra de envio: num mapa estreito os dois se encostariam */
-.mapa-area:has(.barra-lote:not([hidden])) .botao-mapa {
-  display: none;
-}
-
 .mapa-area {
   position: relative;
   min-width: 0;
@@ -2754,9 +2736,21 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   /* os botões compactos do painel do mapa também crescem para o toque; o nome da empresa não, a linha inteira já abre a ficha */
   .seg-chip,
   .pm-filtros button,
-  .pm-linha select,
-  .botao-mapa {
+  .pm-linha select {
     min-height: 44px;
+  }
+  /* no topo do celular cabem marca, Novo lead e a conta: a busca pelo PC fica só com o ícone (o nome segue para o leitor de tela) */
+  #btn-busca-pc {
+    min-width: 44px;
+    padding: 0;
+  }
+  .rotulo-busca-pc {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .lm-nome {
     min-height: 0;

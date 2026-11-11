@@ -196,7 +196,7 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - **Mapa:** pino redondo de 16px na cor do segmento; pinos próximos viram um círculo branco com a contagem e a borda na cor do segmento (cinza quando mistura segmentos, verde quando todas já estão no kanban); clicar no círculo aproxima. A linha apontada na lista ganha um anel marinho no mapa.
 - **Ficha:** abre no mapa, no lugar da empresa, ao clicar na linha ou no pino: nome, segmento e categoria, nota, endereço, telefone com o tipo deduzido, WhatsApp, Site, Google Maps e o botão Marcar para o kanban. Com o clique, o anel chega fechando sobre o lugar em 220ms; pelo teclado não anima, o foco entra na ficha e o Esc o devolve à linha.
 - **Envio:** a barra de lote fica no pé do mapa (presa embaixo da janela no celular). Acima de 50 empresas o botão vira "Confirmar: mandar N para o kanban" e só manda no segundo clique.
-- **Nova busca pelo PC:** botão branco no canto de baixo do mapa, só onde há o PC; some enquanto a barra de lote está na tela.
+- **Nova busca pelo PC:** botão branco no topo, à esquerda de Novo lead, só onde há o PC e com login; leva às buscas do PC de qualquer aba. No celular fica só o ícone de busca.
 
 ### Nova busca (Google Maps, atrás do botão "Nova busca pelo PC")
 - Campos separados na mesma linha: Ramo (vários separados por vírgula), Cidade, Bairro opcional e o botão Iniciar busca. Cada ramo vira um termo "ramo em cidade" para o scraper.

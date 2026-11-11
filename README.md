@@ -103,7 +103,7 @@ Sem Docker, dá para testar a tela com `CNPJ_DEMO=1` no `.env` e `npm start`: o 
 
 ## Google Maps
 
-A aba Google Maps abre no mapa das empresas guardadas no CRM online (mais abaixo). As buscas novas pelo scraper ficam atrás do botão "Nova busca pelo PC", no canto de baixo do mapa: você cadastra uma busca ("dentistas em Campinas"), o servidor local manda para o scraper, acompanha o job e guarda o resultado no PC. Quando a busca fica pronta, o cartão dela abre com a lista e o mapa, e o botão "Mandar para o kanban" manda os leads para o Supabase; os que já estão lá (mesmo lugar do Maps) o banco ignora.
+A aba Google Maps abre no mapa das empresas guardadas no CRM online (mais abaixo). As buscas novas pelo scraper abrem pelo botão "Nova busca pelo PC", no topo, ao lado de "Novo lead" (só no PC, ou no site quando há o túnel): você cadastra uma busca ("dentistas em Campinas"), o servidor local manda para o scraper, acompanha o job e guarda o resultado no PC. Quando a busca fica pronta, o cartão dela abre com a lista e o mapa, e o botão "Mandar para o kanban" manda os leads para o Supabase; os que já estão lá (mesmo lugar do Maps) o banco ignora.
 
 O scraper só roda em Docker. O `.exe` de Windows v1.18.1 falha em toda busca (issue [gosom/google-maps-scraper#322](https://github.com/gosom/google-maps-scraper/issues/322)). `npm run scraper:fake` sobe um servidor que imita a API do gosom com empresas fictícias, para mexer na tela sem raspar o Google.
 
