@@ -47,13 +47,16 @@ function ligar() {
     if (!nome) return
     const restaurar = carregando(form.querySelector('button'), 'Cadastrando…')
     try {
+      // cada empresa do mapa conta para um cliente só: a diferença do total é o que saiu agora,
+      // sem contar a que outro cadastro do mesmo cliente já escondia
+      const antes = totalEscondidas()
       await cadastrarCliente(nome)
       form.reset()
       clientes = await clientesAtivos()
       cruzar()
       desenhar()
-      const n = escondidas.get(clientes.find((c) => c.nome === nome)?.id)?.length ?? 0
-      toast(n ? `${nome} entrou na lista; ${n} ${n === 1 ? 'empresa saiu' : 'empresas saíram'} do mapa.` : `${nome} entrou na lista e não vai aparecer nas pesquisas.`)
+      const n = totalEscondidas() - antes
+      toast(n > 0 ? `${nome} entrou na lista; ${n} ${n === 1 ? 'empresa saiu' : 'empresas saíram'} do mapa.` : `${nome} entrou na lista e não vai aparecer nas pesquisas.`)
     } catch (err) {
       toast(err.message, 'erro')
     }
@@ -71,6 +74,8 @@ function cruzar() {
     if (c) escondidas.set(c.id, [...(escondidas.get(c.id) ?? []), nome])
   }
 }
+
+const totalEscondidas = () => [...escondidas.values()].reduce((soma, nomes) => soma + nomes.length, 0)
 
 const linhaInteira = (conteudo) => h('tr', {}, h('td', { colspan: 3 }, conteudo))
 
