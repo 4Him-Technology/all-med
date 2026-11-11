@@ -1,15 +1,15 @@
-import { buscaMaps, camposLead, idGrupoMaps, resumoBusca, ultimoContato } from './campos.js'
+import { buscaMaps, camposLead, resumoBusca, ultimoContato } from './campos.js'
 import * as crm from './crm.js'
+import { abrirMapa, carregarLeaflet } from './mapa.js'
 import { carregarProspeccao } from './prospeccao.js'
 import { ROTULOS as R, STATUS } from './rotulos.js'
 import { config, supabase } from './supa.js'
-import { $, api, carregando, esqueleto, estado, fecharDialogo, h, icone, prepararDialogos, toast } from './ui.js'
+import { $, api, avaliacao, carregando, esqueleto, estado, fecharDialogo, h, icone, prepararDialogos, toast } from './ui.js'
 
 const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 const fmtDia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
 const fmtData = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
 const quando = (iso) => fmt.format(new Date(iso))
-const nota = (n) => n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 const opcoes = (mapa, atual, vazio) => [vazio != null && h('option', { value: '' }, vazio), ...Object.entries(mapa).map(([v, r]) => h('option', { value: v, selected: v === atual }, r))].filter(Boolean)
 const campo = (rotulo, name, valor, attrs = {}) => h('label', { class: attrs.class }, rotulo, h('input', { name, value: valor ?? '', autocomplete: 'off', ...attrs, class: null }))
@@ -17,10 +17,9 @@ const campoSelect = (rotulo, name, mapa, atual, vazio) => h('label', {}, rotulo,
 const agoraLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 // a ficha pode estar na gaveta (<dialog>) ou ao lado da lista de leads
 const botaoFechar = (el) => h('button', { type: 'button', class: 'fechar', 'aria-label': 'Fechar', onclick: () => (el.tagName === 'DIALOG' ? fecharDialogo(el) : fecharFicha()) }, icone('x', 20))
-const avaliacao = (n, total) => h('span', { class: 'avaliacao' }, icone('estrela', 13), nota(n), total != null && h('span', { class: 'muted' }, `(${total})`))
 
 // ---------- abas ----------
-const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead }), buscas: carregarBuscas }
+const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead }), buscas: abrirGoogleMaps }
 let abaAtual = 'kanban'
 
 function abrirAba(nome) {
@@ -322,7 +321,8 @@ function renderLead(dlg, l) {
         l.emails[0] && h('a', { href: `mailto:${l.emails[0]}`, class: 'botao' }, icone('email'), 'E-mail'),
         l.site && h('a', { href: l.site, ...externo }, icone('site'), 'Site'),
         l.link_maps && h('a', { href: l.link_maps, ...externo }, icone('mapa'), 'Ver no Maps'),
-        l.avaliacao != null && h('span', { class: 'muted' }, avaliacao(l.avaliacao), ` em ${l.total_avaliacoes ?? 0} avaliações`),
+        // nem toda origem informa quantas avaliações o lugar tem: sem o total, fica só a nota
+        l.avaliacao != null && h('span', { class: 'muted' }, avaliacao(l.avaliacao), l.total_avaliacoes != null ? ` em ${l.total_avaliacoes} avaliações` : ' no Google'),
       ),
 
       h('h3', {}, 'Registrar atendimento'),
@@ -426,48 +426,52 @@ function abrirNovoLead() {
   dlg.showModal()
 }
 
-// ---------- buscas no Google Maps ----------
-// Cada busca é um cartão; a pronta abre com a lista do que achou e o mapa, numerados igual, para escolher o que vai ao kanban.
-// Os cartões vêm de dois lugares: as buscas que o PC faz (só com o PC) e as empresas guardadas no CRM online,
-// um cartão por local da busca e segmento, que abre em qualquer computador.
+// ---------- aba Google Maps ----------
+// A tela é o mapa das empresas guardadas no CRM online (mapa.js). As buscas novas pelo scraper do PC ficam
+// atrás do botão "Nova busca pelo PC": cada busca é um cartão, e a pronta abre com a lista do que achou e o mapa.
 // Prospecção e buscas novas rodam no PC com Docker; no site da internet aparecem quando há o túnel até ele (urlPc)
 const temPc = config.local || Boolean(config.urlPc)
+// só quem está logado e na equipe lê as empresas do CRM online; os outros veem apenas as buscas do PC
+let mapaLigado = false
 let timerBuscas
 const cartoes = new Map() // id da busca -> <section>; o cartão sobrevive à atualização da lista, aberto ou não
 const abertas = new Map() // id -> { id, leads, marcadas: Set de place_id, mapa, pinos: Map place_id -> marcador, corpo, ui }
-const gruposCrm = new Map() // id do cartão do CRM online -> { local_busca, segmento }
+
+function abrirGoogleMaps() {
+  if (!mapaLigado) mostrarBuscasPc(true)
+  else if ($('#buscas-pc').hidden) abrirMapa()
+  else carregarBuscas()
+}
+
+function mostrarBuscasPc(sim) {
+  $('#buscas-pc').hidden = !sim
+  $('#mapa-empresas').hidden = sim
+  $('#voltar-mapa').parentElement.hidden = !mapaLigado
+  if (sim) return carregarBuscas()
+  clearTimeout(timerBuscas)
+  abrirMapa()
+}
 
 async function carregarBuscas() {
   clearTimeout(timerBuscas)
   const lista = $('#lista-buscas')
   if (!lista.childElementCount) lista.replaceChildren(...Array.from({ length: 3 }, () => esqueleto('cartao-busca')))
-  const [pc, online] = await Promise.allSettled([temPc ? api('/api/buscas?limit=50') : { itens: [] }, supabase ? crm.gruposMaps() : []])
-  const buscasPc = pc.value?.itens ?? []
-  const itens = [...buscasPc, ...(online.value ?? []).map(cartaoDoCrm)]
-  // uma origem fora do ar não esconde a outra
-  const avisos = [
-    [pc, 'As buscas do PC não carregaram'],
-    [online, 'As empresas do CRM online não carregaram'],
-  ]
-    .filter(([r]) => r.status === 'rejected')
-    .map(([r, titulo]) => estado({ tipo: 'erro', titulo, texto: r.reason.message, acao: h('button', { type: 'button', onclick: carregarBuscas }, 'Tentar de novo') }))
-  if (!itens.length && !avisos.length) {
-    const texto = temPc ? 'Preencha o ramo e a cidade acima e clique em Iniciar busca. Quando ela terminar, a lista e o mapa aparecem aqui para você escolher quem vai para o kanban.' : 'Ainda não há empresas do Google Maps no CRM online.'
-    lista.replaceChildren(estado({ titulo: 'Nenhuma busca ainda', texto }))
-  } else {
-    const els = [...avisos, ...itens.map(cartaoBusca)]
-    // só remonta a lista quando muda o que tem nela: mexer no DOM tira o foco de quem está marcando empresas
-    if (avisos.length || els.length !== lista.children.length || els.some((el, i) => lista.children[i] !== el)) lista.replaceChildren(...els)
+  let itens
+  try {
+    itens = (await api('/api/buscas?limit=50')).itens
+  } catch (err) {
+    lista.replaceChildren(estado({ tipo: 'erro', titulo: 'As buscas do PC não carregaram', texto: err.message, acao: h('button', { type: 'button', onclick: carregarBuscas }, 'Tentar de novo') }))
+    return
   }
-  const ativa = buscasPc.some((b) => b.status === 'pendente' || b.status === 'executando')
-  if (ativa && abaAtual === 'buscas') timerBuscas = setTimeout(carregarBuscas, 5000)
-}
-
-// grupo do CRM online no formato de uma busca pronta: abre com lista e mapa como as do PC
-function cartaoDoCrm(g) {
-  const id = idGrupoMaps(g)
-  gruposCrm.set(id, g)
-  return { id, nome: `${g.local_busca} · ${g.segmento}`, status: 'importado', encontrados: g.encontrados, enviados: g.enviados }
+  if (!itens.length) {
+    lista.replaceChildren(estado({ titulo: 'Nenhuma busca ainda', texto: 'Preencha o ramo e a cidade acima e clique em Iniciar busca. Quando ela terminar, a lista e o mapa aparecem aqui para você escolher quem vai para o kanban.' }))
+  } else {
+    const els = itens.map(cartaoBusca)
+    // só remonta a lista quando muda o que tem nela: mexer no DOM tira o foco de quem está marcando empresas
+    if (els.length !== lista.children.length || els.some((el, i) => lista.children[i] !== el)) lista.replaceChildren(...els)
+  }
+  const ativa = itens.some((b) => b.status === 'pendente' || b.status === 'executando')
+  if (ativa && abaAtual === 'buscas' && !$('#buscas-pc').hidden) timerBuscas = setTimeout(carregarBuscas, 5000)
 }
 
 function cartaoBusca(b) {
@@ -517,7 +521,7 @@ async function alternarBusca(id) {
   el.append(a.corpo)
   botao.setAttribute('aria-expanded', 'true')
   try {
-    a.leads = gruposCrm.has(id) ? await crm.lugaresMaps(gruposCrm.get(id)) : await api(`/api/buscas/${id}/leads`)
+    a.leads = await api(`/api/buscas/${id}/leads`)
     if (abertas.get(id) === a) desenharBusca(a)
   } catch (err) {
     a.corpo.replaceChildren(estado({ tipo: 'erro', titulo: 'Não foi possível abrir a busca', texto: err.message, acao: h('button', { type: 'button', onclick: () => (alternarBusca(id), alternarBusca(id)) }, 'Tentar de novo') }))
@@ -599,24 +603,7 @@ function atualizarBusca(a) {
   }
 }
 
-// Leaflet só baixa quando a primeira busca abre; versão fixa com SRI (hash conferido no jsDelivr em 28/10/2026)
-let leaflet
-function carregarLeaflet() {
-  const base = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/'
-  const baixar = (tag, attrs) => new Promise((ok, falha) => document.head.append(h(tag, { ...attrs, crossorigin: 'anonymous', onload: ok, onerror: () => falha(new Error(`não carregou ${attrs.href ?? attrs.src}`)) })))
-  leaflet ??= Promise.all([
-    baixar('link', { rel: 'stylesheet', href: `${base}leaflet.css`, integrity: 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=' }),
-    baixar('script', { src: `${base}leaflet.js`, integrity: 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=' }),
-  ]).then(
-    () => window.L,
-    (err) => {
-      leaflet = null
-      throw err
-    },
-  )
-  return leaflet
-}
-
+// o Leaflet só baixa quando o primeiro mapa abre (carregarLeaflet, em mapa.js)
 async function montarMapa(a, el) {
   const comLugar = a.leads.map((l, i) => [l, i]).filter(([l]) => l.latitude != null && l.longitude != null)
   if (!comLugar.length) return el.replaceChildren(h('p', { class: 'sem-mapa' }, 'Esta busca não trouxe a localização das empresas.'))
@@ -690,8 +677,7 @@ async function mandarDaBusca(a, botao) {
   const restaurar = carregando(botao, 'Mandando…')
   try {
     const novos = await crm.enviarLeads(leads.map(({ enviado, ...l }) => ({ ...l, origem: 'maps' })))
-    // a busca do PC guarda quem já foi; no CRM online quem marca é o próprio lead (a view cruza pelo place_id)
-    if (!gruposCrm.has(a.id)) await api(`/api/buscas/${a.id}`, { method: 'PATCH', body: { place_ids: leads.map((l) => l.place_id), novos } })
+    await api(`/api/buscas/${a.id}`, { method: 'PATCH', body: { place_ids: leads.map((l) => l.place_id), novos } })
     const repetidas = leads.length - novos
     toast(`${novos} ${novos === 1 ? 'lead novo' : 'leads novos'} na coluna Novo do kanban${repetidas ? `; ${repetidas} já ${repetidas === 1 ? 'estava' : 'estavam'} no CRM` : ''}`)
     for (const l of leads) l.enviado = true
@@ -861,6 +847,7 @@ async function iniciar() {
   $('#fechar-usuarios').addEventListener('click', () => fecharDialogo($('#dlg-usuarios')))
   $('#link-web').append(icone('externo', 14))
   $('#btn-iniciar-busca').prepend(icone('buscar'))
+  $('#voltar-mapa').prepend(icone('seta', 14))
   for (const el of document.querySelectorAll('[data-local]')) el.hidden = !temPc
   if (!temPc) delete abas.prospeccao
 
@@ -905,9 +892,19 @@ async function iniciar() {
     for (const nome of ['kanban', 'leads']) delete abas[nome]
     for (const el of document.querySelectorAll('[data-crm]')) el.hidden = true
   }
-  // a aba Google Maps também abre as empresas guardadas no CRM online, que não dependem do PC
+  // a aba Google Maps mostra o mapa das empresas guardadas no CRM online, que não depende do PC
+  mapaLigado = logado
   if (logado) $('.aba[data-aba="buscas"]').hidden = false
   else if (!temPc) delete abas.buscas
+  // trocar de tela leva o foco junto: quem está no teclado continua de onde a tela nova começa
+  $('#abrir-buscas-pc').addEventListener('click', () => {
+    mostrarBuscasPc(true)
+    $('#form-busca').elements.ramos.focus()
+  })
+  $('#voltar-mapa').addEventListener('click', () => {
+    mostrarBuscasPc(false)
+    $('#abrir-buscas-pc').focus()
+  })
   if (config.local && config.urlWeb) {
     $('#link-web').href = config.urlWeb
     $('#link-web').hidden = false

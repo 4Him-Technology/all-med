@@ -1,5 +1,6 @@
 // Leads, kanban, histórico e equipe no Supabase. Quem vê o quê a RLS decide; aqui é só leitura e gravação.
 import { mensagemErro, termoBusca } from './campos.js'
+import { lerTudo } from './lugares.js'
 import { STATUS } from './rotulos.js'
 import { supabase } from './supa.js'
 
@@ -85,21 +86,21 @@ export async function enviarLeads(leads, chave = 'place_id') {
 }
 
 // ---------- Google Maps guardado no CRM online ----------
-// um cartão por local da busca e segmento, com quantas empresas tem e quantas já viraram lead
-export const gruposMaps = async () =>
-  ok(await cliente().from('maps_grupos').select('local_busca,segmento,encontrados,enviados').order('local_busca').order('segmento').limit(500)).data
-
-// empresas de um cartão, no mesmo formato das buscas do PC (os campos do lead e se já foi enviado)
-export const lugaresMaps = async ({ local_busca, segmento }) =>
-  ok(
-    await cliente()
-      .from('maps_empresas')
-      .select('place_id,nome,categoria,endereco,telefone,site,avaliacao,total_avaliacoes,latitude,longitude,link_maps,enviado')
-      .eq('local_busca', local_busca)
-      .eq('segmento', segmento)
-      .order('nome')
-      .limit(1000),
-  ).data
+// Todas as empresas da pesquisa, para o mapa: uma linha por empresa, segmento e local da busca; enviado diz se já virou lead.
+// Vem em páginas porque a API devolve no máximo 1000 linhas por vez; a ordem fixa não deixa uma linha cair entre duas páginas.
+export const empresasMaps = () =>
+  lerTudo(async (de, ate) =>
+    ok(
+      await cliente()
+        .from('maps_empresas')
+        .select('place_id,segmento,servico,local_busca,nome,categoria,endereco,telefone,site,avaliacao,latitude,longitude,link_maps,enviado', { count: 'exact' })
+        .order('nome')
+        .order('place_id')
+        .order('segmento')
+        .order('local_busca')
+        .range(de, ate),
+    ),
+  )
 
 // ---------- equipe ----------
 // a linha de quem está logado diz se ele entra nos leads (ativo) e se cadastra usuários (admin)

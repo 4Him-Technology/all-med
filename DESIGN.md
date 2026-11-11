@@ -19,6 +19,12 @@ colors:
   etapa-proposta: "#9a6a12"
   etapa-negociacao: "#b4541f"
   etapa-ganho: "#2e7d5b"
+  segmento-laranja: "#c2571a"
+  segmento-azul: "#2a6fb0"
+  segmento-rosa: "#a8508c"
+  segmento-roxo: "#6b3f8f"
+  segmento-turquesa: "#12808f"
+  segmento-ardosia: "#3d4663"
 typography:
   marca:
     fontFamily: "Montserrat, system-ui, sans-serif"
@@ -74,6 +80,15 @@ components:
     backgroundColor: "{colors.petroleo-suave}"
     textColor: "{colors.marinho-texto}"
     rounded: "{rounded.pilula}"
+  botao-segmento:
+    backgroundColor: "{colors.branco-cartao}"
+    textColor: "{colors.marinho-texto}"
+    rounded: "{rounded.pilula}"
+    padding: "3px 10px 3px 9px"
+  botao-segmento-ligado:
+    backgroundColor: "{colors.petroleo-suave}"
+    textColor: "{colors.marinho-texto}"
+    rounded: "{rounded.pilula}"
   barra-lote:
     backgroundColor: "{colors.marinho-texto}"
     textColor: "{colors.branco-cartao}"
@@ -98,7 +113,7 @@ A densidade é de planilha arrumada: tabelas de 14px, cartões brancos com sombr
 - Tema claro fixo, sem modo escuro.
 - Uma cor de ação (petróleo); o resto da cor diz estado.
 - Ações em lote numa barra escura fixa embaixo.
-- Lista e mapa numerados igual no Google Maps.
+- No Google Maps o mapa é a tela: um mapa só com todas as empresas, e a lista ao lado mostra o que está na área dele.
 - A palavra Supabase não aparece em lugar nenhum da interface.
 
 ## Colors
@@ -106,7 +121,7 @@ A densidade é de planilha arrumada: tabelas de 14px, cartões brancos com sombr
 Bege quente de fundo, cartões brancos, texto azul-marinho e um petróleo para ação e foco. Todas as combinações de texto passam no contraste AA (4,5:1).
 
 ### Primary
-- **Petróleo de ação** (#2f6b80): botão principal, link, pino marcado no mapa, seta da coluna ordenada.
+- **Petróleo de ação** (#2f6b80): botão principal, link, pino marcado no mapa das buscas do PC, seta da coluna ordenada.
 - **Petróleo de destaque** (#4e90a7): borda do topo, sublinhado da aba atual, borda do grupo de filtro aberto. Não é usado em texto pequeno.
 - **Petróleo suave** (#dbeaf0): fundo do grupo de filtro aberto, das etiquetas de filtro e da aba atual.
 
@@ -120,10 +135,14 @@ Bege quente de fundo, cartões brancos, texto azul-marinho e um petróleo para a
 
 ### Cores de estado
 - **Etapas do lead**: novo #5b6478, contato #2f6b80, qualificado #4b4f9e, proposta #9a6a12, negociação #b4541f, ganho #2e7d5b, perdido #b3261e. A pílula usa a cor no texto e a mesma cor a 13% no fundo.
-- **Já no kanban**: ganho #2e7d5b, no texto "No kanban" e no pino do mapa.
+- **Já no kanban**: ganho #2e7d5b, no texto "No kanban" e no pino do mapa (pino cheio nas buscas do PC; aro verde com miolo branco no mapa das empresas).
+- **Marcada no mapa das empresas**: anel marinho #0b1238 em volta do pino ou do círculo do grupo.
+
+### Cores de segmento (mapa das empresas)
+No mapa das empresas a cor do pino diz o segmento, na ordem alfabética dos segmentos: laranja #c2571a, azul #2a6fb0, rosa #a8508c, roxo #6b3f8f, turquesa #12808f e, se houver mais segmentos, ocre #9a6a12 e ardósia #3d4663. A mesma cor aparece na bolinha do botão do segmento, da linha da lista e da ficha, que servem de legenda. O verde fica de fora da lista porque no mapa já quer dizer "no kanban", e a ardósia fica por último porque, na borda de um círculo, se parece com o anel marinho de "marcada".
 
 ### Named Rules
-**A regra da cor que diz estado.** Fora o petróleo de ação, toda cor na tela significa um estado (etapa, situação, tipo de telefone, já enviado). Cor decorativa não entra.
+**A regra da cor que diz estado.** Fora o petróleo de ação, toda cor na tela significa um estado (etapa, situação, tipo de telefone, já enviado) ou, no mapa das empresas, o segmento. Cor decorativa não entra.
 
 ## Typography
 
@@ -140,9 +159,9 @@ Bege quente de fundo, cartões brancos, texto azul-marinho e um petróleo para a
 
 ## Layout
 
-Página com margem de 28px (16px no celular), topo fixo com a marca, as abas e a conta. Listas ocupam a largura toda; quando há algo para ler ao lado (ficha do lead, mapa da busca) a tela vira duas colunas: lista flexível e painel fixo de 470px (ficha) ou 440px (mapa). Na Prospecção, os filtros ficam num menu de 300px à esquerda da lista.
+Página com margem de 28px (16px no celular), topo fixo com a marca, as abas e a conta. Listas ocupam a largura toda; quando há algo para ler ao lado (ficha do lead, mapa da busca) a tela vira duas colunas: lista flexível e painel fixo de 470px (ficha) ou 440px (mapa). Na Prospecção, os filtros ficam num menu de 300px à esquerda da lista. No Google Maps a tela é o mapa: ele ocupa a altura que sobra abaixo do topo, sem rolar a página, com um painel de 360 a 460px à esquerda (busca, segmentos, filtros e lista, que rola por dentro).
 
-Abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo; abaixo de 900px o mapa desce para baixo da lista e as abas descem para uma segunda linha do topo; abaixo de 720px tudo vira uma coluna e botões e campos ganham 44px de altura. Tabelas largas rolam para o lado dentro do próprio cartão, nunca a página.
+Abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo; abaixo de 900px o mapa das buscas do PC desce para baixo da lista, o mapa das empresas sobe para cima do painel (e quem rola passa a ser a página) e as abas descem para uma segunda linha do topo; abaixo de 720px tudo vira uma coluna, botões e campos ganham 44px de altura e os segmentos ficam numa linha que rola para o lado. Tabelas largas rolam para o lado dentro do próprio cartão, nunca a página.
 
 ## Elevation & Depth
 
@@ -171,7 +190,15 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - Na coluna da lista, o total da busca e uma etiqueta por filtro ligado; o x tira o filtro e refaz a busca na hora.
 - Abaixo de 900px o menu sobe para cima da lista, sem ficar fixo.
 
-### Nova busca (Google Maps)
+### Mapa das empresas (Google Maps)
+- **Painel:** busca por nome, categoria ou endereço; um botão em pílula por segmento, com a bolinha da cor e a contagem (ligado fica petróleo suave); três botões de filtro (Região, Categoria, Mais filtros) que abrem um painel por cima da lista, um por vez, e fecham com Esc ou clique fora; etiquetas com x para o que está ligado e "Limpar filtros".
+- **Lista:** total do filtro ou "N de M empresas nesta área do mapa" com "Ver todas"; "Marcar todas" e a ordem (por nome ou maior nota). Cada linha tem a caixa de marcar, o nome com a bolinha do segmento, a nota e, embaixo, categoria e telefone. As linhas entram de 60 em 60 ao rolar.
+- **Mapa:** pino redondo de 16px na cor do segmento; pinos próximos viram um círculo branco com a contagem e a borda na cor do segmento (cinza quando mistura segmentos, verde quando todas já estão no kanban); clicar no círculo aproxima. A linha apontada na lista ganha um anel marinho no mapa.
+- **Ficha:** abre no mapa, no lugar da empresa, ao clicar na linha ou no pino: nome, segmento e categoria, nota, endereço, telefone com o tipo deduzido, WhatsApp, Site, Google Maps e o botão Marcar para o kanban. Com o clique, o anel chega fechando sobre o lugar em 220ms; pelo teclado não anima, o foco entra na ficha e o Esc o devolve à linha.
+- **Envio:** a barra de lote fica no pé do mapa (presa embaixo da janela no celular). Acima de 50 empresas o botão vira "Confirmar: mandar N para o kanban" e só manda no segundo clique.
+- **Nova busca pelo PC:** botão branco no canto de baixo do mapa, só onde há o PC; some enquanto a barra de lote está na tela.
+
+### Nova busca (Google Maps, atrás do botão "Nova busca pelo PC")
 - Campos separados na mesma linha: Ramo (vários separados por vírgula), Cidade, Bairro opcional e o botão Iniciar busca. Cada ramo vira um termo "ramo em cidade" para o scraper.
 
 ### Barra de lote
@@ -189,7 +216,7 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 ### Ficha ao lado (Leads)
 - Painel branco fixo de 470px que entra deslizando, rola por dentro e fecha no x ou com Esc. É o mesmo conteúdo da gaveta do kanban.
 
-### Cartão de busca (Google Maps)
+### Cartão de busca do PC (Google Maps)
 - Título com seta, nome, status e resumo; a busca rodando mostra uma barra de andamento que só indica atividade (o scraper não informa porcentagem).
 - Aberto, mostra a lista com número e o mapa com pinos do mesmo número: branco não marcado, petróleo marcado, verde já no kanban. Clicar no pino marca a empresa. O mapa é em tons de cinza (OpenStreetMap com filtro) para os pinos aparecerem.
 

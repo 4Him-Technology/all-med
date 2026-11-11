@@ -10,10 +10,13 @@
       Direção das telas (impeccable, 28/10/2026; o kanban não entra e fica como está)
       THESIS: sistema de trabalho de uma pessoa só; cada tela serve para escolher empresas e agir sobre várias de uma vez, sem janela por cima.
       OWN-WORLD: o mesmo bege, azul-marinho e azul-petróleo do kanban, Montserrat, cartões com sombra fina; nada novo de identidade.
-      STORY: Prospecção acha e manda em lote; Google Maps revisa o que a busca trouxe (lista e mapa) antes de mandar; Leads ordena e trabalha um lead por vez.
+      STORY: Prospecção acha e manda em lote; Google Maps mostra todas as empresas da pesquisa num mapa só, para filtrar, ver onde estão, abrir a ficha e mandar em lote; Leads ordena e trabalha um lead por vez.
       FIRST VIEWPORT: Prospecção = menu lateral de grupos de filtro + etiquetas do que está ligado + lista ao lado (pedido do Filipe em 03/11/2026, no lugar da barra no topo);
-        Leads = tabela ordenável com a ficha do lead ao lado; Google Maps = buscas em cartões, a aberta com lista e mapa numerados igual.
-      FORM: Prospecção barra no topo (seed bb63c07d), Leads tabela com ficha ao lado (seed 5d3c6ead), Google Maps cartões que abrem com mapa (seed d9b4c1ec).
+        Leads = tabela ordenável com a ficha do lead ao lado;
+        Google Maps = o mapa ocupa a tela, com o painel de busca, segmentos, filtros e lista à esquerda; a lista mostra o que está na área do mapa
+        (pedido do Filipe em 11/11/2026, no lugar de um cartão por local e segmento).
+      FORM: Prospecção barra no topo (seed bb63c07d), Leads tabela com ficha ao lado (seed 5d3c6ead),
+        Google Maps mapa com painel ao lado (2 de 7, seed 00ad34c9); os cartões que abrem com mapa (seed d9b4c1ec) ficaram só nas buscas do PC.
       FINISH: barra escura de lote fixa embaixo, movimento só para mudança de estado (140 a 220 ms, ease-out), teclado e leitor de tela em tudo, contraste AA.
     -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -119,7 +122,31 @@
         </div>
       </section>
 
-      <section id="aba-buscas" aria-label="Buscas no Google Maps" hidden>
+      <section id="aba-buscas" aria-label="Empresas do Google Maps" hidden>
+        <!-- o mapa é a tela: todas as empresas guardadas no CRM online num mapa só, com busca, filtros e lista no painel ao lado -->
+        <div id="mapa-empresas" class="mapa-tela">
+          <aside id="painel-mapa" class="painel-mapa" aria-label="Busca, filtros e lista das empresas">
+            <div id="pm-topo" class="pm-topo"></div>
+            <div id="pm-resumo" class="pm-resumo" hidden></div>
+            <ul id="pm-lista" class="pm-lista" aria-label="Empresas na área do mapa"></ul>
+          </aside>
+          <div class="mapa-area">
+            <div id="mapa-geral" class="mapa" role="region" aria-label="Mapa das empresas. A lista ao lado mostra as mesmas empresas."></div>
+            <!-- no canto do mapa para não tirar altura da lista; só aparece onde há o PC -->
+            <button type="button" id="abrir-buscas-pc" class="botao-mapa" data-local>Nova busca pelo PC</button>
+            <p id="legenda-mapa" class="legenda-mapa" hidden>
+              <span><span class="pe sel" aria-hidden="true"></span>Marcada</span>
+              <span><span class="pe ja" aria-hidden="true"></span>Já no kanban</span>
+              <span class="lg-grupo"><span class="pg" aria-hidden="true">12</span>Várias juntas: clique para aproximar</span>
+            </p>
+            <!-- no pé do mapa, para não cobrir a lista; no celular fica presa embaixo da tela, como na Prospecção -->
+            <div id="barra-lote-mapa" class="barra-lote" role="region" aria-label="Empresas marcadas" hidden></div>
+          </div>
+        </div>
+
+        <!-- buscas novas pelo scraper do PC: ficam atrás do botão "Nova busca pelo PC" -->
+        <div id="buscas-pc" hidden>
+          <p class="voltar-mapa"><button type="button" id="voltar-mapa" class="link">Voltar ao mapa das empresas</button></p>
         <form id="form-busca" class="nova-busca" data-local>
           <div class="nova-linha">
             <label>Ramo <input name="ramos" required maxlength="1000" placeholder="Ex.: ortopedista, clínica de fisioterapia" autocomplete="off" aria-describedby="ajuda-ramos" /></label>
@@ -140,6 +167,7 @@
           <p class="muted pequeno">Cada busca leva alguns minutos. Vá com calma no volume: muitas buscas seguidas fazem o Google bloquear.</p>
         </form>
         <div id="lista-buscas" class="buscas"></div>
+        </div>
       </section>
     </main>
 

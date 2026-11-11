@@ -103,15 +103,25 @@ Sem Docker, dá para testar a tela com `CNPJ_DEMO=1` no `.env` e `npm start`: o 
 
 ## Google Maps
 
-Na aba Google Maps você cadastra uma busca ("dentistas em Campinas"). O servidor local manda para o scraper, acompanha o job e guarda o resultado no PC. Quando a busca fica pronta, o botão "Enviar ao kanban" manda os leads para o Supabase; os que já estão lá (mesmo lugar do Maps) o banco ignora.
+A aba Google Maps abre no mapa das empresas guardadas no CRM online (mais abaixo). As buscas novas pelo scraper ficam atrás do botão "Nova busca pelo PC", no canto de baixo do mapa: você cadastra uma busca ("dentistas em Campinas"), o servidor local manda para o scraper, acompanha o job e guarda o resultado no PC. Quando a busca fica pronta, o cartão dela abre com a lista e o mapa, e o botão "Mandar para o kanban" manda os leads para o Supabase; os que já estão lá (mesmo lugar do Maps) o banco ignora.
 
 O scraper só roda em Docker. O `.exe` de Windows v1.18.1 falha em toda busca (issue [gosom/google-maps-scraper#322](https://github.com/gosom/google-maps-scraper/issues/322)). `npm run scraper:fake` sobe um servidor que imita a API do gosom com empresas fictícias, para mexer na tela sem raspar o Google.
 
-### Empresas do Google Maps guardadas no CRM online
+### Mapa das empresas guardadas no CRM online
 
-Empresas levantadas fora do sistema (por exemplo, numa planilha) ficam na tabela `maps_lugares` do CRM online (migration `20261110120000_maps_no_crm.sql`). Só entram as que têm endereço, telefone e nota do Google. Na aba Google Maps, cada local da busca (cidade e bairro) com cada segmento vira um cartão, que abre a mesma lista com mapa das buscas do PC e manda as marcadas para o kanban. Esses cartões não dependem do PC, então a aba também aparece no site para quem está logado; só o formulário de busca nova continua precisando do PC.
+Empresas levantadas fora do sistema (por exemplo, numa planilha) ficam na tabela `maps_lugares` do CRM online (migration `20261110120000_maps_no_crm.sql`). Só entram as que têm endereço, telefone e nota do Google.
 
-A equipe só lê essa tabela. A carga roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar. Para tirar tudo: `delete from public.maps_lugares;`. Para voltar atrás na tabela, veja o rollback no começo da migration.
+A tela é um mapa só com todas elas ([public/mapa.js](public/mapa.js); a lógica sem tela está em [public/lugares.js](public/lugares.js), testada em [test/lugares.test.js](test/lugares.test.js)):
+
+- O painel à esquerda tem a busca por nome, categoria ou endereço, os segmentos (a cor do pino é a do segmento) e os filtros de região, categoria do Google, nota mínima, com site, com celular e fora do kanban. O número ao lado de cada opção é quantas empresas ela traria com os outros filtros como estão.
+- A lista mostra as empresas que estão na área do mapa. Ao mexer no mapa ela acompanha, e "Ver todas" volta a enquadrar o filtro inteiro.
+- Pinos próximos se juntam num círculo com a contagem (leaflet.markercluster, versão fixa com SRI, como o Leaflet); clicar no círculo aproxima.
+- Clicar numa linha ou num pino abre a ficha da empresa no mapa, com telefone, WhatsApp (quando o número tem formato de celular), site e a página no Google Maps.
+- As marcadas vão para o kanban pela barra escura no pé do mapa. Acima de 50 de uma vez, o botão pede um segundo clique, porque lead criado não se apaga, só se arquiva um por um. O lead leva nas observações o segmento, o local da pesquisa e o serviço.
+
+O mapa não depende do PC, então a aba também aparece no site para quem está logado.
+
+A equipe só lê essa tabela. A carga roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar. A quantidade de avaliações fica vazia nessa carga: na planilha de origem a coluna trazia a nota vezes 10, não a quantidade. Para tirar tudo: `delete from public.maps_lugares;`. Para voltar atrás na tabela, veja o rollback no começo da migration. Para voltar à tela anterior (um cartão por local e segmento), reverta no git o commit do mapa das empresas.
 
 ## Segurança
 
@@ -132,7 +142,7 @@ Os termos do Google Maps proíbem raspagem automatizada; o risco prático é blo
 | `db-local/migrations/` | Base de CNPJ no PC: esquema, montagem mensal, funções de busca |
 | `importador/` | Download, descompactação e carga mensal dos arquivos da Receita |
 | `src/` | Servidor local: tela, ponte para a base de CNPJ (`/api/rpc/<função>`), buscas do Maps, `config.js` |
-| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local) |
+| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local, `mapa.js` é o mapa das empresas do Google Maps) |
 | `scripts/gerar-config.js` | Build do site: `config.js` e `_headers` |
 | `test/` | Testes (`node:test`; PGlite roda as duas migrations de verdade), scraper falso e dados fictícios |
 
