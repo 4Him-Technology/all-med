@@ -57,6 +57,15 @@ export function ultimoContato(iso, agora = new Date()) {
   return dia.format(d)
 }
 
+// texto ao lado do nome no cartão da busca; só a busca em andamento formata a hora, porque o cartão do CRM online não tem data
+export function resumoBusca(b) {
+  if (b.status === 'executando') return `começou às ${hora.format(new Date(b.created_at))}`
+  if (b.status === 'pendente') return 'esperando a vez'
+  if (b.status === 'falhou') return b.erro ?? 'a busca parou com erro'
+  if (!b.encontrados) return 'nenhuma empresa encontrada'
+  return `${b.encontrados} ${b.encontrados === 1 ? 'encontrada' : 'encontradas'}${b.enviados ? ` · ${b.enviados} no kanban` : ''}`
+}
+
 const MENSAGENS = {
   23505: 'Essa empresa já está no CRM',
   23514: 'Algum campo está com valor inválido (confira site, e-mails e tamanhos)',
