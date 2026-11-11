@@ -227,3 +227,41 @@ test('Google Maps no CRM online: só entra empresa com endereço, telefone e not
   await lugarMaps('0xmaps4:0x4', 'Segunda carga')
   assert.deepEqual((await db.query(`select nome from public.maps_lugares where place_id = '0xmaps4:0x4'`)).rows, [{ nome: 'Segunda carga' }])
 })
+
+// ---------- clientes ativos (nomes inventados: o repositório é público) ----------
+const clientesAtivos = async (uid) => (await como(uid, 'select nome from public.clientes_ativos where deleted_at is null order by nome')).map((c) => c.nome)
+
+test('Clientes ativos: a equipe vê, cadastra e tira; quem está fora não vê nem grava', async () => {
+  await como(ANA, `insert into public.clientes_ativos (nome) values ('Metalúrgica Faísca Ltda')`)
+  assert.deepEqual(await clientesAtivos(BRUNO), ['Metalúrgica Faísca Ltda'])
+  const [{ id }] = await como(BRUNO, `insert into public.clientes_ativos (nome) values ('Padaria Trigo Fino') returning id`)
+  assert.equal((await como(BRUNO, 'update public.clientes_ativos set deleted_at = now() where id = $1 returning id', [id])).length, 1)
+  assert.deepEqual(await clientesAtivos(ANA), ['Metalúrgica Faísca Ltda'])
+  for (const fora of [CARLA, DANI]) {
+    assert.deepEqual(await clientesAtivos(fora), [])
+    await assert.rejects(como(fora, `insert into public.clientes_ativos (nome) values ('intruso')`), /row-level security/)
+    assert.equal((await como(fora, 'update public.clientes_ativos set deleted_at = now() returning id')).length, 0)
+  }
+  await assert.rejects(como(ANA, 'delete from public.clientes_ativos'), /permission denied/)
+  await assert.rejects(como(ANA, 'update public.clientes_ativos set created_at = now()'), /permission denied/)
+  await db.exec('set role anon')
+  try {
+    await assert.rejects(db.query('select * from public.clientes_ativos'), /permission denied/)
+  } finally {
+    await db.exec('reset role')
+  }
+})
+
+test('Clientes ativos: o mesmo nome não entra duas vezes na lista, mas volta depois de tirado; a carga roda de novo sem duplicar', async () => {
+  await como(ANA, `insert into public.clientes_ativos (nome) values ('Transportes Vento Sul Ltda')`)
+  await assert.rejects(como(BRUNO, `insert into public.clientes_ativos (nome) values ('  transportes vento sul ltda ')`), /clientes_ativos_nome_unico/)
+  await como(ANA, `update public.clientes_ativos set deleted_at = now() where nome = 'Transportes Vento Sul Ltda'`)
+  await como(BRUNO, `insert into public.clientes_ativos (nome) values ('Transportes Vento Sul Ltda')`)
+  assert.equal((await clientesAtivos(ANA)).filter((n) => n === 'Transportes Vento Sul Ltda').length, 1)
+  const carga = `insert into public.clientes_ativos (nome) values ('Construtora Pedra Lisa Ltda'), ('Transportes Vento Sul Ltda')
+    on conflict (lower(btrim(nome))) where deleted_at is null do nothing`
+  await db.exec(carga)
+  await db.exec(carga)
+  assert.equal((await clientesAtivos(ANA)).filter((n) => n === 'Construtora Pedra Lisa Ltda').length, 1)
+  await assert.rejects(como(ANA, `insert into public.clientes_ativos (nome) values ('   ')`), /check/)
+})

@@ -102,6 +102,31 @@ export const empresasMaps = () =>
     ),
   )
 
+// ---------- clientes ativos ----------
+// Uma lista só, lida inteira e guardada até alguém mudar: o mapa, as buscas do PC e a Prospecção conferem nela.
+// shortcut: lê até 1000 clientes de uma vez; acima disso, ler em páginas com lerTudo
+let pedidoClientes
+export function clientesAtivos() {
+  pedidoClientes ??= (async () => ok(await cliente().from('clientes_ativos').select('id,nome').is('deleted_at', null).order('nome').limit(1000)).data)().catch((err) => {
+    pedidoClientes = null
+    throw err
+  })
+  return pedidoClientes
+}
+
+export async function cadastrarCliente(nome) {
+  const { error } = await cliente().from('clientes_ativos').insert({ nome })
+  if (error?.code === '23505') throw new Error('Esse cliente já está na lista.')
+  ok({ error })
+  pedidoClientes = null
+}
+
+// tirar da lista não apaga: preenche deleted_at, e o cliente volta a aparecer nas pesquisas
+export async function tirarCliente(id) {
+  ok(await cliente().from('clientes_ativos').update({ deleted_at: new Date().toISOString() }).eq('id', id))
+  pedidoClientes = null
+}
+
 // ---------- equipe ----------
 // a linha de quem está logado diz se ele entra nos leads (ativo) e se cadastra usuários (admin)
 export const meuPerfil = async (userId) => ok(await cliente().from('membros').select('nome,papel,ativo').eq('user_id', userId).maybeSingle()).data

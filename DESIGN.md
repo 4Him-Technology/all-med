@@ -135,7 +135,7 @@ Bege quente de fundo, cartões brancos, texto azul-marinho e um petróleo para a
 
 ### Cores de estado
 - **Etapas do lead**: novo #5b6478, contato #2f6b80, qualificado #4b4f9e, proposta #9a6a12, negociação #b4541f, ganho #2e7d5b, perdido #b3261e. A pílula usa a cor no texto e a mesma cor a 13% no fundo.
-- **Já no kanban**: ganho #2e7d5b, no texto "No kanban" e no pino do mapa (pino cheio nas buscas do PC; aro verde com miolo branco no mapa das empresas).
+- **Já no kanban**: ganho #2e7d5b, no texto "No kanban" e no pino do mapa (pino cheio nas buscas do PC; aro verde com miolo branco no mapa das empresas). O mesmo verde marca "Cliente ativo" na Prospecção.
 - **Marcada no mapa das empresas**: anel marinho #0b1238 em volta do pino ou do círculo do grupo.
 
 ### Cores de segmento (mapa das empresas)
@@ -200,6 +200,12 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 
 ### Nova busca (Google Maps, atrás do botão "Nova busca pelo PC")
 - Campos separados na mesma linha: Ramo (vários separados por vírgula), Cidade, Bairro opcional e o botão Iniciar busca. Cada ramo vira um termo "ramo em cidade" para o scraper.
+
+### Clientes ativos
+- Cartão branco com o cadastro numa linha (campo "Cadastrar cliente" e botão primário) e a explicação de como o cliente é reconhecido; embaixo, o total e a busca na lista, e a tabela com Cliente, Escondidas no mapa (o que a regra reconheceu, ou "Nenhuma" em cinza) e o botão Tirar.
+- Tirar pede um segundo clique: o botão vira "Confirmar" em vermelho e volta ao normal quando perde o foco.
+- Nas pesquisas, o cliente reconhecido some do mapa e das buscas do PC; na Prospecção leva a etiqueta "Cliente ativo" em verde (o mesmo de "No kanban": já é ganho) no lugar da caixa de marcar.
+- Largura máxima de 1100px, alinhada à esquerda.
 
 ### Barra de lote
 - Barra marinho fixa no centro de baixo, com a contagem, "Limpar" e o botão branco "Mandar N para o kanban". Aparece com a primeira empresa marcada, entra subindo 12px em 220ms. Enquanto está na tela o aviso flutuante sobe para não ficar por baixo.

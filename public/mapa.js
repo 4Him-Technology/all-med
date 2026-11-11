@@ -1,7 +1,8 @@
 // Aba Google Maps: todas as empresas da pesquisa guardadas no CRM online num mapa só.
 // O painel ao lado tem a busca, os filtros e a lista, que mostra o que está na área do mapa; a ficha da empresa abre no mapa.
-// A lógica sem tela (filtros, contagens, área do mapa) está em lugares.js.
-import { empresasMaps, enviarLeads } from './crm.js'
+// A lógica sem tela (filtros, contagens, área do mapa) está em lugares.js. Quem já é cliente ativo não aparece (clientes.js).
+import { clienteDe, prepararClientes } from './clientes.js'
+import { clientesAtivos, empresasMaps, enviarLeads } from './crm.js'
 import { FILTRO_VAZIO, etiquetasDoMapa, facetas, filtrarLugares, juntarLugares, leadDoLugar, linkWhatsApp, listarOpcoes, naArea, ordenarLugares, regioes, resumoDaArea, rotuloLocal, semEtiqueta, tipoTelefone } from './lugares.js'
 import { $, avaliacao, carregando, esqueleto, estado, h, icone, toast } from './ui.js'
 
@@ -18,7 +19,9 @@ const semMovimento = () => matchMedia('(prefers-reduced-motion: reduce)').matche
 const temLugar = (l) => l.latitude != null && l.longitude != null
 
 const s = {
-  lugares: null, // todas as empresas, uma por place_id
+  todos: null, // todas as empresas, uma por place_id
+  lugares: null, // as que aparecem: todas menos as que já são clientes ativos
+  clientes: undefined, // a lista de clientes usada na última separação; null quando não carregou
   porId: new Map(),
   segmentos: [],
   locais: [],
@@ -86,7 +89,9 @@ export function abrirMapa() {
     s.mapa.invalidateSize()
     if (semTamanho) enquadrar()
   }
-  if (s.lendo || (s.lugares && Date.now() - s.lidoEm < VALIDADE)) return s.lendo
+  if (s.lendo) return s.lendo
+  // dentro da validade, só confere se a lista de clientes mudou na tela Clientes ativos
+  if (s.lugares && Date.now() - s.lidoEm < VALIDADE) return conferirClientes()
   const primeira = !s.lugares
   if (primeira) {
     $('#pm-topo').replaceChildren(esqueleto('linha'), esqueleto('linha'))
@@ -97,9 +102,10 @@ export function abrirMapa() {
 }
 
 async function lerEmpresas(primeira) {
-  let linhas
+  let linhas, clientes
   try {
-    linhas = await empresasMaps()
+    // a lista de clientes fora do ar não segura o mapa: as empresas aparecem, e o painel avisa
+    ;[linhas, clientes] = await Promise.all([empresasMaps(), clientesAtivos().catch((err) => (console.error('clientes:', err.message), null))])
   } catch (err) {
     // na releitura em segundo plano, o que já está na tela continua valendo
     if (!primeira) return
@@ -107,14 +113,13 @@ async function lerEmpresas(primeira) {
     $('#pm-lista').replaceChildren(h('li', {}, estado({ tipo: 'erro', titulo: 'As empresas não carregaram', texto: err.message, acao: h('button', { type: 'button', onclick: abrirMapa }, 'Tentar de novo') })))
     return
   }
-  s.lugares = juntarLugares(linhas)
+  s.todos = juntarLugares(linhas)
   s.lidoEm = Date.now()
-  s.porId = new Map(s.lugares.map((l) => [l.place_id, l]))
-  s.segmentos = [...new Set(s.lugares.flatMap((l) => l.segmentos))].sort(alfabetica)
-  s.locais = [...new Set(s.lugares.flatMap((l) => l.locais))]
+  s.segmentos = [...new Set(s.todos.flatMap((l) => l.segmentos))].sort(alfabetica)
+  s.locais = [...new Set(s.todos.flatMap((l) => l.locais))]
   // a cor do pino é a do primeiro segmento da empresa
-  for (const l of s.lugares) l.seg = s.segmentos.indexOf(l.segmentos[0]) % CORES
-  for (const id of s.marcadas) if (s.porId.get(id)?.enviado !== false) s.marcadas.delete(id)
+  for (const l of s.todos) l.seg = s.segmentos.indexOf(l.segmentos[0]) % CORES
+  separarClientes(clientes)
   // os pinos guardam a empresa da leitura anterior: são refeitos
   s.pinos.clear()
   s.assinatura = ''
@@ -124,6 +129,38 @@ async function lerEmpresas(primeira) {
   }
   aplicar({ ajustar: primeira })
   desenharBarra()
+  desenharNotaClientes()
+}
+
+// Tira do mapa quem já é cliente ativo. Sem a lista (null), nada some e o painel avisa.
+function separarClientes(clientes) {
+  s.clientes = clientes
+  const preparados = prepararClientes(clientes ?? [])
+  for (const l of s.todos) l.cliente = clienteDe(l.nome, preparados)?.nome ?? null
+  s.lugares = s.todos.filter((l) => !l.cliente)
+  s.porId = new Map(s.lugares.map((l) => [l.place_id, l]))
+  // marcada que virou cliente, ou que já foi para o kanban, sai da seleção
+  for (const id of s.marcadas) if (s.porId.get(id)?.enviado !== false) s.marcadas.delete(id)
+}
+
+// a lista de clientes guardada só muda quando alguém cadastra ou tira um cliente
+async function conferirClientes() {
+  const clientes = await clientesAtivos().catch(() => s.clientes)
+  if (clientes === s.clientes) return
+  separarClientes(clientes)
+  s.assinatura = ''
+  aplicar({ ajustar: false })
+  desenharBarra()
+  desenharNotaClientes()
+}
+
+function desenharNotaClientes() {
+  const el = s.ui.notaClientes
+  const n = s.todos.length - s.lugares.length
+  el.classList.toggle('erro', s.clientes === null)
+  el.hidden = s.clientes !== null && !n
+  if (s.clientes === null) el.replaceChildren(icone('alerta', 14), 'A lista de clientes ativos não carregou: eles podem aparecer no mapa.')
+  else el.replaceChildren(`${numero(n)} ${n === 1 ? 'empresa é cliente ativo e não aparece aqui.' : 'empresas são clientes ativos e não aparecem aqui.'} `, h('button', { type: 'button', class: 'link', onclick: () => $('.aba[data-aba="clientes"]')?.click() }, 'Ver clientes'))
 }
 
 // ---------- painel: busca, filtros e resumo ----------
@@ -166,7 +203,8 @@ function montarPainel() {
     botao.focus()
   })
   document.addEventListener('pointerdown', (e) => s.painel && !filtros.contains(e.target) && alternarPainel(s.painel, true))
-  $('#pm-resumo').replaceChildren(h('div', { class: 'pm-linha' }, s.ui.total, s.ui.verTodas), h('div', { class: 'pm-linha' }, h('label', { class: 'check' }, s.ui.todas, 'Marcar todas'), h('span', { class: 'esp' }), s.ui.ordem))
+  s.ui.notaClientes = h('p', { class: 'pm-clientes', hidden: true })
+  $('#pm-resumo').replaceChildren(h('div', { class: 'pm-linha' }, s.ui.total, s.ui.verTodas), s.ui.notaClientes, h('div', { class: 'pm-linha' }, h('label', { class: 'check' }, s.ui.todas, 'Marcar todas'), h('span', { class: 'esp' }), s.ui.ordem))
 
   let espera
   s.ui.q.addEventListener('input', () => {

@@ -1,5 +1,6 @@
 // Prospecção na base de CNPJ da Receita (Postgres local do Docker): filtros na barra, resultados, detalhe e envio em lote para o kanban online
-import { criarLead, enviarLeads, jaNoCrm } from './crm.js'
+import { clienteDe, prepararClientes } from './clientes.js'
+import { clientesAtivos, criarLead, enviarLeads, jaNoCrm } from './crm.js'
 import { CONTATO, dataBr, etiquetasDosFiltros, FAIXAS, moeda, ORDEM_PORTES, ORDEM_SITUACOES, PORTES, SITUACOES } from './filtros.js'
 import { config, supabase } from './supa.js'
 import { $, api, carregando, esqueleto, estado, fecharDialogo, h, icone, norm, toast } from './ui.js'
@@ -26,6 +27,9 @@ let municipios = [] // todas as cidades com empresa na base: { codigo, nome, uf 
 let sel = {}
 let itens = [] // empresas da página na tela
 let noCrm = new Map() // cnpj -> arquivada?, das empresas da página que já estão no CRM
+// cnpj -> nome do cliente, das empresas da página que já são clientes ativos (a busca vem paginada do PC:
+// esconder bagunçaria a contagem e as páginas, então elas aparecem marcadas e não vão para o kanban)
+let clientesNaPagina = new Map()
 const marcadas = new Map() // cnpj -> empresa; vale entre páginas da mesma busca
 
 // Combobox com busca e etiquetas removíveis (UF, cidade, CNAE, natureza jurídica), no padrão ARIA:
@@ -374,8 +378,14 @@ async function buscar(nova = true) {
       $('#estado-prospeccao').replaceChildren(estado({ titulo: 'Nenhuma empresa com esses filtros', texto: 'Tente tirar um filtro de contato ou de perfil, incluir a atividade secundária ou ampliar a localização.' }))
     } else {
       itens = r.itens
-      // o CRM fora do ar não pode esconder a lista: sem a resposta, só não aparece quem já está no kanban
-      noCrm = await jaNoCrm(itens.map((e) => e.cnpj)).catch((err) => (console.error('CRM:', err.message), new Map()))
+      // o CRM fora do ar não pode esconder a lista: sem a resposta, só não aparece quem já está no kanban ou é cliente
+      const [noKanban, clientes] = await Promise.all([
+        jaNoCrm(itens.map((e) => e.cnpj)).catch((err) => (console.error('CRM:', err.message), new Map())),
+        (supabase ? clientesAtivos() : Promise.resolve([])).catch((err) => (console.error('clientes:', err.message), [])),
+      ])
+      noCrm = noKanban
+      const preparados = prepararClientes(clientes)
+      clientesNaPagina = new Map(itens.map((e) => [e.cnpj, (clienteDe(e.razao_social, preparados) ?? clienteDe(e.nome_fantasia, preparados))?.nome]).filter(([, c]) => c))
       desenharLinhas()
       // um único movimento: a lista nova aparece de uma vez, sem efeito em cascata
       corpo.classList.add('atualizado')
@@ -420,7 +430,8 @@ function contatos(e) {
 
 const nomeEmpresa = (e) => e.nome_fantasia ?? e.razao_social ?? fmtCnpj(e.cnpj)
 // sem CRM ligado neste PC não há para onde mandar: a coluna de marcar fica vazia
-const marcavel = (e) => Boolean(supabase) && !noCrm.has(e.cnpj)
+const marcavel = (e) => Boolean(supabase) && !noCrm.has(e.cnpj) && !clientesNaPagina.has(e.cnpj)
+const etiquetaCliente = (e) => h('span', { class: 'ja', title: `Cliente ativo: ${clientesNaPagina.get(e.cnpj)}` }, 'Cliente ativo')
 
 function desenharLinhas() {
   $('#lista-empresas').replaceChildren(...itens.map(linhaEmpresa))
@@ -498,7 +509,9 @@ const linhaEmpresa = (e) =>
       { class: 'col-marcar' },
       noCrm.has(e.cnpj)
         ? h('span', { class: 'ja' }, noCrm.get(e.cnpj) ? 'Arquivada' : 'No kanban')
-        : marcavel(e) &&
+        : clientesNaPagina.has(e.cnpj)
+          ? etiquetaCliente(e)
+          : marcavel(e) &&
             h('input', {
               type: 'checkbox',
               checked: marcadas.has(e.cnpj),
@@ -594,7 +607,13 @@ async function abrirEmpresa(e) {
         h('div', {}, h('h2', { id: 'drawer-titulo' }, e.nome_fantasia ?? e.razao_social), h('p', { class: 'muted' }, `${e.razao_social ?? ''} · CNPJ ${fmtCnpj(e.cnpj)}`)),
         h('button', { type: 'button', class: 'fechar', 'aria-label': 'Fechar', onclick: () => fecharDialogo(dlg) }, icone('x', 20)),
       ),
-      h('div', { class: 'atalhos' }, situacao(e), h('span', { class: 'muted' }, regimes(e)), h('button', { type: 'button', class: 'primario', onclick: (ev) => paraKanban(e, ev.currentTarget, (lead) => abrirLeadCrm?.(lead.id)) }, icone('mais'), 'Adicionar ao kanban')),
+      h(
+        'div',
+        { class: 'atalhos' },
+        situacao(e),
+        h('span', { class: 'muted' }, regimes(e)),
+        clientesNaPagina.has(e.cnpj) ? etiquetaCliente(e) : h('button', { type: 'button', class: 'primario', onclick: (ev) => paraKanban(e, ev.currentTarget, (lead) => abrirLeadCrm?.(lead.id)) }, icone('mais'), 'Adicionar ao kanban'),
+      ),
       h(
         'dl',
         { class: 'ficha' },
