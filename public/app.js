@@ -1,4 +1,4 @@
-import { buscaMaps, camposLead, idGrupoMaps, ultimoContato } from './campos.js'
+import { buscaMaps, camposLead, idGrupoMaps, resumoBusca, ultimoContato } from './campos.js'
 import * as crm from './crm.js'
 import { carregarProspeccao } from './prospeccao.js'
 import { ROTULOS as R, STATUS } from './rotulos.js'
@@ -8,7 +8,6 @@ import { $, api, carregando, esqueleto, estado, fecharDialogo, h, icone, prepara
 const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 const fmtDia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
 const fmtData = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
-const horaCurta = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 const quando = (iso) => fmt.format(new Date(iso))
 const nota = (n) => n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
@@ -489,12 +488,7 @@ function cartaoBusca(b) {
 
 function topoBusca(b) {
   const abre = b.status === 'importado' && b.encontrados > 0
-  const meta = {
-    pendente: 'esperando a vez',
-    executando: `começou às ${horaCurta.format(new Date(b.created_at))}`,
-    importado: b.encontrados ? `${b.encontrados} ${b.encontrados === 1 ? 'encontrada' : 'encontradas'}${b.enviados ? ` · ${b.enviados} no kanban` : ''}` : 'nenhuma empresa encontrada',
-    falhou: b.erro ?? 'a busca parou com erro',
-  }[b.status]
+  const meta = resumoBusca(b)
   const conteudo = [
     abre && icone('baixo', 16),
     h('strong', { id: `bc-${b.id}-nome` }, b.nome),

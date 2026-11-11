@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buscaMaps, camposLead, idGrupoMaps, mensagemErro, termoBusca, ultimoContato } from '../public/campos.js'
+import { buscaMaps, camposLead, idGrupoMaps, mensagemErro, resumoBusca, termoBusca, ultimoContato } from '../public/campos.js'
 
 test('converte o formulário para as colunas do Supabase', () => {
   assert.deepEqual(camposLead({ nome: ' Clínica ', site: '', emails: 'a@b.com, ,c@d.com', temperatura: '' }), {
@@ -38,6 +38,15 @@ test('busca do Maps: cada ramo vira um termo na cidade, com o bairro quando houv
 test('cartão do Google Maps guardado no CRM online: id sem espaço nem acento, um por local e segmento', () => {
   assert.equal(idGrupoMaps({ local_busca: 'Morumbi, São Paulo - SP', segmento: 'Construção Civil' }), 'crm-morumbi-sao-paulo-sp-construcao-civil')
   assert.notEqual(idGrupoMaps({ local_busca: 'Lapa, São Paulo - SP', segmento: 'Padaria (redes)' }), idGrupoMaps({ local_busca: 'Lapa, São Paulo - SP', segmento: 'Padaria (avulsas)' }))
+})
+
+test('resumo do cartão da busca; o cartão do CRM online não tem hora de início e não pode quebrar a lista', () => {
+  assert.equal(resumoBusca({ status: 'importado', encontrados: 12, enviados: 3 }), '12 encontradas · 3 no kanban')
+  assert.equal(resumoBusca({ status: 'importado', encontrados: 1, enviados: 0 }), '1 encontrada')
+  assert.equal(resumoBusca({ status: 'importado', encontrados: 0, enviados: 0 }), 'nenhuma empresa encontrada')
+  assert.equal(resumoBusca({ status: 'pendente', created_at: '2026-11-10T13:05:00Z' }), 'esperando a vez')
+  assert.equal(resumoBusca({ status: 'falhou', created_at: '2026-11-10T13:05:00Z' }), 'a busca parou com erro')
+  assert.match(resumoBusca({ status: 'executando', created_at: '2026-11-10T13:05:00Z' }), /^começou às \d{2}:\d{2}$/)
 })
 
 test('traduz os erros do banco para mensagens da tela', () => {
