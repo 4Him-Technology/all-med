@@ -35,6 +35,15 @@ export function buscaMaps({ ramos, cidade, bairro }) {
   return { nome: `${lista.join(', ')} · ${String(cidade ?? '').trim()}`.slice(0, 200), keywords: lista.map((r) => `${r} em ${local}`) }
 }
 
+// id do cartão de um grupo do Google Maps guardado no CRM online; vai em atributo id do HTML, então sem espaço nem acento
+export const idGrupoMaps = ({ local_busca, segmento }) =>
+  `crm-${`${local_busca} ${segmento}`
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')}`
+
 const hora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 const dia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 const mesmoDia = (a, b) => a.toDateString() === b.toDateString()

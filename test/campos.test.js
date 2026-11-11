@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buscaMaps, camposLead, mensagemErro, termoBusca, ultimoContato } from '../public/campos.js'
+import { buscaMaps, camposLead, idGrupoMaps, mensagemErro, termoBusca, ultimoContato } from '../public/campos.js'
 
 test('converte o formulário para as colunas do Supabase', () => {
   assert.deepEqual(camposLead({ nome: ' Clínica ', site: '', emails: 'a@b.com, ,c@d.com', temperatura: '' }), {
@@ -33,6 +33,11 @@ test('busca do Maps: cada ramo vira um termo na cidade, com o bairro quando houv
   assert.deepEqual(buscaMaps({ ramos: 'ortopedista', cidade: 'São José do Rio Preto - SP', bairro: 'Centro' }).keywords, [
     'ortopedista em Centro, São José do Rio Preto - SP',
   ])
+})
+
+test('cartão do Google Maps guardado no CRM online: id sem espaço nem acento, um por local e segmento', () => {
+  assert.equal(idGrupoMaps({ local_busca: 'Morumbi, São Paulo - SP', segmento: 'Construção Civil' }), 'crm-morumbi-sao-paulo-sp-construcao-civil')
+  assert.notEqual(idGrupoMaps({ local_busca: 'Lapa, São Paulo - SP', segmento: 'Padaria (redes)' }), idGrupoMaps({ local_busca: 'Lapa, São Paulo - SP', segmento: 'Padaria (avulsas)' }))
 })
 
 test('traduz os erros do banco para mensagens da tela', () => {

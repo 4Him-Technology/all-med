@@ -84,6 +84,23 @@ export async function enviarLeads(leads, chave = 'place_id') {
   return novos
 }
 
+// ---------- Google Maps guardado no CRM online ----------
+// um cartão por local da busca e segmento, com quantas empresas tem e quantas já viraram lead
+export const gruposMaps = async () =>
+  ok(await cliente().from('maps_grupos').select('local_busca,segmento,encontrados,enviados').order('local_busca').order('segmento').limit(500)).data
+
+// empresas de um cartão, no mesmo formato das buscas do PC (os campos do lead e se já foi enviado)
+export const lugaresMaps = async ({ local_busca, segmento }) =>
+  ok(
+    await cliente()
+      .from('maps_empresas')
+      .select('place_id,nome,categoria,endereco,telefone,site,avaliacao,total_avaliacoes,latitude,longitude,link_maps,enviado')
+      .eq('local_busca', local_busca)
+      .eq('segmento', segmento)
+      .order('nome')
+      .limit(1000),
+  ).data
+
 // ---------- equipe ----------
 // a linha de quem está logado diz se ele entra nos leads (ativo) e se cadastra usuários (admin)
 export const meuPerfil = async (userId) => ok(await cliente().from('membros').select('nome,papel,ativo').eq('user_id', userId).maybeSingle()).data

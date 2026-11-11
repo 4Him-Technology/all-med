@@ -179,3 +179,51 @@ test('quem já tinha conta quando a equipe foi criada vira admin', async () => {
   // quem já entrava com senha conta como primeiro acesso feito
   assert.ok((await banco.query('select ativado_em from public.membros')).rows[0].ativado_em)
 })
+
+// ---------- Google Maps no CRM online ----------
+// a carga roda no SQL Editor (sem RLS): aqui ela entra direto, como dona das tabelas
+const lugarMaps = (placeId, nome, extra = {}) => {
+  const c = { place_id: placeId, segmento: 'Transportadora', servico: 'PCMSO', local_busca: 'Lapa, São Paulo - SP', nome, categoria: 'Serviço de transporte', endereco: 'R. A, 1 - Lapa, São Paulo - SP, 05075-000', telefone: '(11) 3333-4444', avaliacao: 4.5, latitude: -23.52, longitude: -46.7, ...extra }
+  const cols = Object.keys(c)
+  return db.query(
+    `insert into public.maps_lugares (${cols.join(',')}) values (${cols.map((_, i) => `$${i + 1}`).join(',')})
+     on conflict (place_id, segmento, local_busca) do update set nome = excluded.nome`,
+    Object.values(c),
+  )
+}
+
+test('Google Maps no CRM online: a equipe vê as empresas por local e segmento, e quais já estão no kanban', async () => {
+  await lugarMaps('0xmaps1:0x1', 'Trans A')
+  await lugarMaps('0xmaps2:0x2', 'Trans B')
+  await novoLead(ANA, { nome: 'Trans A', place_id: '0xmaps1:0x1', origem: 'maps' })
+  const grupos = await como(BRUNO, `select segmento, encontrados, enviados from public.maps_grupos where local_busca = 'Lapa, São Paulo - SP'`)
+  assert.deepEqual(grupos, [{ segmento: 'Transportadora', encontrados: 2, enviados: 1 }])
+  const empresas = await como(BRUNO, `select nome, enviado from public.maps_empresas where local_busca = 'Lapa, São Paulo - SP' order by nome`)
+  assert.deepEqual(empresas, [
+    { nome: 'Trans A', enviado: true },
+    { nome: 'Trans B', enviado: false },
+  ])
+  for (const fora of [CARLA, DANI]) {
+    assert.equal((await como(fora, 'select * from public.maps_empresas')).length, 0)
+    assert.equal((await como(fora, 'select * from public.maps_grupos')).length, 0)
+  }
+})
+
+test('Google Maps no CRM online: o app só lê; quem grava é a carga', async () => {
+  await assert.rejects(como(ANA, `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xmaps3:0x3', 'S', 'L', 'N', 'E', 'T', 3)`), /permission denied/)
+  await assert.rejects(como(ANA, `update public.maps_lugares set nome = 'x'`), /permission denied/)
+  await assert.rejects(como(ANA, 'delete from public.maps_lugares'), /permission denied/)
+  await db.exec('set role anon')
+  try {
+    await assert.rejects(db.query('select * from public.maps_empresas'), /permission denied/)
+  } finally {
+    await db.exec('reset role')
+  }
+})
+
+test('Google Maps no CRM online: só entra empresa com endereço, telefone e nota, e a carga roda de novo sem duplicar', async () => {
+  for (const falta of ['endereco', 'telefone', 'avaliacao']) await assert.rejects(lugarMaps(`0xmaps-${falta}:0x9`, 'Incompleta', { [falta]: null }), new RegExp(falta))
+  await lugarMaps('0xmaps4:0x4', 'Primeira carga')
+  await lugarMaps('0xmaps4:0x4', 'Segunda carga')
+  assert.deepEqual((await db.query(`select nome from public.maps_lugares where place_id = '0xmaps4:0x4'`)).rows, [{ nome: 'Segunda carga' }])
+})
