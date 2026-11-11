@@ -37,6 +37,8 @@
       </nav>
       <div class="conta">
         <a id="link-web" class="botao" target="_blank" rel="noopener noreferrer" hidden>CRM online</a>
+        <!-- só onde há o PC e com login: de qualquer aba leva às buscas novas do scraper -->
+        <button type="button" id="btn-busca-pc" data-local data-crm><span class="rotulo-busca-pc">Nova busca pelo PC</span></button>
         <button type="button" id="btn-novo-lead" class="primario" data-crm>Novo lead</button>
         <!-- popover nativo: abre e fecha no clique, fecha com Esc e com clique fora -->
         <button type="button" id="btn-conta" class="btn-conta" popovertarget="menu-conta" aria-label="Minha conta" hidden></button>
@@ -132,8 +134,6 @@
           </aside>
           <div class="mapa-area">
             <div id="mapa-geral" class="mapa" role="region" aria-label="Mapa das empresas. A lista ao lado mostra as mesmas empresas."></div>
-            <!-- no canto do mapa para não tirar altura da lista; só aparece onde há o PC -->
-            <button type="button" id="abrir-buscas-pc" class="botao-mapa" data-local>Nova busca pelo PC</button>
             <p id="legenda-mapa" class="legenda-mapa" hidden>
               <span><span class="pe sel" aria-hidden="true"></span>Marcada</span>
               <span><span class="pe ja" aria-hidden="true"></span>Já no kanban</span>
@@ -144,7 +144,7 @@
           </div>
         </div>
 
-        <!-- buscas novas pelo scraper do PC: ficam atrás do botão "Nova busca pelo PC" -->
+        <!-- buscas novas pelo scraper do PC: abrem pelo botão "Nova busca pelo PC", no topo -->
         <div id="buscas-pc" hidden>
           <p class="voltar-mapa"><button type="button" id="voltar-mapa" class="link">Voltar ao mapa das empresas</button></p>
         <form id="form-busca" class="nova-busca" data-local>

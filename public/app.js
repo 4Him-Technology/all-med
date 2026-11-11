@@ -839,6 +839,7 @@ async function iniciar() {
   prepararDialogos()
   // ícones dos botões fixos do HTML (o texto continua sendo o nome acessível)
   $('#btn-novo-lead').prepend(icone('mais'))
+  $('#btn-busca-pc').prepend(icone('buscar'))
   $('#btn-conta').append(icone('usuario', 20))
   $('#menu-usuarios').prepend(icone('equipe'))
   $('#menu-senha').prepend(icone('chave'))
@@ -896,14 +897,15 @@ async function iniciar() {
   mapaLigado = logado
   if (logado) $('.aba[data-aba="buscas"]').hidden = false
   else if (!temPc) delete abas.buscas
-  // trocar de tela leva o foco junto: quem está no teclado continua de onde a tela nova começa
-  $('#abrir-buscas-pc').addEventListener('click', () => {
+  // o botão do topo leva às buscas do PC de qualquer aba; trocar de tela leva o foco junto
+  $('#btn-busca-pc').addEventListener('click', () => {
+    if (abaAtual !== 'buscas') abrirAba('buscas')
     mostrarBuscasPc(true)
     $('#form-busca').elements.ramos.focus()
   })
   $('#voltar-mapa').addEventListener('click', () => {
     mostrarBuscasPc(false)
-    $('#abrir-buscas-pc').focus()
+    $('#btn-busca-pc').focus()
   })
   if (config.local && config.urlWeb) {
     $('#link-web').href = config.urlWeb
