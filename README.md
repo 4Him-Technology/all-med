@@ -9,7 +9,7 @@ Gerenciador de leads com kanban de acompanhamento e histórico de atendimentos. 
 | CRM online | Supabase pessoal (plano Free) + site estático (Netlify ou Cloudflare Pages) | Login, leads, kanban, histórico de atendimentos | 0 |
 | Prospecção | PC com Docker | Base de CNPJ da Receita (Postgres), importador mensal, scraper do Google Maps | Só o disco do PC |
 
-A mesma pasta `public/` serve as duas partes. No PC, o servidor local entrega a tela com as abas Prospecção e Google Maps, e o envio de empresas grava direto no Supabase, logado com o seu usuário. Na web, o site mostra só Kanban e Leads. O Supabase nunca vê a base de CNPJ, só as empresas que você escolhe.
+A mesma pasta `public/` serve as duas partes. No PC, o servidor local entrega a tela com as abas Prospecção e Google Maps, e o envio de empresas grava direto no Supabase, logado com o seu usuário. Na web, o site mostra Kanban, Leads e as empresas do Google Maps guardadas no CRM online. O Supabase nunca vê a base de CNPJ, só as empresas que você escolhe.
 
 ## 1. Configurar o Supabase (uma vez)
 
@@ -106,6 +106,12 @@ Sem Docker, dá para testar a tela com `CNPJ_DEMO=1` no `.env` e `npm start`: o 
 Na aba Google Maps você cadastra uma busca ("dentistas em Campinas"). O servidor local manda para o scraper, acompanha o job e guarda o resultado no PC. Quando a busca fica pronta, o botão "Enviar ao kanban" manda os leads para o Supabase; os que já estão lá (mesmo lugar do Maps) o banco ignora.
 
 O scraper só roda em Docker. O `.exe` de Windows v1.18.1 falha em toda busca (issue [gosom/google-maps-scraper#322](https://github.com/gosom/google-maps-scraper/issues/322)). `npm run scraper:fake` sobe um servidor que imita a API do gosom com empresas fictícias, para mexer na tela sem raspar o Google.
+
+### Empresas do Google Maps guardadas no CRM online
+
+Empresas levantadas fora do sistema (por exemplo, numa planilha) ficam na tabela `maps_lugares` do CRM online (migration `20261110120000_maps_no_crm.sql`). Só entram as que têm endereço, telefone e nota do Google. Na aba Google Maps, cada local da busca (cidade e bairro) com cada segmento vira um cartão, que abre a mesma lista com mapa das buscas do PC e manda as marcadas para o kanban. Esses cartões não dependem do PC, então a aba também aparece no site para quem está logado; só o formulário de busca nova continua precisando do PC.
+
+A equipe só lê essa tabela. A carga roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar. Para tirar tudo: `delete from public.maps_lugares;`. Para voltar atrás na tabela, veja o rollback no começo da migration.
 
 ## Segurança
 
