@@ -192,6 +192,190 @@ test('quem já tinha conta quando a equipe foi criada vira admin', async () => {
   assert.ok((await banco.query('select ativado_em from public.membros')).rows[0].ativado_em)
 })
 
+// ---------- Painel gerencial ----------
+// Banco próprio, porque os números somam tudo o que existe nele. O período fica em setembro de 2026 (8 a 14, horário de São Paulo);
+// os leads parados contam a partir de agora. O cenário entra direto, como dona das tabelas, para escolher as datas.
+const PERIODO = ['2026-09-08T03:00:00Z', '2026-09-15T02:59:59Z']
+const L = (n) => `aaaaaaaa-0000-4000-8000-00000000000${n}`
+let bancoPainel
+const painelPronto = () => (bancoPainel ??= montarPainel())
+async function montarPainel() {
+  const b = new PGlite()
+  await b.exec(AUTH_SUPABASE)
+  await migrar(b)
+  for (const [id, email] of [[ANA, 'ana@x.com'], [BRUNO, 'bruno@x.com'], [CARLA, 'carla@x.com'], [DANI, 'dani@x.com']]) await b.query('insert into auth.users values ($1, $2)', [id, email])
+  await b.query(`insert into public.membros (user_id, email, nome, papel, ativo) values ($1, 'ana@x.com', 'Ana', 'admin', true), ($2, 'bruno@x.com', 'Bruno', 'membro', true), ($3, 'dani@x.com', 'Dani', 'membro', false)`, [ANA, BRUNO, DANI])
+  await b.query(
+    `insert into public.leads (id, user_id, nome, status, temperatura, origem, place_id, cnpj, created_at, deleted_at) values
+      ($1, $7, 'Lead Um', 'ganho', null, 'maps', 'p1', null, '2026-09-08T12:00:00Z', null),
+      ($2, $7, 'Lead Dois', 'perdido', null, 'receita', null, '55555555000101', '2026-09-09T12:00:00Z', null),
+      ($3, $7, 'Lead Três', 'novo', 'quente', 'manual', null, null, '2026-09-10T12:00:00Z', null),
+      ($4, $7, 'Lead Quatro', 'contato', null, 'maps', 'p2', null, '2026-09-02T12:00:00Z', null),
+      ($5, $7, 'Lead Arquivado', 'novo', null, 'manual', null, null, '2026-09-09T12:00:00Z', '2026-09-10T12:00:00Z'),
+      ($6, $7, 'Lead Recente', 'qualificado', null, 'manual', null, null, now() - interval '3 days', null)`,
+    [L(1), L(2), L(3), L(4), L(5), L(6), ANA],
+  )
+  // histórico de etapas no formato que o trigger grava, e os contatos registrados na ficha
+  await b.query(
+    `insert into public.atendimentos (lead_id, user_id, tipo, descricao, data) values
+      ($1, $6, 'status', 'Status alterado de Novo para Em contato', '2026-09-09T12:00:00Z'),
+      ($1, $6, 'status', 'Status alterado de Em contato para Proposta', '2026-09-10T12:00:00Z'),
+      ($1, $6, 'status', 'Status alterado de Proposta para Ganho', '2026-09-12T12:00:00Z'),
+      ($2, $6, 'status', 'Status alterado de Novo para Em contato', '2026-09-10T13:00:00Z'),
+      ($2, $6, 'status', 'Status alterado de Em contato para Perdido', '2026-09-13T12:00:00Z'),
+      ($3, $6, 'status', 'Status alterado de Novo para Em contato', '2026-09-03T12:00:00Z'),
+      ($1, $6, 'ligacao', 'oi', '2026-09-08T15:00:00Z'),
+      ($1, $6, 'whatsapp', 'oi', '2026-09-12T01:30:00Z'),
+      ($2, $6, 'email', 'oi', '2026-09-10T18:00:00Z'),
+      ($3, $6, 'ligacao', 'oi', '2026-09-03T13:00:00Z'),
+      ($4, $6, 'visita', 'oi', '2026-09-09T14:00:00Z'),
+      ($5, $6, 'outro', 'oi', now() - interval '1 day')`,
+    [L(1), L(2), L(4), L(5), L(6), BRUNO],
+  )
+  // p1 aparece em dois segmentos da mesma busca; p4 foi excluída
+  await b.exec(
+    `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao, created_at, deleted_at) values
+      ('p1', 'Transportadora', 'Lapa', 'Lead Um', 'R. A, 1', '(11) 3333-0001', 4.5, '2026-08-01T12:00:00Z', null),
+      ('p1', 'Logística', 'Lapa', 'Lead Um', 'R. A, 1', '(11) 3333-0001', 4.5, '2026-08-01T12:00:00Z', null),
+      ('p2', 'Transportadora', 'Osasco', 'Lead Quatro', 'R. B, 2', '(11) 3333-0002', 4.0, '2026-08-01T12:00:00Z', null),
+      ('p3', 'Padaria', 'Lapa', 'Padaria Três', 'R. C, 3', '(11) 3333-0003', 4.8, '2026-09-10T12:00:00Z', null),
+      ('p4', 'Padaria', 'Osasco', 'Padaria Fechada', 'R. D, 4', '(11) 3333-0004', 3.0, '2026-08-01T12:00:00Z', '2026-08-02T12:00:00Z');
+     insert into public.clientes_ativos (nome, deleted_at) values ('Cliente Ativo', null), ('Cliente Tirado', now());`,
+  )
+  return b
+}
+async function painelComo(uid, de, ate) {
+  const b = await painelPronto()
+  await b.exec('set role authenticated')
+  await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid])
+  try {
+    return (await b.query('select public.painel_gerencial($1, $2) as p', [de, ate])).rows[0].p
+  } finally {
+    await b.exec('reset role')
+  }
+}
+const porChave = (linhas, chave, valor) => Object.fromEntries(linhas.map((l) => [l[chave], l[valor]]))
+
+test('Painel: números do período contra o período anterior, sem contar mudança de etapa como contato nem lead arquivado', async () => {
+  const p = await painelComo(ANA, ...PERIODO)
+  assert.equal(p.periodo.unidade, 'day')
+  assert.equal(p.periodo.compara, true)
+  assert.deepEqual(p.atual, { contatos: 4, leads_novos: 3, avancos: 4, ganhos: 1, perdidos: 1, empresas_novas: 1 })
+  assert.deepEqual(p.anterior, { contatos: 1, leads_novos: 1, avancos: 1, ganhos: 0, perdidos: 0, empresas_novas: 0 })
+  // dos 3 leads do período, 2 tiveram contato (3 h e 30 h depois de entrar) e 1 ainda não
+  assert.deepEqual(p.primeiro_contato, { leads: 3, com_contato: 2, sem_contato: 1, mediana_horas: 16.5 })
+  assert.deepEqual(porChave(p.tipos, 'tipo', 'total'), { email: 1, ligacao: 1, visita: 1, whatsapp: 1 })
+})
+
+test('Painel: funil dos leads que entraram no período conta quem chegou pelo menos até cada etapa', async () => {
+  const { funil, origens } = await painelComo(ANA, ...PERIODO)
+  // o Lead Um pulou Qualificado e Negociação, mas chegou ao Ganho: conta em todas as etapas até lá
+  assert.deepEqual(porChave(funil.etapas, 'status', 'leads'), { novo: 3, contato: 2, qualificado: 1, proposta: 1, negociacao: 1, ganho: 1 })
+  assert.deepEqual(funil.etapas.map((e) => e.status), ['novo', 'contato', 'qualificado', 'proposta', 'negociacao', 'ganho'])
+  assert.equal(funil.perdidos, 1)
+  assert.equal(funil.em_aberto, 1)
+  const o = Object.fromEntries(origens.map(({ origem, ...resto }) => [origem, resto]))
+  assert.deepEqual(o, {
+    maps: { leads: 1, com_contato: 1, ganhos: 1, perdidos: 0 },
+    receita: { leads: 1, com_contato: 1, ganhos: 0, perdidos: 1 },
+    manual: { leads: 1, com_contato: 0, ganhos: 0, perdidos: 0 },
+  })
+})
+
+test('Painel: série por dia no horário de São Paulo, com os dias vazios no lugar', async () => {
+  const { serie } = await painelComo(ANA, ...PERIODO)
+  assert.deepEqual(serie.map((s) => s.inicio), ['2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14'])
+  // o WhatsApp das 01:30 UTC do dia 12 foi às 22:30 do dia 11 em São Paulo
+  assert.deepEqual(serie.map((s) => s.contatos), [1, 1, 1, 1, 0, 0, 0])
+  assert.deepEqual(serie.map((s) => s.leads), [1, 1, 1, 0, 0, 0, 0])
+  assert.deepEqual(serie.map((s) => s.ganhos), [0, 0, 0, 0, 1, 0, 0])
+})
+
+test('Painel: situação de hoje, com os leads em andamento parados há mais de 7 dias sem contato', async () => {
+  const { hoje } = await painelComo(ANA, ...PERIODO)
+  assert.deepEqual(porChave(hoje.etapas, 'status', 'leads'), { novo: 1, contato: 1, qualificado: 1, ganho: 1, perdido: 1 })
+  assert.deepEqual(hoje.parados.faixas, { ate_7: 1, de_8_a_14: 0, de_15_a_30: 0, mais_de_30: 2 })
+  // o mais antigo primeiro; quem nunca teve contato conta desde que entrou
+  assert.deepEqual(hoje.parados.lista.map((l) => [l.id, l.nome, l.status, l.temperatura, l.nunca]), [
+    [L(4), 'Lead Quatro', 'contato', null, false],
+    [L(3), 'Lead Três', 'novo', 'quente', true],
+  ])
+  assert.ok(hoje.parados.lista.every((l) => l.dias > 30))
+  assert.deepEqual(porChave(hoje.temperatura, 'temperatura', 'leads'), { quente: 1, null: 2 })
+  assert.equal(hoje.clientes_ativos, 1)
+  assert.equal(hoje.empresas, 3)
+  assert.equal(hoje.empresas_lead, 2)
+})
+
+test('Painel: segmentos e locais de busca do Google Maps, com quantas empresas viraram lead e quantas foram ganhas', async () => {
+  const { segmentos, regioes } = await painelComo(ANA, ...PERIODO)
+  assert.deepEqual(segmentos, [
+    { segmento: 'Transportadora', empresas: 2, leads: 2, ganhos: 1 },
+    { segmento: 'Logística', empresas: 1, leads: 1, ganhos: 1 },
+    { segmento: 'Padaria', empresas: 1, leads: 0, ganhos: 0 },
+  ])
+  assert.deepEqual(regioes, [
+    { local_busca: 'Lapa', empresas: 2, leads: 1, ganhos: 1 },
+    { local_busca: 'Osasco', empresas: 1, leads: 1, ganhos: 0 },
+  ])
+})
+
+test('Painel: sem período escolhido vai desde o começo e não compara', async () => {
+  const p = await painelComo(ANA, null, null)
+  assert.equal(p.periodo.compara, false)
+  assert.equal(p.anterior, null)
+  assert.equal(p.atual.leads_novos, 5)
+  assert.equal(p.atual.contatos, 6)
+  // começa no registro mais antigo (a empresa de agosto): até uns 6 meses a série vai por semana, depois por mês
+  const dias = (Date.now() - Date.parse('2026-08-01T12:00:00Z')) / 864e5
+  assert.equal(p.periodo.unidade, dias <= 190 ? 'week' : 'month')
+  assert.equal(p.periodo.de.slice(0, 10), '2026-08-01')
+})
+
+test('Painel: só quem abre a tela Painel recebe os números, mesmo sem abrir o Kanban; os outros recebem null', async () => {
+  const b = await painelPronto()
+  // Bruno é membro ativo, mas sem tela nenhuma: o administrador ainda não liberou o Painel para ele
+  for (const fora of [BRUNO, CARLA, DANI]) assert.equal(await painelComo(fora, ...PERIODO), null)
+  await b.query(`insert into public.membro_telas (user_id, tela) values ($1, 'painel'), ($2, 'painel')`, [BRUNO, DANI])
+  try {
+    // com só o Painel, ele vê os números de todos os leads, que a RLS não deixa ele ler direto
+    assert.deepEqual((await painelComo(BRUNO, ...PERIODO)).atual, (await painelComo(ANA, ...PERIODO)).atual)
+    await b.exec('set role authenticated')
+    await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [BRUNO])
+    assert.equal((await b.query('select id from public.leads')).rows.length, 0)
+    await b.exec('reset role')
+    // desativado não abre, nem com a tela marcada
+    assert.equal(await painelComo(DANI, ...PERIODO), null)
+  } finally {
+    await b.exec('reset role')
+    await b.query('delete from public.membro_telas where user_id in ($1, $2)', [BRUNO, DANI])
+  }
+  await b.exec('set role anon')
+  try {
+    await assert.rejects(b.query('select public.painel_gerencial(null, null)'), /permission denied/)
+  } finally {
+    await b.exec('reset role')
+  }
+})
+
+test('Painel: lê as etapas do histórico que o trigger grava de verdade', async () => {
+  const b = await painelPronto()
+  const antes = new Date(Date.now() - 60_000).toISOString()
+  await b.exec('set role authenticated')
+  // a administradora abre todas as telas, então cria e move o lead pelo caminho normal, com RLS
+  await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [ANA])
+  try {
+    const [{ id }] = (await b.query(`insert into public.leads (nome) values ('Lead do Trigger') returning id`)).rows
+    await b.query(`update public.leads set status = 'qualificado' where id = $1`, [id])
+    await b.query(`update public.leads set status = 'ganho' where id = $1`, [id])
+  } finally {
+    await b.exec('reset role')
+  }
+  const p = await painelComo(ANA, antes, null)
+  assert.deepEqual([p.atual.leads_novos, p.atual.avancos, p.atual.ganhos, p.atual.contatos], [1, 2, 1, 0])
+  assert.deepEqual(porChave(p.funil.etapas, 'status', 'leads'), { novo: 1, contato: 1, qualificado: 1, proposta: 1, negociacao: 1, ganho: 1 })
+})
+
 // ---------- Google Maps no CRM online ----------
 // a carga roda no SQL Editor (sem RLS): aqui ela entra direto, como dona das tabelas
 const lugarMaps = (placeId, nome, extra = {}) => {

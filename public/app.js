@@ -5,6 +5,7 @@ import * as crm from './crm.js'
 import { abrirMapa, carregarLeaflet } from './mapa.js'
 import { carregarProspeccao } from './prospeccao.js'
 import { carregarClientes } from './tela-clientes.js'
+import { carregarPainel } from './tela-painel.js'
 import { ROTULOS as R, STATUS } from './rotulos.js'
 import { config, supabase } from './supa.js'
 import { $, api, avaliacao, carregando, esqueleto, estado, fecharDialogo, h, icone, prepararDialogos, toast } from './ui.js'
@@ -23,9 +24,11 @@ const botaoFechar = (el) => h('button', { type: 'button', class: 'fechar', 'aria
 
 // ---------- abas ----------
 // quem não abre Kanban nem Leads ainda manda empresas ao kanban pela Prospecção, mas a ficha do lead não abre para ele
+// (nem pela lista de parados do Painel)
 let abreLeads = true
-const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead: abreLeads ? abrirLead : null }), buscas: abrirGoogleMaps, clientes: carregarClientes }
-let abaAtual = 'kanban'
+// o Painel vem primeiro: é a tela que abre para quem pode; para quem não pode, a primeira aba liberada
+const abas = { painel: () => carregarPainel({ abrirLead: abreLeads ? abrirLead : null }), kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead: abreLeads ? abrirLead : null }), buscas: abrirGoogleMaps, clientes: carregarClientes }
+let abaAtual = 'painel'
 
 function abrirAba(nome) {
   abaAtual = nome
@@ -954,7 +957,7 @@ async function iniciar() {
     return
   }
   if (!logado) {
-    for (const nome of ['kanban', 'leads', 'clientes']) delete abas[nome]
+    for (const nome of ['painel', 'kanban', 'leads', 'clientes']) delete abas[nome]
     for (const el of document.querySelectorAll('[data-crm]')) el.hidden = true
   }
   // a aba Google Maps mostra o mapa das empresas guardadas no CRM online, que não depende do PC

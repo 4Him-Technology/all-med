@@ -199,12 +199,13 @@ Ao instalar, quem já está na equipe recebe as cinco telas: nada muda até voc�
 | Prospecção | A base de CNPJ no PC; mandar empresas ao kanban; ler a lista de clientes ativos (para marcar quem já é cliente) |
 | Google Maps | O mapa das empresas; as buscas novas pelo PC, guardar o resultado delas no mapa e excluir uma busca em "Buscas feitas"; mandar ao kanban; ler a lista de clientes ativos (para esconder quem já é cliente) |
 | Clientes ativos | Cadastrar e tirar clientes; ler as empresas do mapa, para a coluna "Escondidas no mapa" |
+| Painel | Os números do Painel gerencial, em totais, de todos os leads e empresas, mesmo sem as outras telas; a lista dos leads parados (a ficha só abre com Kanban ou Leads) |
 
 Detalhes:
 
 - Quem tem Prospecção ou Google Maps sem Kanban e sem Leads manda empresas para o kanban, mas só enxerga os leads que ele mesmo mandou. "No kanban" aparece só nesses; uma empresa que outra pessoa já mandou o banco ignora no envio, e o aviso conta como "já estava no CRM".
 - O PC confere a tela antes de abrir a base de CNPJ (Prospecção) e as buscas do Google (Google Maps), e guarda a resposta por 1 minuto: uma tela tirada vale no PC em até 1 minuto. No site, a aba some quando a pessoa carrega a página de novo; os dados ela já não consegue ler na hora.
-- O Painel gerencial, quando existir, aparece sozinho como mais uma coluna.
+- O Painel não vem marcado para ninguém: só o administrador o abre até você marcar a coluna Painel na linha da pessoa. Quem abre o Painel sem Kanban e sem Leads vê os números, mas o nome do lead parado fica sem link, porque a ficha não abriria.
 
 Instalação, nesta ordem:
 
@@ -221,6 +222,20 @@ Para voltar atrás: no topo da migration há um script de volta (as linhas que c
 - Com o Docker Desktop abrindo no login, o sistema sobe sozinho com o PC. É só abrir http://localhost:3000.
 - A porta 3000 fica presa em 127.0.0.1. Para usar de fora, use o túnel do passo 8; não libere a porta na rede.
 - Parar tudo: `docker compose --profile maps stop`. Voltar: `docker compose --profile maps up -d`.
+
+## Painel gerencial
+
+O Painel é a primeira aba de quem pode abri-lo: o administrador sempre; as outras pessoas, depois que você marcar a coluna Painel na linha delas em **Usuários e acessos** (seção "Acessos por tela"). Para quem não abre o Painel, a primeira aba é a primeira liberada. Os números vêm de uma função do CRM online, então ele só mostra números depois de instalar a função.
+
+Instalação, nesta ordem:
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261112150000_painel_gerencial.sql` e clique em **Run**. Ela precisa da `20261112120000_acessos.sql` (seção "Acessos por tela"), que já rodou. A migration só cria a função `public.painel_gerencial`: não muda tabela nem dado, e roda em segundos.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
+3. **PC:** rode `git pull` e o mesmo `up -d --build` de sempre (com `--profile tunel` se usa o túnel).
+
+Se o site for atualizado antes do banco, o Painel abre com o aviso "O painel não carregou" e as outras abas seguem normais. Para conferir depois de rodar, entre no site com a conta de administrador: a frase do período e os números aparecem no lugar do aviso. Depois marque o Painel para quem mais da gerência for acompanhar.
+
+Para voltar atrás: no **SQL Editor**, rode `drop function public.painel_gerencial(timestamptz, timestamptz);` e reverta o PR no GitHub. Nenhum dado se perde, porque a função só lê.
 
 ## Atualizar o sistema
 

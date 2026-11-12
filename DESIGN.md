@@ -141,8 +141,11 @@ Bege quente de fundo, cartões brancos, texto azul-marinho e um petróleo para a
 ### Cores de segmento (mapa das empresas)
 No mapa das empresas a cor do pino diz o segmento, na ordem alfabética dos segmentos: laranja #c2571a, azul #2a6fb0, rosa #a8508c, roxo #6b3f8f, turquesa #12808f e, se houver mais segmentos, ocre #9a6a12 e ardósia #3d4663. A mesma cor aparece na bolinha do botão do segmento, da linha da lista e da ficha, que servem de legenda. O verde fica de fora da lista porque no mapa já quer dizer "no kanban", e a ardósia fica por último porque, na borda de um círculo, se parece com o anel marinho de "marcada".
 
+### Cores de dado (Painel)
+Cada gráfico do Painel tem uma série só, então não tem legenda: o título diz o que está desenhado. A barra de dado é petróleo de destaque #4e90a7 (3,6:1 sobre o branco) e a coluna apontada ou com foco fica petróleo de ação #2f6b80. Nos medidores, o trilho é o petróleo suave #dbeaf0. No funil, que é uma sequência, todas as etapas têm o mesmo tom e só a barra de Ganho fica verde #2e7d5b: as cores das etapas do kanban, lado a lado, ficam parecidas demais para servir de barra (o validador da skill dataviz reprovou: vizinhas com ΔE 5, abaixo do piso de 15). A comparação com o período anterior usa o verde de ganho com a seta para cima e o vermelho de perigo com a seta para baixo, sempre com o texto ("12 a mais"); igual fica em ardósia.
+
 ### Named Rules
-**A regra da cor que diz estado.** Fora o petróleo de ação, toda cor na tela significa um estado (etapa, situação, tipo de telefone, já enviado) ou, no mapa das empresas, o segmento. Cor decorativa não entra.
+**A regra da cor que diz estado.** Fora o petróleo de ação, toda cor na tela significa um estado (etapa, situação, tipo de telefone, já enviado), no mapa das empresas o segmento, e no Painel o dado de uma série só. Cor decorativa não entra.
 
 ## Typography
 
@@ -161,7 +164,7 @@ No mapa das empresas a cor do pino diz o segmento, na ordem alfabética dos segm
 
 Página com margem de 28px (16px no celular), topo fixo com a marca, as abas e a conta. Listas ocupam a largura toda; quando há algo para ler ao lado (ficha do lead, mapa da busca) a tela vira duas colunas: lista flexível e painel fixo de 470px (ficha) ou 440px (mapa). Na Prospecção, os filtros ficam num menu de 300px à esquerda da lista. No Google Maps a tela é o mapa: ele ocupa a altura que sobra abaixo do topo, sem rolar a página, com um painel de 360 a 460px à esquerda (busca, segmentos, filtros e lista, que rola por dentro).
 
-Abaixo de 1200px as abas descem para uma segunda linha do topo (numa linha só, marca, cinco abas e os três botões não cabem) e o mapa das empresas encolhe o mesmo tanto; abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo; abaixo de 900px o mapa das buscas do PC desce para baixo da lista e o mapa das empresas sobe para cima do painel (e quem rola passa a ser a página); abaixo de 720px tudo vira uma coluna, botões e campos ganham 44px de altura e os segmentos ficam numa linha que rola para o lado. Tabelas largas rolam para o lado dentro do próprio cartão, nunca a página.
+Abaixo de 1280px as abas descem para uma segunda linha do topo (numa linha só, marca, seis abas e os três botões não cabem) e o mapa das empresas encolhe o mesmo tanto; abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo; abaixo de 900px o mapa das buscas do PC desce para baixo da lista e o mapa das empresas sobe para cima do painel (e quem rola passa a ser a página); abaixo de 720px tudo vira uma coluna, botões e campos ganham 44px de altura e os segmentos ficam numa linha que rola para o lado. Tabelas largas rolam para o lado dentro do próprio cartão, nunca a página.
 
 ## Elevation & Depth
 
@@ -210,6 +213,16 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - Tirar pede um segundo clique: o botão vira "Confirmar" em vermelho e volta ao normal quando perde o foco.
 - Nas pesquisas, o cliente reconhecido some do mapa e das buscas do PC; na Prospecção leva a etiqueta "Cliente ativo" em verde (o mesmo de "No kanban": já é ganho) no lugar da caixa de marcar.
 - Largura máxima de 1100px, alinhada à esquerda.
+
+### Painel
+- Primeira aba de quem abre o Painel (o administrador sempre, os outros quando liberados); para quem não abre, a aba some. Relatório numa coluna de leitura de até 1000px, alinhada à esquerda, com cinco cartões brancos em sequência: a frase do período, Atividade, Funil, Onde rende e Precisa de atenção. Nenhum cartão dentro de outro; as tabelas de dentro levam só o contorno de areia.
+- **Período:** uma linha acima de tudo, com cinco botões num grupo branco (7 dias, 30 dias, 90 dias, 12 meses, Desde o começo); o escolhido fica petróleo suave, com aria-pressed, e o navegador lembra a escolha. À direita, "Atualizado às 14:38". O período vale para a frase, a Atividade e o Funil; Onde rende diz "desde o começo" e Precisa de atenção diz "hoje", na nota cinza embaixo do título.
+- **A frase do período:** título de 24px (21px no celular) montado dos números ("46 contatos e 36 leads novos nos últimos 30 dias."), a linha cinza com a comparação e os parados, e o link "Ver os parados", que leva o foco ao último cartão. Embaixo, "Setas: comparação com os 30 dias anteriores." e seis números em grade (seis colunas, três abaixo de 900px, duas no celular): rótulo de 13px, valor de 26px em 600 sem algarismos tabulares, e a diferença curta embaixo.
+- **Gráfico de colunas:** uma coluna por dia (até 31 dias), semana (até uns 6 meses) ou mês; barra de no máximo 24px com a ponta de 4px arredondada, 2px de vão entre colunas e uma linha de base de areia forte. A coluna inteira é o alvo do ponteiro e ganha um fundo de petróleo a 9%. O valor aparece na linha do título ("4 em 01/11"), no lugar do total; sem o ponteiro, o título mostra o total e o dia mais alto. O gráfico é uma parada de Tab só, e as setas, Home e End andam entre as colunas. Embaixo, "Ver os números em tabela" abre a mesma série numa tabela.
+- **Medidores** (tipos de contato, segmentos, locais da busca): nome, trilho de 8px e o número numa coluna de largura fixa, para os trilhos terem o mesmo tamanho em todas as linhas; no celular a barra desce para baixo do nome.
+- **Funil:** barra de 20px que nasce da esquerda, com o número e a conversão da etapa anterior ao lado ("21 · 58% de Novo"); embaixo, a taxa de ganho, perdidos e em aberto, e a tabela "De onde vieram".
+- **Precisa de atenção:** as quatro faixas de tempo sem contato em números, a tabela dos 10 parados há mais tempo (o nome abre a ficha do lead na gaveta), as pílulas de etapa com a quantidade de hoje e as etiquetas de temperatura.
+- **Estados:** esqueleto na primeira carga; ao trocar o período, o painel anterior fica a 55% até o novo chegar, sem pular a tela; erro e "sem acesso" no bloco de estado com "Tentar de novo"; sem dado, cada cartão diz o que falta em vez de mostrar zero desenhado. O único movimento é a chegada dos números da primeira vez (aparecer, 220ms).
 
 ### Barra de lote
 - Barra marinho fixa no centro de baixo, com a contagem, "Limpar" e o botão branco "Mandar N para o kanban". Aparece com a primeira empresa marcada, entra subindo 12px em 220ms. Enquanto está na tela o aviso flutuante sobe para não ficar por baixo.

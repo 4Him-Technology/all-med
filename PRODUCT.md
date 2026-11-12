@@ -23,6 +23,7 @@ Junta, num lugar só e sem IA, a pesquisa profunda de empresas que ferramentas c
 - Parte local (PC com Docker): prospecção na base de CNPJ, importador mensal da Receita, scraper do Google Maps.
 - Parte online (site estático + banco com login): kanban, lista de leads, ficha do lead e histórico.
 - O fluxo diário: filtrar empresas, mandar as boas para a coluna Novo, ligar ou mandar mensagem, registrar o atendimento, mover o card pelas colunas (Novo, Em contato, Qualificado, Proposta, Negociação, Ganho, Perdido).
+- A captação (prospecção e contatos) é feita por uma pessoa só (Filipe, 12/11/2026). A gerência acompanha o trabalho dela pelo Painel gerencial, a primeira tela de quem tem acesso a ele (o administrador libera em "Usuários e acessos"), sem placar por pessoa.
 
 ## Capabilities and Constraints
 
