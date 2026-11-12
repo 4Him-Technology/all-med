@@ -114,7 +114,7 @@ O scraper só roda em Docker. O `.exe` de Windows v1.18.1 falha em toda busca (i
 
 ### Mapa das empresas guardadas no CRM online
 
-As empresas das buscas pelo PC e as levantadas fora do sistema (por exemplo, numa planilha) ficam na tabela `maps_lugares` do CRM online (migrations `20261110120000_maps_no_crm.sql` e `20261112120000_maps_buscas_do_pc.sql`). Só entram as que têm endereço, telefone e nota do Google.
+As empresas das buscas pelo PC e as levantadas fora do sistema (por exemplo, numa planilha) ficam na tabela `maps_lugares` do CRM online (migrations `20261110120000_maps_no_crm.sql` e `20261112110000_maps_buscas_do_pc.sql`). Só entram as que têm endereço, telefone e nota do Google.
 
 A tela é um mapa só com todas elas ([public/mapa.js](public/mapa.js); a lógica sem tela está em [public/lugares.js](public/lugares.js), testada em [test/lugares.test.js](test/lugares.test.js)):
 
