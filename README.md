@@ -167,7 +167,7 @@ Regras das contas, testadas em [test/crm-sql.test.js](test/crm-sql.test.js) (per
 - dias, semanas e meses no horário de Brasília; o período anterior tem o mesmo tamanho e vem logo antes; desde o começo não compara;
 - o tempo até o primeiro contato é a mediana, que não se deixa levar por um lead esquecido por meses.
 
-Quem vê: a função roda como dona das tabelas (security definer) e confere a permissão dentro dela, porque o Painel é a tela da gerência e mostra os números de todos os leads mesmo para quem não abre o Kanban. Hoje basta ser membro ativo da equipe; com o controle de acesso por tela, a regra passa a ser ter a tela Painel. Quem não pode recebe null e a tela avisa. Visitante sem login não chama a função.
+Quem vê: a função roda como dona das tabelas (security definer) e confere a permissão dentro dela, porque o Painel é a tela da gerência e mostra os números de todos os leads mesmo para quem não abre o Kanban. A regra é a do acesso por tela, `crm.pode('painel')`: o administrador abre sempre, e os outros só depois que ele marcar o Painel em "Usuários e acessos". Para quem não abre o Painel, a aba some e a primeira tela passa a ser a primeira aba liberada; se chamar a função mesmo assim, recebe null. Quem abre o Painel sem Kanban e sem Leads vê o nome dos leads parados sem link, porque a ficha não abriria para ele. Visitante sem login não chama a função.
 
 ## Segurança
 

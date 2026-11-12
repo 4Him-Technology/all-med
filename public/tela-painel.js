@@ -15,7 +15,7 @@ const EM_ANDAMENTO = ['novo', 'contato', 'qualificado', 'proposta', 'negociacao'
 const REGIOES_VISIVEIS = 8
 
 let ligado = false
-let abrirLead = () => {}
+let abrirLead = null
 let escolhido = guardado()
 let pedido = 0
 let desenhado = false
@@ -312,7 +312,8 @@ function blocoAtencao(p) {
                 h(
                   'tr',
                   {},
-                  h('td', {}, h('button', { type: 'button', class: 'link', onclick: () => abrirLead(l.id) }, l.nome)),
+                  // quem abre o Painel sem Kanban nem Leads não abre a ficha (o banco não entrega o lead): o nome fica só texto
+                  h('td', {}, abrirLead ? h('button', { type: 'button', class: 'link', onclick: () => abrirLead(l.id) }, l.nome) : l.nome),
                   h('td', {}, h('span', { class: `pill st-${l.status}` }, R.status[l.status])),
                   h('td', {}, l.temperatura ? h('span', { class: `tag t-${l.temperatura}` }, R.temperatura[l.temperatura]) : h('span', { class: 'muted' }, 'sem')),
                   h('td', {}, semContato(l)),

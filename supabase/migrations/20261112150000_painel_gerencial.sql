@@ -4,9 +4,10 @@
 --
 -- Quem vê: security definer com a permissão conferida aqui dentro, e não pela RLS de cada tabela, porque o Painel é a
 -- tela da gerência: quem abre o Painel vê os números de todos os leads, mesmo sem abrir o Kanban ou o Google Maps.
--- Hoje a regra é ser membro ativo da equipe (crm.membro_ativo(), a mesma das policies). Quando entrar o controle de
--- acesso por tela (migration 20261112120000_acessos.sql, que já prevê a tela 'painel'), a regra vira crm.pode('painel').
+-- A regra é a do acesso por tela (migration 20261112120000_acessos.sql, que já criou a tela 'painel'): crm.pode('painel').
+-- O administrador abre sempre; os outros membros só depois que o administrador marcar o Painel em "Usuários e acessos".
 -- Quem não pode recebe null. A função devolve só totais e, dos leads parados, nome, etapa e temperatura.
+-- Depende da migration de acessos: rode esta depois dela.
 --
 -- Regras das contas:
 -- - contato é atendimento registrado na ficha; a mudança de etapa (tipo status) não conta;
@@ -180,12 +181,12 @@ select jsonb_build_object(
                  count(distinct place_id) filter (where ganho) as ganhos
           from lugares group by local_busca) r), '[]')
 )
--- quem não é membro ativo da equipe não recebe nada
-where (select crm.membro_ativo())
+-- quem não abre a tela Painel não recebe nada
+where (select crm.pode('painel'))
 $fn$;
 
 comment on function public.painel_gerencial(timestamptz, timestamptz) is
-  'Números da aba Painel no período [p_de, p_ate] (sem p_de: desde o começo; sem p_ate: agora). Só para membro ativo da equipe; os outros recebem null.';
+  'Números da aba Painel no período [p_de, p_ate] (sem p_de: desde o começo; sem p_ate: agora). Só para quem abre a tela Painel (crm.pode); os outros recebem null.';
 
 -- No Supabase as funções novas em public já nascem liberadas para anon: tira de todos e devolve só para quem está logado
 revoke all on function public.painel_gerencial(timestamptz, timestamptz) from public, anon, authenticated;

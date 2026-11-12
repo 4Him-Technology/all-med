@@ -268,7 +268,7 @@ test('Painel: números do período contra o período anterior, sem contar mudan�
 })
 
 test('Painel: funil dos leads que entraram no período conta quem chegou pelo menos até cada etapa', async () => {
-  const { funil, origens } = await painelComo(BRUNO, ...PERIODO)
+  const { funil, origens } = await painelComo(ANA, ...PERIODO)
   // o Lead Um pulou Qualificado e Negociação, mas chegou ao Ganho: conta em todas as etapas até lá
   assert.deepEqual(porChave(funil.etapas, 'status', 'leads'), { novo: 3, contato: 2, qualificado: 1, proposta: 1, negociacao: 1, ganho: 1 })
   assert.deepEqual(funil.etapas.map((e) => e.status), ['novo', 'contato', 'qualificado', 'proposta', 'negociacao', 'ganho'])
@@ -332,9 +332,24 @@ test('Painel: sem período escolhido vai desde o começo e não compara', async 
   assert.equal(p.periodo.de.slice(0, 10), '2026-08-01')
 })
 
-test('Painel: só membro ativo recebe os números (os outros recebem null); visitante sem login não chama', async () => {
-  for (const fora of [CARLA, DANI]) assert.equal(await painelComo(fora, ...PERIODO), null)
+test('Painel: só quem abre a tela Painel recebe os números, mesmo sem abrir o Kanban; os outros recebem null', async () => {
   const b = await painelPronto()
+  // Bruno é membro ativo, mas sem tela nenhuma: o administrador ainda não liberou o Painel para ele
+  for (const fora of [BRUNO, CARLA, DANI]) assert.equal(await painelComo(fora, ...PERIODO), null)
+  await b.query(`insert into public.membro_telas (user_id, tela) values ($1, 'painel'), ($2, 'painel')`, [BRUNO, DANI])
+  try {
+    // com só o Painel, ele vê os números de todos os leads, que a RLS não deixa ele ler direto
+    assert.deepEqual((await painelComo(BRUNO, ...PERIODO)).atual, (await painelComo(ANA, ...PERIODO)).atual)
+    await b.exec('set role authenticated')
+    await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [BRUNO])
+    assert.equal((await b.query('select id from public.leads')).rows.length, 0)
+    await b.exec('reset role')
+    // desativado não abre, nem com a tela marcada
+    assert.equal(await painelComo(DANI, ...PERIODO), null)
+  } finally {
+    await b.exec('reset role')
+    await b.query('delete from public.membro_telas where user_id in ($1, $2)', [BRUNO, DANI])
+  }
   await b.exec('set role anon')
   try {
     await assert.rejects(b.query('select public.painel_gerencial(null, null)'), /permission denied/)
@@ -347,7 +362,8 @@ test('Painel: lê as etapas do histórico que o trigger grava de verdade', async
   const b = await painelPronto()
   const antes = new Date(Date.now() - 60_000).toISOString()
   await b.exec('set role authenticated')
-  await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [BRUNO])
+  // a administradora abre todas as telas, então cria e move o lead pelo caminho normal, com RLS
+  await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [ANA])
   try {
     const [{ id }] = (await b.query(`insert into public.leads (nome) values ('Lead do Trigger') returning id`)).rows
     await b.query(`update public.leads set status = 'qualificado' where id = $1`, [id])
