@@ -222,6 +222,20 @@ Para voltar atrás: no topo da migration há um script de volta (as linhas que c
 - A porta 3000 fica presa em 127.0.0.1. Para usar de fora, use o túnel do passo 8; não libere a porta na rede.
 - Parar tudo: `docker compose --profile maps stop`. Voltar: `docker compose --profile maps up -d`.
 
+## Painel gerencial
+
+O Painel é a primeira aba de quem entra. Os números vêm de uma função do CRM online, então ele só aparece depois de instalar a função.
+
+Instalação, nesta ordem:
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261112150000_painel_gerencial.sql` e clique em **Run**. A migration só cria a função `public.painel_gerencial`: não muda tabela nem dado, e roda em segundos.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
+3. **PC:** rode `git pull` e o mesmo `up -d --build` de sempre (com `--profile tunel` se usa o túnel).
+
+Se o site for atualizado antes do banco, o Painel abre com o aviso "O painel não carregou" e as outras abas seguem normais. Para conferir depois de rodar, entre no site: a frase do período e os números aparecem no lugar do aviso.
+
+Para voltar atrás: no **SQL Editor**, rode `drop function public.painel_gerencial(timestamptz, timestamptz);` e reverta o PR no GitHub. Nenhum dado se perde, porque a função só lê.
+
 ## Atualizar o sistema
 
 ```powershell

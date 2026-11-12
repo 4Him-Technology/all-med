@@ -146,6 +146,29 @@ Além de esconder quem é o cliente, o mapa avisa quem tem nome parecido ("Parec
 
 A carga inicial é um arquivo SQL gerado da planilha, rodado no SQL Editor e fora do git (é a lista de clientes); pode rodar de novo sem duplicar. Os testes usam nomes inventados pelo mesmo motivo. Para tirar a tabela: o rollback está no começo da migration.
 
+## Painel gerencial
+
+A aba Painel é a primeira tela de quem entra: o relatório que a gerência acompanha, numa coluna de leitura. Os números são calculados no banco pela função `public.painel_gerencial` (migration `20261112150000_painel_gerencial.sql`), que devolve só totais num JSON; o navegador não baixa as linhas. A captação é feita por uma pessoa só, então o painel não separa os números por pessoa.
+
+O que aparece, nesta ordem:
+
+- **A frase do período** (7, 30 ou 90 dias, 12 meses ou desde o começo): contatos, leads novos e ganhos, a comparação dos contatos com o período anterior do mesmo tamanho e quantos leads em andamento estão parados. Embaixo, seis números com a diferença para o período anterior: contatos feitos, leads novos, avanços de etapa, ganhos (e perdidos), tempo até o primeiro contato (mediana) e empresas novas encontradas no Google Maps.
+- **Atividade:** contatos e leads novos por dia, semana ou mês, e como foram os contatos (ligação, WhatsApp...). Os mesmos números ficam numa tabela logo abaixo.
+- **Funil:** dos leads que entraram no período, quantos chegaram pelo menos até cada etapa, a conversão de uma etapa para a seguinte, a taxa de ganho, e de onde vieram (Google Maps, Prospecção por CNPJ, cadastro manual).
+- **Onde rende** (desde o começo): empresas do Google Maps encontradas e quantas viraram lead, por segmento e por local da busca.
+- **Precisa de atenção** (hoje): os leads em andamento por tempo sem contato (até 7, 8 a 14, 15 a 30 e mais de 30 dias), os 10 parados há mais tempo (o nome abre a ficha) e quantos leads há em cada etapa.
+
+Regras das contas, testadas em [test/crm-sql.test.js](test/crm-sql.test.js) (períodos e textos em [public/painel.js](public/painel.js), testados em [test/painel.test.js](test/painel.test.js)):
+
+- contato é atendimento registrado na ficha; mudar a etapa no kanban não conta;
+- lead arquivado sai dos números de leads; o contato feito nele continua contando;
+- as etapas por onde o lead passou vêm do histórico de mudança de etapa, que só o banco grava; quem pulou uma etapa conta nela também;
+- ganho e perdido do período são os leads que estão hoje nessa etapa e chegaram a ela dentro do período; avanço é ir para uma etapa mais adiante (ir para Perdido não conta);
+- dias, semanas e meses no horário de Brasília; o período anterior tem o mesmo tamanho e vem logo antes; desde o começo não compara;
+- o tempo até o primeiro contato é a mediana, que não se deixa levar por um lead esquecido por meses.
+
+Quem vê: a função roda como dona das tabelas (security definer) e confere a permissão dentro dela, porque o Painel é a tela da gerência e mostra os números de todos os leads mesmo para quem não abre o Kanban. Hoje basta ser membro ativo da equipe; com o controle de acesso por tela, a regra passa a ser ter a tela Painel. Quem não pode recebe null e a tela avisa. Visitante sem login não chama a função.
+
 ## Segurança
 
 - Tela local: presa em `127.0.0.1`, checagem do cabeçalho Host (contra DNS rebinding), POST só com `application/json`, CSP restrita, DOM montado sem `innerHTML`, sem stack trace nas respostas.
@@ -166,7 +189,7 @@ Os termos do Google Maps proíbem raspagem automatizada; o risco prático é blo
 | `db-local/migrations/` | Base de CNPJ no PC: esquema, montagem mensal, funções de busca |
 | `importador/` | Download, descompactação e carga mensal dos arquivos da Receita |
 | `src/` | Servidor local: tela, ponte para a base de CNPJ (`/api/rpc/<função>`), buscas do Maps, `config.js` |
-| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local, `mapa.js` é o mapa das empresas do Google Maps, `buscas-mapa.js` leva as buscas do PC para esse mapa, `tela-clientes.js` a aba Clientes ativos e `clientes.js` o reconhecimento do cliente pelo nome) |
+| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local, `mapa.js` é o mapa das empresas do Google Maps, `buscas-mapa.js` leva as buscas do PC para esse mapa, `tela-clientes.js` a aba Clientes ativos, `clientes.js` o reconhecimento do cliente pelo nome, `tela-painel.js` a aba Painel e `painel.js` os períodos e textos dela) |
 | `scripts/gerar-config.js` | Build do site: `config.js` e `_headers` |
 | `test/` | Testes (`node:test`; PGlite roda as duas migrations de verdade), scraper falso e dados fictícios |
 
