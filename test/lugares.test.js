@@ -10,8 +10,10 @@ import {
   lerTudo,
   linkWhatsApp,
   listarOpcoes,
+  lugaresDaBusca,
   naArea,
   ordenarLugares,
+  origemDaBusca,
   regioes,
   resumoDaArea,
   rotuloLocal,
@@ -194,4 +196,53 @@ test('lê todas as páginas da consulta, mesmo quando o servidor devolve menos d
   assert.equal(pedidos.length, 5)
   assert.deepEqual(await lerTudo(async () => ({ data: [], count: 0 })), [])
   assert.deepEqual(await lerTudo(async () => ({ data: [1, 2], count: null })), [1, 2])
+})
+
+// ---------- busca nova pelo PC entrando no mapa do CRM online ----------
+test('a busca do PC diz o segmento e o local pelo termo "<ramo> em <bairro>, <cidade>"', () => {
+  assert.deepEqual(origemDaBusca({ nome: 'veterinário · Guarulhos', keywords: ['veterinário em centro, Guarulhos'] }), { segmento: 'Veterinário', local_busca: 'Centro, Guarulhos' })
+  assert.deepEqual(origemDaBusca({ keywords: ['dentistas em Campinas'] }), { segmento: 'Dentistas', local_busca: 'Campinas' })
+  // busca antiga com dois ramos de uma vez: o segmento leva os dois
+  assert.deepEqual(origemDaBusca({ keywords: ['pet shop em Lapa, São Paulo', 'veterinário em Lapa, São Paulo'] }), { segmento: 'Pet shop, Veterinário', local_busca: 'Lapa, São Paulo' })
+  // o ramo pode ter "em" no meio: o local é o que vem depois do último
+  assert.deepEqual(origemDaBusca({ keywords: ['especialista em joelho em Moema, São Paulo'] }), { segmento: 'Especialista em joelho', local_busca: 'Moema, São Paulo' })
+  assert.equal(origemDaBusca({ keywords: ['dentistas'] }), null)
+  assert.equal(origemDaBusca({ keywords: [] }), null)
+})
+
+test('empresas da busca do PC no formato do CRM online: só as completas, uma por lugar, sem dado que o banco recusa', () => {
+  const busca = { keywords: ['veterinário em centro, Guarulhos'] }
+  const vet = { place_id: 'p1', nome: ' Vet Um ', categoria: 'Veterinário', endereco: 'R. A, 1', telefone: '(11) 2222-3333', site: 'https://vet.exemplo.com', emails: ['a@exemplo.com'], avaliacao: 4.9, total_avaliacoes: 247, latitude: -23.4, longitude: -46.5, link_maps: 'https://maps.google.com/?cid=1' }
+  const r = lugaresDaBusca(busca, [
+    vet,
+    { ...vet, place_id: 'p2', telefone: null },
+    { ...vet, place_id: 'p3', avaliacao: null },
+    { ...vet, place_id: 'p4', endereco: ' ' },
+    { ...vet, nome: 'Vet Um de novo' },
+    { ...vet, place_id: 'p5', site: 'javascript:alert(1)', latitude: 200, total_avaliacoes: -1, categoria: null },
+  ])
+  assert.equal(r.fora, 3)
+  assert.deepEqual(
+    r.linhas.map((l) => l.place_id),
+    ['p1', 'p5'],
+  )
+  assert.deepEqual(r.linhas[0], {
+    place_id: 'p1',
+    segmento: 'Veterinário',
+    local_busca: 'Centro, Guarulhos',
+    nome: 'Vet Um',
+    categoria: 'Veterinário',
+    endereco: 'R. A, 1',
+    telefone: '(11) 2222-3333',
+    site: 'https://vet.exemplo.com',
+    avaliacao: 4.9,
+    total_avaliacoes: 247,
+    latitude: -23.4,
+    longitude: -46.5,
+    link_maps: 'https://maps.google.com/?cid=1',
+    deleted_at: null,
+  })
+  assert.deepEqual([r.linhas[1].site, r.linhas[1].latitude, r.linhas[1].longitude, r.linhas[1].total_avaliacoes, r.linhas[1].categoria], [null, null, null, null, null])
+  // sem o local, nada entra: o CRM online agrupa as empresas por segmento e local
+  assert.deepEqual(lugaresDaBusca({ keywords: ['dentistas'] }, [vet]), { linhas: [], fora: 1 })
 })

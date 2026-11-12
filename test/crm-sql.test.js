@@ -9,6 +9,9 @@ const ANA = '11111111-1111-4111-8111-111111111111' // admin da equipe
 const BRUNO = '22222222-2222-4222-8222-222222222222' // membro
 const CARLA = '33333333-3333-4333-8333-333333333333' // tem conta, mas não é da equipe
 const DANI = '44444444-4444-4444-8444-444444444444' // membro desativado
+const EDU = '55555555-5555-4555-8555-555555555555' // membro que só prospecta: Prospecção e Google Maps
+const FABI = '66666666-6666-4666-8666-666666666666' // membro só com o Kanban
+const TODAS = ['kanban', 'leads', 'prospeccao', 'buscas', 'clientes']
 let db
 
 const AUTH_SUPABASE = `
@@ -19,20 +22,29 @@ const AUTH_SUPABASE = `
   grant usage on schema auth to anon, authenticated;
   grant usage on schema public to anon, authenticated;
 `
-const migrar = async (banco) => {
-  for (const f of readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()) await banco.exec(readFileSync(new URL(f, MIGRATIONS), 'utf8'))
+const ARQUIVOS = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
+const migrar = async (banco, arquivos = ARQUIVOS) => {
+  for (const f of arquivos) await banco.exec(readFileSync(new URL(f, MIGRATIONS), 'utf8'))
 }
+// as telas que o admin liberou para cada um (a carga entra direto, como dona das tabelas)
+const liberar = (uid, telas) => db.query('insert into public.membro_telas (user_id, tela) select $1, unnest($2::text[])::public.tela', [uid, telas])
 
 before(async () => {
   db = new PGlite()
   await db.exec(AUTH_SUPABASE)
   await migrar(db)
-  for (const [id, email] of [[ANA, 'ana@x.com'], [BRUNO, 'bruno@x.com'], [CARLA, 'carla@x.com'], [DANI, 'dani@x.com']]) await db.query('insert into auth.users values ($1, $2)', [id, email])
+  for (const [id, email] of [[ANA, 'ana@x.com'], [BRUNO, 'bruno@x.com'], [CARLA, 'carla@x.com'], [DANI, 'dani@x.com'], [EDU, 'edu@x.com'], [FABI, 'fabi@x.com']]) await db.query('insert into auth.users values ($1, $2)', [id, email])
   await db.query(
     `insert into public.membros (user_id, email, nome, papel, ativo) values
-      ($1, 'ana@x.com', 'Ana', 'admin', true), ($2, 'bruno@x.com', 'Bruno', 'membro', true), ($3, 'dani@x.com', 'Dani', 'membro', false)`,
-    [ANA, BRUNO, DANI],
+      ($1, 'ana@x.com', 'Ana', 'admin', true), ($2, 'bruno@x.com', 'Bruno', 'membro', true), ($3, 'dani@x.com', 'Dani', 'membro', false),
+      ($4, 'edu@x.com', 'Edu', 'membro', true), ($5, 'fabi@x.com', 'Fabi', 'membro', true)`,
+    [ANA, BRUNO, DANI, EDU, FABI],
   )
+  await liberar(BRUNO, TODAS)
+  // desativado não abre nada, mesmo com telas liberadas
+  await liberar(DANI, TODAS)
+  await liberar(EDU, ['prospeccao', 'buscas'])
+  await liberar(FABI, ['kanban'])
 })
 
 // executa como um usuário logado do Supabase (papel authenticated + sub do JWT)
@@ -152,7 +164,7 @@ test('lista de leads ordena pelo último contato e o envio em lote por CNPJ igno
 
 test('a equipe vê quem faz parte dela, mas ninguém se cadastra nem muda o próprio papel pelo app', async () => {
   const nomes = (await como(BRUNO, 'select nome from public.membros order by nome')).map((m) => m.nome)
-  assert.deepEqual(nomes, ['Ana', 'Bruno', 'Dani'])
+  assert.deepEqual(nomes, ['Ana', 'Bruno', 'Dani', 'Edu', 'Fabi'])
   // a lista de usuários mostra quem ainda não fez o primeiro acesso
   assert.equal((await como(ANA, 'select ativado_em from public.membros where user_id = $1', [BRUNO]))[0].ativado_em, null)
   await assert.rejects(como(BRUNO, 'update public.membros set ativado_em = now() where user_id = $1', [BRUNO]), /permission denied/)
@@ -209,13 +221,51 @@ test('Google Maps no CRM online: a equipe vê as empresas por local e segmento, 
   }
 })
 
-test('Google Maps no CRM online: o app só lê; quem grava é a carga', async () => {
-  await assert.rejects(como(ANA, `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xmaps3:0x3', 'S', 'L', 'N', 'E', 'T', 3)`), /permission denied/)
-  await assert.rejects(como(ANA, `update public.maps_lugares set nome = 'x'`), /permission denied/)
+// o que o site manda ao guardar uma busca do PC: upsert do PostgREST, que regrava todas as colunas enviadas
+const guardarDaBusca = (uid, extra = {}) => {
+  const c = { place_id: '0xbusca1:0x1', segmento: 'Veterinário', local_busca: 'Centro, Guarulhos', nome: 'Vet A', categoria: 'Veterinário', endereco: 'R. B, 2', telefone: '(11) 2222-3333', site: null, avaliacao: 4.9, total_avaliacoes: 247, latitude: -23.4, longitude: -46.5, link_maps: null, deleted_at: null, ...extra }
+  const cols = Object.keys(c)
+  return como(
+    uid,
+    `insert into public.maps_lugares (${cols.join(',')}) values (${cols.map((_, i) => `$${i + 1}`).join(',')})
+     on conflict (place_id, segmento, local_busca) do update set ${cols.map((k) => `${k} = excluded.${k}`).join(', ')} returning nome`,
+    Object.values(c),
+  )
+}
+const daBusca = (uid) => como(uid, `select nome from public.maps_empresas where local_busca = 'Centro, Guarulhos' order by nome`)
+
+test('Google Maps no CRM online: a equipe guarda o resultado de uma busca do PC e exclui a busca inteira', async () => {
+  await guardarDaBusca(BRUNO)
+  await guardarDaBusca(BRUNO, { place_id: '0xbusca2:0x2', nome: 'Vet B' })
+  // a mesma busca de novo atualiza, sem duplicar
+  await guardarDaBusca(ANA, { nome: 'Vet A (novo nome)' })
+  assert.deepEqual(await daBusca(ANA), [{ nome: 'Vet A (novo nome)' }, { nome: 'Vet B' }])
+  const [grupo] = await como(ANA, `select segmento, encontrados, ultima from public.maps_grupos where local_busca = 'Centro, Guarulhos'`)
+  assert.equal(grupo.segmento, 'Veterinário')
+  assert.equal(grupo.encontrados, 2)
+  assert.ok(grupo.ultima instanceof Date)
+
+  // excluir a busca é preencher deleted_at nas empresas dela; o lead que já foi para o kanban não é tocado
+  const excluir = `update public.maps_lugares set deleted_at = now() where segmento = 'Veterinário' and local_busca = 'Centro, Guarulhos' and deleted_at is null returning id`
+  assert.equal((await como(ANA, excluir)).length, 2)
+  assert.deepEqual(await daBusca(BRUNO), [])
+  // repetir a busca traz a empresa de volta
+  await guardarDaBusca(BRUNO)
+  assert.deepEqual(await daBusca(ANA), [{ nome: 'Vet A' }])
+})
+
+test('Google Maps no CRM online: quem está fora da equipe não grava; ninguém apaga de verdade nem mexe nas datas', async () => {
+  for (const fora of [CARLA, DANI]) {
+    await assert.rejects(guardarDaBusca(fora, { place_id: '0xfora:0x1' }), /row-level security/)
+    assert.equal((await como(fora, 'update public.maps_lugares set deleted_at = now() returning id')).length, 0)
+  }
   await assert.rejects(como(ANA, 'delete from public.maps_lugares'), /permission denied/)
+  await assert.rejects(como(ANA, 'update public.maps_lugares set created_at = now()'), /permission denied/)
+  await assert.rejects(guardarDaBusca(ANA, { place_id: '0xinvalida:0x1', telefone: null }), /telefone/)
   await db.exec('set role anon')
   try {
     await assert.rejects(db.query('select * from public.maps_empresas'), /permission denied/)
+    await assert.rejects(db.query(`insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xanon:0x1', 'S', 'L', 'N', 'E', 'T', 3)`), /permission denied/)
   } finally {
     await db.exec('reset role')
   }
@@ -264,4 +314,138 @@ test('Clientes ativos: o mesmo nome não entra duas vezes na lista, mas volta de
   await db.exec(carga)
   assert.equal((await clientesAtivos(ANA)).filter((n) => n === 'Construtora Pedra Lisa Ltda').length, 1)
   await assert.rejects(como(ANA, `insert into public.clientes_ativos (nome) values ('   ')`), /check/)
+})
+
+// ---------- acessos: quais telas cada pessoa abre ----------
+const minhasTelas = async (uid) => (await como(uid, 'select public.minhas_telas() as t'))[0].t
+
+test('Acessos: cada membro abre só as telas liberadas; administrador abre todas, inclusive as que vierem depois', async () => {
+  assert.deepEqual(await minhasTelas(ANA), [...TODAS, 'painel'])
+  assert.deepEqual(await minhasTelas(BRUNO), TODAS)
+  assert.deepEqual(await minhasTelas(EDU), ['prospeccao', 'buscas'])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban'])
+  // fora da equipe e desativado (mesmo com telas liberadas) não abrem nada
+  assert.deepEqual(await minhasTelas(CARLA), [])
+  assert.deepEqual(await minhasTelas(DANI), [])
+  await db.exec('set role anon')
+  try {
+    await assert.rejects(db.query('select public.minhas_telas()'), /permission denied/)
+  } finally {
+    await db.exec('reset role')
+  }
+})
+
+test('Acessos: sem Kanban e sem Leads o banco não mostra os leads nem o histórico; quem prospecta manda para o kanban e vê só o que mandou', async () => {
+  const daAna = await novoLead(ANA, { nome: 'Lead da Ana', place_id: '0xacesso1:0x1' })
+  await como(ANA, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'oi')`, [daAna.id])
+  assert.equal((await como(EDU, 'select * from public.leads where id = $1', [daAna.id])).length, 0)
+  assert.equal((await como(EDU, 'select * from public.leads_kanban where id = $1', [daAna.id])).length, 0)
+  assert.equal((await como(EDU, 'select * from public.atendimentos where lead_id = $1', [daAna.id])).length, 0)
+  assert.equal((await como(EDU, `update public.leads set nome = 'x' where id = $1 returning id`, [daAna.id])).length, 0)
+  // o envio em lote da Prospecção e do Google Maps: o repetido o banco ignora, o novo volta para contar
+  const lote = await como(EDU, `insert into public.leads (nome, place_id, origem) values ('Repetido', '0xacesso1:0x1', 'maps'), ('Novo do Edu', '0xacesso2:0x2', 'maps') on conflict (place_id) do nothing returning id, nome`)
+  assert.deepEqual(lote.map((l) => l.nome), ['Novo do Edu'])
+  assert.equal((await como(EDU, 'select * from public.leads where id = $1', [lote[0].id])).length, 1)
+  // mas não trabalha o lead: editar e registrar atendimento são do Kanban e da aba Leads
+  assert.equal((await como(EDU, `update public.leads set status = 'contato' where id = $1 returning id`, [lote[0].id])).length, 0)
+  await assert.rejects(como(EDU, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'oi')`, [lote[0].id]), /row-level security/)
+  // quem só tem o Kanban trabalha os leads da equipe
+  assert.equal((await como(FABI, `update public.leads set temperatura = 'quente' where id = $1 returning id`, [daAna.id])).length, 1)
+  assert.equal((await como(FABI, 'select * from public.atendimentos where lead_id = $1', [daAna.id])).length, 1)
+})
+
+test('Acessos: Google Maps e Clientes ativos só abrem para quem tem a tela', async () => {
+  await lugarMaps('0xacesso3:0x3', 'Empresa do mapa')
+  await como(ANA, `insert into public.clientes_ativos (nome) values ('Cliente Acesso Ltda')`)
+  // quem prospecta vê o mapa e a lista de clientes (para esconder quem já é cliente), mas não mexe na lista
+  assert.ok((await como(EDU, 'select * from public.maps_empresas')).length > 0)
+  assert.ok((await clientesAtivos(EDU)).includes('Cliente Acesso Ltda'))
+  await assert.rejects(como(EDU, `insert into public.clientes_ativos (nome) values ('Outro')`), /row-level security/)
+  assert.equal((await como(EDU, 'update public.clientes_ativos set deleted_at = now() returning id')).length, 0)
+  // só com o Kanban, nem mapa nem clientes
+  assert.equal((await como(FABI, 'select * from public.maps_lugares')).length, 0)
+  assert.equal((await como(FABI, 'select * from public.maps_grupos')).length, 0)
+  assert.deepEqual(await clientesAtivos(FABI), [])
+})
+
+test('Acessos: só quem abre o Google Maps guarda e exclui as buscas do PC no mapa', async () => {
+  const local = { local_busca: 'Acesso, Osasco' }
+  const excluir = `update public.maps_lugares set deleted_at = now() where local_busca = 'Acesso, Osasco' and deleted_at is null returning id`
+  const ativas = async () => (await db.query(`select id from public.maps_lugares where local_busca = 'Acesso, Osasco' and deleted_at is null`)).rows.length
+  assert.deepEqual(await guardarDaBusca(EDU, { ...local, place_id: '0xacesso4:0x4' }), [{ nome: 'Vet A' }])
+  // só com o Kanban: não guarda nem exclui, nem com o comando que não lê nada de volta (esse não passa pela regra de leitura)
+  await assert.rejects(como(FABI, `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xacesso5:0x5', 'S', 'Acesso, Osasco', 'N', 'E', 'T', 3)`), /row-level security/)
+  await assert.rejects(guardarDaBusca(FABI, { ...local, place_id: '0xacesso4:0x4', nome: 'Trocado' }), /row-level security/)
+  await como(FABI, 'update public.maps_lugares set deleted_at = now()')
+  assert.equal(await ativas(), 1)
+  assert.equal((await como(FABI, excluir)).length, 0)
+  assert.equal((await como(EDU, excluir)).length, 1)
+  assert.equal(await ativas(), 0)
+})
+
+test('Acessos: só o administrador muda as telas de alguém; cada um vê só as próprias', async () => {
+  // a tela Clientes ativos mostra o que cada cliente esconde no mapa: ela também lê as empresas do mapa
+  await como(ANA, `insert into public.membro_telas (user_id, tela) values ($1, 'clientes')`, [FABI])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'clientes'])
+  assert.ok((await como(FABI, 'select * from public.maps_lugares')).length > 0)
+  await como(FABI, `insert into public.clientes_ativos (nome) values ('Cliente da Fabi')`)
+  await como(ANA, `delete from public.membro_telas where user_id = $1 and tela = 'clientes'`, [FABI])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban'])
+  // membro não se dá tela nem tira a dos outros, e só enxerga as próprias
+  await assert.rejects(como(EDU, `insert into public.membro_telas (user_id, tela) values ($1, 'kanban')`, [EDU]), /row-level security/)
+  assert.equal((await como(EDU, 'delete from public.membro_telas where user_id = $1 returning tela', [BRUNO])).length, 0)
+  assert.deepEqual((await como(EDU, 'select distinct user_id from public.membro_telas')).map((r) => r.user_id), [EDU])
+  assert.equal((await como(ANA, 'select user_id, tela from public.membro_telas')).length, 2 * TODAS.length + 3)
+  // a tela que não existe o banco recusa; e só quem é da equipe recebe tela
+  await assert.rejects(como(ANA, `insert into public.membro_telas (user_id, tela) values ($1, 'financeiro')`, [FABI]), /invalid input value for enum/)
+  await assert.rejects(como(ANA, `insert into public.membro_telas (user_id, tela) values ($1, 'kanban')`, [CARLA]), /foreign key/)
+  await assert.rejects(como(ANA, `update public.membro_telas set tela = 'leads' where user_id = $1`, [FABI]), /permission denied/)
+  await db.exec('set role anon')
+  try {
+    await assert.rejects(db.query('select * from public.membro_telas'), /permission denied/)
+  } finally {
+    await db.exec('reset role')
+  }
+})
+
+test('Acessos: quem já era da equipe quando as telas chegaram continua abrindo tudo o que abria', async () => {
+  const banco = new PGlite()
+  await banco.exec(AUTH_SUPABASE)
+  const acessos = ARQUIVOS.findIndex((n) => n.endsWith('_acessos.sql'))
+  assert.ok(acessos > 0)
+  await migrar(banco, ARQUIVOS.slice(0, acessos))
+  await banco.query(`insert into auth.users values ($1, 'bruno@x.com')`, [BRUNO])
+  await banco.query(`insert into public.membros (user_id, email, nome) values ($1, 'bruno@x.com', 'Bruno')`, [BRUNO])
+  await migrar(banco, ARQUIVOS.slice(acessos))
+  const telas = (await banco.query('select tela from public.membro_telas order by tela')).rows.map((r) => r.tela)
+  // o Painel gerencial ainda não existia: fica para o administrador liberar
+  assert.deepEqual(telas, TODAS)
+})
+
+test('Acessos: o script de volta do topo da migration devolve tudo a quem é da equipe', async () => {
+  const banco = new PGlite()
+  await banco.exec(AUTH_SUPABASE)
+  await migrar(banco)
+  await banco.query(`insert into auth.users values ($1, 'gil@x.com')`, [FABI])
+  await banco.query(`insert into public.membros (user_id, email, nome) values ($1, 'gil@x.com', 'Gil')`, [FABI])
+  const gravar = async (sql) => {
+    await banco.exec('set role authenticated')
+    await banco.query(`select set_config('request.jwt.claim.sub', $1, false)`, [FABI])
+    try {
+      return (await banco.query(sql)).rows
+    } finally {
+      await banco.exec('reset role')
+    }
+  }
+  const lead = `insert into public.leads (nome) values ('Depois da volta') returning nome`
+  const lugar = `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xvolta:0x1', 'S', 'L', 'N', 'E', 'T', 3)`
+  // sem tela nenhuma o banco recusa
+  await assert.rejects(gravar(lead), /row-level security/)
+  await assert.rejects(gravar(lugar), /row-level security/)
+  const migration = readFileSync(new URL(ARQUIVOS.find((n) => n.endsWith('_acessos.sql')), MIGRATIONS), 'utf8')
+  const volta = migration.split('\n').filter((l) => /^-- (drop|create) /.test(l)).map((l) => l.slice(3)).join('\n')
+  await banco.exec(volta)
+  assert.deepEqual(await gravar(lead), [{ nome: 'Depois da volta' }])
+  await gravar(lugar)
+  assert.equal((await banco.query(`select to_regclass('public.membro_telas') as t`)).rows[0].t, null)
 })

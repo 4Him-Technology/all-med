@@ -161,7 +161,7 @@ No mapa das empresas a cor do pino diz o segmento, na ordem alfabética dos segm
 
 Página com margem de 28px (16px no celular), topo fixo com a marca, as abas e a conta. Listas ocupam a largura toda; quando há algo para ler ao lado (ficha do lead, mapa da busca) a tela vira duas colunas: lista flexível e painel fixo de 470px (ficha) ou 440px (mapa). Na Prospecção, os filtros ficam num menu de 300px à esquerda da lista. No Google Maps a tela é o mapa: ele ocupa a altura que sobra abaixo do topo, sem rolar a página, com um painel de 360 a 460px à esquerda (busca, segmentos, filtros e lista, que rola por dentro).
 
-Abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo; abaixo de 900px o mapa das buscas do PC desce para baixo da lista, o mapa das empresas sobe para cima do painel (e quem rola passa a ser a página) e as abas descem para uma segunda linha do topo; abaixo de 720px tudo vira uma coluna, botões e campos ganham 44px de altura e os segmentos ficam numa linha que rola para o lado. Tabelas largas rolam para o lado dentro do próprio cartão, nunca a página.
+Abaixo de 1200px as abas descem para uma segunda linha do topo (numa linha só, marca, cinco abas e os três botões não cabem) e o mapa das empresas encolhe o mesmo tanto; abaixo de 1100px a ficha do lead abre na gaveta e o e-mail da conta sai do topo; abaixo de 900px o mapa das buscas do PC desce para baixo da lista e o mapa das empresas sobe para cima do painel (e quem rola passa a ser a página); abaixo de 720px tudo vira uma coluna, botões e campos ganham 44px de altura e os segmentos ficam numa linha que rola para o lado. Tabelas largas rolam para o lado dentro do próprio cartão, nunca a página.
 
 ## Elevation & Depth
 
@@ -196,10 +196,14 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - **Mapa:** pino redondo de 16px na cor do segmento; pinos próximos viram um círculo branco com a contagem e a borda na cor do segmento (cinza quando mistura segmentos, verde quando todas já estão no kanban); clicar no círculo aproxima. A linha apontada na lista ganha um anel marinho no mapa.
 - **Ficha:** abre no mapa, no lugar da empresa, ao clicar na linha ou no pino: nome, segmento e categoria, nota, endereço, telefone com o tipo deduzido, WhatsApp, Site, Google Maps e o botão Marcar para o kanban. Com o clique, o anel chega fechando sobre o lugar em 220ms; pelo teclado não anima, o foco entra na ficha e o Esc o devolve à linha.
 - **Envio:** a barra de lote fica no pé do mapa (presa embaixo da janela no celular). Acima de 50 empresas o botão vira "Confirmar: mandar N para o kanban" e só manda no segundo clique.
-- **Nova busca pelo PC:** botão branco no topo, à esquerda de Novo lead, só onde há o PC e com login; leva às buscas do PC de qualquer aba. No celular fica só o ícone de busca.
+- **Nova busca pelo PC:** botão branco no topo, à esquerda de Novo lead, só onde há o PC e com login; de qualquer aba, abre a aba Google Maps com a janela da nova busca por cima do mapa. No celular fica só o ícone de busca.
+- **Faixa das buscas:** entre os filtros e o resumo do painel. Cada busca rodando no PC é uma linha bege com a barra de andamento; a que entrou no mapa é uma linha verde suave com o que entrou, o que ficou de fora, "Ver no mapa" e o x para fechar; a que parou com erro é vermelha suave, com "Tirar". Cada linha entra surgindo (220ms) só quando muda; a conferência a cada 5s não refaz nada que não mudou. Embaixo, o botão "Buscas feitas".
+- **Buscas feitas:** popup largo com a tabela Busca (segmento e, embaixo, o local), Empresas (e quantas no kanban), Guardada em e os botões Ver no mapa e Excluir. Excluir pede um segundo clique ("Confirmar" em vermelho) e o foco segue para a próxima busca. No celular cada busca vira um bloco, com os dois botões lado a lado embaixo.
+- **Parece cliente:** etiqueta âmbar (a cor de "Aguardando", porque é um aviso inferido, não um fato) na segunda linha da empresa; na ficha, uma caixa âmbar com o nome do cliente e "Confira antes de mandar ao kanban". O painel diz quantas são.
 
-### Nova busca (Google Maps, atrás do botão "Nova busca pelo PC")
-- Campos separados na mesma linha: Ramo (vários separados por vírgula), Cidade, Bairro opcional e o botão Iniciar busca. Cada ramo vira um termo "ramo em cidade" para o scraper.
+### Nova busca (janela "Nova busca pelo PC")
+- Popup largo com o título, a explicação de que as empresas entram no mapa sozinhas e o formulário sem cartão em volta: Ramo (vários separados por vírgula), Cidade, Bairro opcional e o botão Iniciar busca, na mesma linha. Cada ramo vira uma busca "ramo em bairro, cidade" para o scraper, e no mapa um segmento.
+- Sem o CRM online (só o PC), o mesmo formulário fica no alto da aba, acima dos cartões das buscas.
 
 ### Clientes ativos
 - Cartão branco com o cadastro numa linha (campo "Cadastrar cliente" e botão primário) e a explicação de como o cliente é reconhecido; embaixo, o total e a busca na lista, e a tabela com Cliente, Escondidas no mapa (o que a regra reconheceu, ou "Nenhuma" em cinza) e o botão Tirar.
@@ -215,14 +219,16 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - Leads: o título da coluna ordena; a coluna ordenada mostra a seta em petróleo e aria-sort.
 
 ### Conta e usuários
-- Ícone de usuário redondo no canto direito do topo. Abre um menu (popover nativo, fecha com Esc e clique fora) com nome e e-mail, Trocar senha, Usuários da equipe (só admin) e Sair.
-- Usuários da equipe é um popup largo (860px): formulário de uma linha (Nome, E-mail, Papel, Cadastrar) e a lista com a situação em pílula: Ativo (verde), Aguardando primeiro acesso (âmbar), Desativado (vermelho).
+- Ícone de usuário redondo no canto direito do topo. Abre um menu (popover nativo, fecha com Esc e clique fora) com nome e e-mail, Trocar senha, Usuários e acessos (só admin) e Sair.
+- Usuários e acessos é um popup largo (1120px): formulário de uma linha (Nome, E-mail, Papel, Cadastrar) e a lista com Pessoa (nome e, embaixo, o e-mail), Papel, a situação em pílula (Ativo verde, Aguardando primeiro acesso âmbar, Desativado vermelho), uma coluna por tela com a caixa de marcar no meio e o botão Desativar ou Reativar.
+- As colunas de tela são as abas do topo, com o mesmo nome; aba nova entra sozinha. Na linha do administrador, as caixas dão lugar a "Abre todas as telas". Marcar grava na hora, com o aviso "Bruno agora abre Leads"; se o banco recusar, a caixa volta e o aviso diz o erro. Pelo teclado, o foco fica na caixa.
+- A aba e o botão (Novo lead, Nova busca pelo PC) de tela não liberada somem do topo. Sem nenhuma tela, fica só o aviso para pedir acesso ao administrador.
 - Login com dois cartões que se alternam: Entrar e Primeiro acesso (o e-mail digitado passa de um para o outro).
 
 ### Ficha ao lado (Leads)
 - Painel branco fixo de 470px que entra deslizando, rola por dentro e fecha no x ou com Esc. É o mesmo conteúdo da gaveta do kanban.
 
-### Cartão de busca do PC (Google Maps)
+### Cartão de busca do PC (Google Maps, só sem o CRM online)
 - Título com seta, nome, status e resumo; a busca rodando mostra uma barra de andamento que só indica atividade (o scraper não informa porcentagem).
 - Aberto, mostra a lista com número e o mapa com pinos do mesmo número: branco não marcado, petróleo marcado, verde já no kanban. Clicar no pino marca a empresa. O mapa é em tons de cinza (OpenStreetMap com filtro) para os pinos aparecerem.
 

@@ -161,7 +161,7 @@ Daí em diante, o dia a dia usa `--profile maps --profile tunel` nos comandos de
 
 ## Usuários da equipe
 
-Todos os usuários cadastrados trabalham nos mesmos leads e no mesmo kanban. No ícone de usuário, no canto do topo, cada um troca a própria senha e sai. Quem é **Administrador** também abre por ali **Usuários da equipe**, onde cadastra (nome, e-mail e papel), desativa e reativa pessoas.
+Todos os usuários cadastrados trabalham nos mesmos leads e no mesmo kanban. No ícone de usuário, no canto do topo, cada um troca a própria senha e sai. Quem é **Administrador** também abre por ali **Usuários e acessos**, onde cadastra (nome, e-mail e papel), desativa e reativa pessoas e escolhe as telas de cada uma (veja "Acessos por tela", logo abaixo).
 
 Quem foi cadastrado cria a própria senha: abre o sistema, clica em **Primeiro acesso? Crie sua senha**, digita o e-mail cadastrado e escolhe a senha. Isso vale uma vez só; depois, a senha muda pelo ícone de usuário. Escolha consciente: quem souber o e-mail de alguém que ainda não fez o primeiro acesso consegue criar a senha antes dele. A lista de usuários mostra quem está **Aguardando primeiro acesso**; se alguém ativar uma conta que não devia, desative a pessoa e cadastre de novo com outro e-mail.
 
@@ -174,6 +174,47 @@ Instalação, no painel do CRM online:
 Faça os três em sequência: com só uma parte no ar, o cadastro e o primeiro acesso dão erro.
 
 Para desfazer: os scripts de volta estão no topo das duas migrations; a função se apaga em **Edge Functions**; e o código volta revertendo o PR.
+
+## Buscas do PC entrando no mapa
+
+Desde 12/11/2026, quando uma busca do Google termina, as empresas dela entram sozinhas no mapa da aba Google Maps, e a lista "Buscas feitas" mostra e exclui cada busca. Para ligar, nesta ordem:
+
+1. No painel do CRM online, em **SQL Editor**, rode `supabase/migrations/20261112110000_maps_buscas_do_pc.sql` numa consulta nova. Ela deixa a equipe gravar as empresas das buscas e excluir uma busca.
+2. Aprove o PR no GitHub. O site atualiza sozinho.
+3. Neste PC, abra o sistema pelo .bat, que já faz `git pull` e sobe a versão nova, ou rode `git pull` e `docker compose --profile maps --profile tunel up -d --build`.
+
+A ordem importa: sem o passo 1, a tela não consegue guardar as empresas, e a busca fica no PC com o aviso do erro. Nesse caso, não clique em "Tirar", senão o resultado se perde: rode a migration e abra a aba de novo.
+
+Para desfazer: o script de volta está no topo da migration, e o código volta revertendo o PR. As empresas que já entraram no mapa continuam lá.
+
+## Acessos por tela
+
+Em **Usuários e acessos**, cada pessoa tem uma caixa por tela: Kanban, Leads, Prospecção, Google Maps e Clientes ativos. Marcar ou desmarcar grava na hora. Quem não tem a tela não vê a aba nem o botão dela, e o CRM online recusa os dados dela mesmo para quem tentar direto pela API. Administrador abre todas, sem caixa. Quem não tem nenhuma tela vê só o aviso para pedir acesso.
+
+Ao instalar, quem já está na equipe recebe as cinco telas: nada muda até você desmarcar alguma. Quem for cadastrado depois começa sem nenhuma; marque as telas logo depois de cadastrar.
+
+| Tela | O que ela abre no CRM online |
+|---|---|
+| Kanban, Leads | Ler, editar e arquivar os leads da equipe, o histórico e o botão Novo lead (qualquer uma das duas basta) |
+| Prospecção | A base de CNPJ no PC; mandar empresas ao kanban; ler a lista de clientes ativos (para marcar quem já é cliente) |
+| Google Maps | O mapa das empresas; as buscas novas pelo PC, guardar o resultado delas no mapa e excluir uma busca em "Buscas feitas"; mandar ao kanban; ler a lista de clientes ativos (para esconder quem já é cliente) |
+| Clientes ativos | Cadastrar e tirar clientes; ler as empresas do mapa, para a coluna "Escondidas no mapa" |
+
+Detalhes:
+
+- Quem tem Prospecção ou Google Maps sem Kanban e sem Leads manda empresas para o kanban, mas só enxerga os leads que ele mesmo mandou. "No kanban" aparece só nesses; uma empresa que outra pessoa já mandou o banco ignora no envio, e o aviso conta como "já estava no CRM".
+- O PC confere a tela antes de abrir a base de CNPJ (Prospecção) e as buscas do Google (Google Maps), e guarda a resposta por 1 minuto: uma tela tirada vale no PC em até 1 minuto. No site, a aba some quando a pessoa carrega a página de novo; os dados ela já não consegue ler na hora.
+- O Painel gerencial, quando existir, aparece sozinho como mais uma coluna.
+
+Instalação, nesta ordem:
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261112120000_acessos.sql` e clique em **Run**. Antes, a `20261112110000_maps_buscas_do_pc.sql` (seção anterior) precisa ter rodado: esta troca as regras de gravar e excluir buscas que ela cria.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
+3. **PC:** rode `git pull` e o mesmo `up -d --build` de sempre (com `--profile tunel` se usa o túnel).
+
+Se o site for atualizado antes do banco, ele mostra todas as abas, como antes. Se o PC for atualizado antes do banco, Prospecção e Google Maps respondem "Não consegui conferir o seu login agora" até a migration rodar.
+
+Para voltar atrás: no topo da migration há um script de volta (as linhas que começam com `-- drop` e `-- create`). Copie essas linhas sem o `-- ` do começo e rode no **SQL Editor**: todo membro ativo volta a abrir todas as telas, e a tabela de acessos é apagada. Depois reverta o PR no GitHub e, no PC, volte o código como em "Voltar atrás". Só reverter o site e o PC não basta: o banco continua recusando os dados de quem não tem a tela, e as abas aparecem vazias.
 
 ## Dia a dia
 

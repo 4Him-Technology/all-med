@@ -23,12 +23,14 @@ Depois, as migrations seguintes da mesma pasta, em ordem, e a função de cadast
 O que as migrations garantem no banco, testado em [test/crm-sql.test.js](test/crm-sql.test.js):
 
 - a equipe (membros ativos) vê e trabalha os mesmos leads e atendimentos (RLS); conta fora da equipe, membro desativado e visitante sem login não leem nada;
+- cada pessoa abre só as telas que o administrador liberou (tabela `membro_telas`; as policies pedem `crm.pode('<tela>')`); o administrador abre todas; sem a tela, o banco não entrega os dados dela (migration `20261112120000_acessos.sql`, detalhes em [INSTALAR.md](INSTALAR.md), "Acessos por tela");
 - só a função `usuarios`, com a chave secreta, cadastra e desativa membros, e só a pedido de um admin; o primeiro acesso (a pessoa cadastrada cria a própria senha digitando o e-mail) vale uma vez só, com tentativas limitadas ([test/usuarios.test.js](test/usuarios.test.js));
 - quem criou, origem, CNPJ e datas não podem ser alterados depois de criados (permissão por coluna);
 - nada é apagado de verdade: arquivar preenche `deleted_at`, e o histórico de atendimentos é imutável;
 - mudança de coluna no kanban grava sozinha no histórico, e o usuário não consegue forjar esse registro;
 - a mesma empresa (CNPJ ou lugar do Maps) não entra duas vezes na equipe, nem depois de arquivada;
 - a conta de quem criou um lead não pode ser apagada (o trabalho é da equipe); para tirar alguém, desativa-se;
+- a equipe guarda as empresas das buscas do Google Maps e exclui uma busca (preenchendo `deleted_at`), mas não apaga de verdade nem mexe nas datas; quem está fora da equipe não grava;
 - site, e-mails, CNPJ, avaliação e tamanhos de texto são validados por CHECK.
 
 ## 2. Rodar a parte do PC (Docker)
@@ -103,13 +105,17 @@ Sem Docker, dá para testar a tela com `CNPJ_DEMO=1` no `.env` e `npm start`: o 
 
 ## Google Maps
 
-A aba Google Maps abre no mapa das empresas guardadas no CRM online (mais abaixo). As buscas novas pelo scraper abrem pelo botão "Nova busca pelo PC", no topo, ao lado de "Novo lead" (só no PC, ou no site quando há o túnel): você cadastra uma busca ("dentistas em Campinas"), o servidor local manda para o scraper, acompanha o job e guarda o resultado no PC. Quando a busca fica pronta, o cartão dela abre com a lista e o mapa, e o botão "Mandar para o kanban" manda os leads para o Supabase; os que já estão lá (mesmo lugar do Maps) o banco ignora.
+A aba Google Maps abre no mapa das empresas guardadas no CRM online (mais abaixo). As buscas novas pelo scraper abrem pelo botão "Nova busca pelo PC", no topo, ao lado de "Novo lead" (só no PC, ou no site quando há o túnel). O formulário abre numa janela por cima do mapa, com ramo, cidade e bairro; cada ramo vira uma busca separada. O servidor local manda a busca para o scraper, acompanha o job e guarda o resultado no PC.
+
+Quando a busca termina, a tela de quem está logado guarda as empresas dela no CRM online, tira a busca do PC e o mapa relê as empresas ([public/buscas-mapa.js](public/buscas-mapa.js); a conversão está em `lugaresDaBusca`, em [public/lugares.js](public/lugares.js)). Isso acontece sozinho, mesmo com a pessoa em outra aba, enquanto o sistema estiver aberto. A faixa no painel do mapa mostra as buscas que estão rodando e o que entrou. Como na carga das planilhas, só entram empresas com endereço, telefone e nota, e a faixa diz quantas ficaram de fora. O botão "Buscas feitas" lista cada busca guardada (um ramo num lugar), com "Ver no mapa", que filtra o mapa por ela, e "Excluir", que pede um segundo clique e tira as empresas dela do mapa (`deleted_at`; o que já foi para o kanban continua lá). Repetir uma busca excluída traz as empresas de volta.
+
+Sem o CRM online (só o PC), a aba continua sendo a lista de cartões das buscas, cada uma com a lista e o mapa do que achou e o botão "Mandar para o kanban".
 
 O scraper só roda em Docker. O `.exe` de Windows v1.18.1 falha em toda busca (issue [gosom/google-maps-scraper#322](https://github.com/gosom/google-maps-scraper/issues/322)). `npm run scraper:fake` sobe um servidor que imita a API do gosom com empresas fictícias, para mexer na tela sem raspar o Google.
 
 ### Mapa das empresas guardadas no CRM online
 
-Empresas levantadas fora do sistema (por exemplo, numa planilha) ficam na tabela `maps_lugares` do CRM online (migration `20261110120000_maps_no_crm.sql`). Só entram as que têm endereço, telefone e nota do Google.
+As empresas das buscas pelo PC e as levantadas fora do sistema (por exemplo, numa planilha) ficam na tabela `maps_lugares` do CRM online (migrations `20261110120000_maps_no_crm.sql` e `20261112110000_maps_buscas_do_pc.sql`). Só entram as que têm endereço, telefone e nota do Google.
 
 A tela é um mapa só com todas elas ([public/mapa.js](public/mapa.js); a lógica sem tela está em [public/lugares.js](public/lugares.js), testada em [test/lugares.test.js](test/lugares.test.js)):
 
@@ -119,9 +125,11 @@ A tela é um mapa só com todas elas ([public/mapa.js](public/mapa.js); a lógic
 - Clicar numa linha ou num pino abre a ficha da empresa no mapa, com telefone, WhatsApp (quando o número tem formato de celular), site e a página no Google Maps.
 - As marcadas vão para o kanban pela barra escura no pé do mapa. Acima de 50 de uma vez, o botão pede um segundo clique, porque lead criado não se apaga, só se arquiva um por um. O lead leva nas observações o segmento, o local da pesquisa e o serviço.
 
+- Empresa com nome parecido com um cliente ativo continua no mapa, mas ganha a etiqueta âmbar "Parece cliente" na lista e um aviso na ficha com o nome do cliente; o painel diz quantas são. É só uma ajuda para conferir: a regra está em `parecidoCom`, em [public/clientes.js](public/clientes.js) (ver Clientes ativos).
+
 O mapa não depende do PC, então a aba também aparece no site para quem está logado.
 
-A equipe só lê essa tabela. A carga roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar. A quantidade de avaliações fica vazia nessa carga: na planilha de origem a coluna trazia a nota vezes 10, não a quantidade. Para tirar tudo: `delete from public.maps_lugares;`. Para voltar atrás na tabela, veja o rollback no começo da migration. Para voltar à tela anterior (um cartão por local e segmento), reverta no git o commit do mapa das empresas.
+A equipe grava nessa tabela só pelo que a tela manda: as colunas da empresa e o `deleted_at` (sem DELETE e sem mexer nas datas), e só quem é membro ativo (RLS). A carga das planilhas roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar. A quantidade de avaliações fica vazia nessa carga: na planilha de origem a coluna trazia a nota vezes 10, não a quantidade. Para tirar tudo: `delete from public.maps_lugares;`. Para voltar atrás na tabela, veja o rollback no começo da migration. Para voltar à tela anterior (um cartão por local e segmento), reverta no git o commit do mapa das empresas.
 
 ## Clientes ativos
 
@@ -134,12 +142,15 @@ Quem está na lista:
 
 O reconhecimento é pelo nome, porque a lista de clientes não tem CNPJ, telefone nem endereço ([public/clientes.js](public/clientes.js), testado em [test/clientes.test.js](test/clientes.test.js)). Os nomes são comparados sem acento, caixa, pontuação, Ltda, S.A., CNPJ e a unidade depois do traço. A empresa é reconhecida quando tem as mesmas palavras do cliente, quando tem o nome do cliente inteiro, ou quando o cliente tem o nome dela inteiro com pelo menos duas palavras próprias (palavras de ramo, como "Construtora" ou "Transportes", sozinhas não bastam). Na tela, a coluna "Escondidas no mapa" mostra o que foi reconhecido para cada cliente. Quando uma filial aparece com outro nome (por exemplo, a marca seguida do bairro), cadastre o nome curto da marca: cliente de uma palavra só esconde as empresas cujo nome começa por ela.
 
+Além de esconder quem é o cliente, o mapa avisa quem tem nome parecido ("Parece cliente"), sem esconder: a marca do cliente (a primeira palavra dele que não é de ramo nem comum, como "Posto" ou "Hotel", com 5 letras ou mais) aparece no nome da empresa, ou os dois têm duas dessas palavras em comum. Esse aviso pega o que a regra de esconder deixa passar de propósito, como a marca no meio do nome ou uma unidade com outro complemento.
+
 A carga inicial é um arquivo SQL gerado da planilha, rodado no SQL Editor e fora do git (é a lista de clientes); pode rodar de novo sem duplicar. Os testes usam nomes inventados pelo mesmo motivo. Para tirar a tabela: o rollback está no começo da migration.
 
 ## Segurança
 
 - Tela local: presa em `127.0.0.1`, checagem do cabeçalho Host (contra DNS rebinding), POST só com `application/json`, CSP restrita, DOM montado sem `innerHTML`, sem stack trace nas respostas.
-- CRM online: autorização toda no banco (RLS e permissão por coluna); o navegador só tem a chave pública.
+- CRM online: autorização toda no banco (RLS e permissão por coluna); o navegador só tem a chave pública. Esconder a aba de quem não tem a tela é só conforto: quem barra é a RLS.
+- API do PC (Prospecção e buscas do Google, também pelo túnel): com o CRM online ligado, toda chamada confere o login e a tela no próprio CRM (`public.minhas_telas`): a base de CNPJ pede a tela Prospecção e as buscas pedem Google Maps. Sem essa conferência, quem perdeu a tela continuaria abrindo a base de CNPJ e disparando buscas no Google pelo túnel, porque o PC não passa pela RLS. A resposta fica guardada por 1 minuto.
 - **Sessão de login**: fica no `sessionStorage` (some ao fechar a aba), não em cookie HttpOnly. Num site estático o cookie HttpOnly exige uma função no servidor intermediando o login. O risco que sobra é XSS, contido pela CSP (só o próprio site e o supabase-js em versão fixa no jsDelivr). Se quiser o cookie HttpOnly, dá para colocar essa função no Netlify ou no Cloudflare Pages.
 - Tentativas de login: o Supabase Auth já limita por IP. Dá para ligar CAPTCHA no painel se o site ficar público.
 
@@ -155,7 +166,7 @@ Os termos do Google Maps proíbem raspagem automatizada; o risco prático é blo
 | `db-local/migrations/` | Base de CNPJ no PC: esquema, montagem mensal, funções de busca |
 | `importador/` | Download, descompactação e carga mensal dos arquivos da Receita |
 | `src/` | Servidor local: tela, ponte para a base de CNPJ (`/api/rpc/<função>`), buscas do Maps, `config.js` |
-| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local, `mapa.js` é o mapa das empresas do Google Maps, `tela-clientes.js` a aba Clientes ativos e `clientes.js` o reconhecimento do cliente pelo nome) |
+| `public/` | Front em JS puro, usado no PC e na web (`crm.js` fala com o Supabase, `prospeccao.js` com a base local, `mapa.js` é o mapa das empresas do Google Maps, `buscas-mapa.js` leva as buscas do PC para esse mapa, `tela-clientes.js` a aba Clientes ativos e `clientes.js` o reconhecimento do cliente pelo nome) |
 | `scripts/gerar-config.js` | Build do site: `config.js` e `_headers` |
 | `test/` | Testes (`node:test`; PGlite roda as duas migrations de verdade), scraper falso e dados fictícios |
 

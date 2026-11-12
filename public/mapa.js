@@ -1,7 +1,9 @@
 // Aba Google Maps: todas as empresas da pesquisa guardadas no CRM online num mapa só.
 // O painel ao lado tem a busca, os filtros e a lista, que mostra o que está na área do mapa; a ficha da empresa abre no mapa.
-// A lógica sem tela (filtros, contagens, área do mapa) está em lugares.js. Quem já é cliente ativo não aparece (clientes.js).
-import { clienteDe, prepararClientes } from './clientes.js'
+// A lógica sem tela (filtros, contagens, área do mapa) está em lugares.js. Quem já é cliente ativo não aparece, e quem
+// tem nome parecido com um cliente aparece com o aviso "Parece cliente" (clientes.js).
+// As buscas novas pelo PC entram aqui sozinhas quando terminam (buscas-mapa.js chama recarregarMapa).
+import { clienteDe, parecidoCom, prepararClientes } from './clientes.js'
 import { clientesAtivos, empresasMaps, enviarLeads } from './crm.js'
 import { FILTRO_VAZIO, etiquetasDoMapa, facetas, filtrarLugares, juntarLugares, leadDoLugar, linkWhatsApp, listarOpcoes, naArea, ordenarLugares, regioes, resumoDaArea, rotuloLocal, semEtiqueta, tipoTelefone } from './lugares.js'
 import { $, avaliacao, carregando, esqueleto, estado, h, icone, toast } from './ui.js'
@@ -101,6 +103,24 @@ export function abrirMapa() {
   return s.lendo
 }
 
+// Relê as empresas agora (uma busca do PC acabou de entrar ou foi excluída), mesmo com a aba em outra tela.
+// Se o mapa ainda não abriu nesta visita, a primeira abertura já lê tudo.
+export async function recarregarMapa() {
+  if (!s.lugares) return
+  await s.lendo
+  s.lendo = lerEmpresas(false).finally(() => (s.lendo = null))
+  return s.lendo
+}
+
+// "Ver no mapa" de uma busca: filtra pelo segmento e pelo local dela e enquadra as empresas
+export function mostrarBusca(segmento, local) {
+  if (!s.ui) return
+  s.filtro = { ...FILTRO_VAZIO, segmentos: [segmento], locais: [local] }
+  s.termoCategoria = ''
+  s.ui.q.value = ''
+  aplicar()
+}
+
 async function lerEmpresas(primeira) {
   let linhas, clientes
   try {
@@ -117,6 +137,8 @@ async function lerEmpresas(primeira) {
   s.lidoEm = Date.now()
   s.segmentos = [...new Set(s.todos.flatMap((l) => l.segmentos))].sort(alfabetica)
   s.locais = [...new Set(s.todos.flatMap((l) => l.locais))]
+  // segmento ou local que sumiu (busca excluída) sai do filtro, senão a lista ficaria vazia sem motivo à vista
+  s.filtro = { ...s.filtro, segmentos: s.filtro.segmentos.filter((v) => s.segmentos.includes(v)), locais: s.filtro.locais.filter((v) => s.locais.includes(v)) }
   // a cor do pino é a do primeiro segmento da empresa
   for (const l of s.todos) l.seg = s.segmentos.indexOf(l.segmentos[0]) % CORES
   separarClientes(clientes)
@@ -136,7 +158,10 @@ async function lerEmpresas(primeira) {
 function separarClientes(clientes) {
   s.clientes = clientes
   const preparados = prepararClientes(clientes ?? [])
-  for (const l of s.todos) l.cliente = clienteDe(l.nome, preparados)?.nome ?? null
+  for (const l of s.todos) {
+    l.cliente = clienteDe(l.nome, preparados)?.nome ?? null
+    l.parecido = l.cliente ? null : (parecidoCom(l.nome, preparados)?.nome ?? null)
+  }
   s.lugares = s.todos.filter((l) => !l.cliente)
   s.porId = new Map(s.lugares.map((l) => [l.place_id, l]))
   // marcada que virou cliente, ou que já foi para o kanban, sai da seleção
@@ -157,10 +182,20 @@ async function conferirClientes() {
 function desenharNotaClientes() {
   const el = s.ui.notaClientes
   const n = s.todos.length - s.lugares.length
+  const parecidas = s.lugares.filter((l) => l.parecido).length
   el.classList.toggle('erro', s.clientes === null)
-  el.hidden = s.clientes !== null && !n
+  el.hidden = s.clientes !== null && !n && !parecidas
   if (s.clientes === null) el.replaceChildren(icone('alerta', 14), 'A lista de clientes ativos não carregou: eles podem aparecer no mapa.')
-  else el.replaceChildren(`${numero(n)} ${n === 1 ? 'empresa é cliente ativo e não aparece aqui.' : 'empresas são clientes ativos e não aparecem aqui.'} `, h('button', { type: 'button', class: 'link', onclick: () => $('.aba[data-aba="clientes"]')?.click() }, 'Ver clientes'))
+  else
+    // replaceChildren escreveria "false" na tela: as partes que não valem saem antes
+    el.replaceChildren(
+      ...[
+        n > 0 && `${numero(n)} ${n === 1 ? 'empresa é cliente ativo e não aparece aqui.' : 'empresas são clientes ativos e não aparecem aqui.'} `,
+        parecidas > 0 && `${numero(parecidas)} ${parecidas === 1 ? 'tem nome parecido com um cliente: confira a etiqueta' : 'têm nome parecido com um cliente: confira a etiqueta'} `,
+        parecidas > 0 && h('span', { class: 'tag parecido' }, 'Parece cliente'),
+        h('button', { type: 'button', class: 'link', onclick: () => $('.aba[data-aba="clientes"]')?.click() }, 'Ver clientes'),
+      ].filter(Boolean),
+    )
 }
 
 // ---------- painel: busca, filtros e resumo ----------
@@ -413,7 +448,7 @@ function mostrar(lista) {
 }
 
 function semEmpresas() {
-  if (!s.lugares.length) return estado({ titulo: 'Nenhuma empresa ainda', texto: 'As empresas do Google Maps entram no CRM online pela carga de uma planilha de pesquisa.' })
+  if (!s.lugares.length) return estado({ titulo: 'Nenhuma empresa ainda', texto: 'Use "Nova busca pelo PC", no topo. Quando a busca terminar, as empresas que ela achou aparecem aqui.' })
   if (!s.filtradas.length) return estado({ titulo: 'Nenhuma empresa com esses filtros', texto: 'Tire um filtro ou procure por outro nome.', acao: h('button', { type: 'button', onclick: limparFiltros }, 'Limpar filtros') })
   return estado({ titulo: 'Nenhuma empresa nesta área do mapa', texto: 'Afaste o mapa ou volte para onde elas estão.', acao: h('button', { type: 'button', onclick: enquadrar }, `Ver as ${numero(s.filtradas.length)} do filtro`) })
 }
@@ -443,7 +478,15 @@ function linha(l) {
     // sem mapa ou sem localização não há ficha para abrir: o nome fica como texto
     s.mapa && temLugar(l) ? h('button', { type: 'button', class: 'lm-nome', title: l.nome, onclick: (e) => abrirFicha(l, e.detail === 0) }, nome) : h('span', { class: 'lm-nome', title: l.nome }, nome),
     l.avaliacao != null && h('span', { class: 'lm-nota' }, avaliacao(l.avaliacao)),
-    h('p', { class: 'lm-linha2' }, l.categoria && h('span', { class: 'lm-cat' }, l.categoria), l.telefone && h('span', { class: 'lm-tel' }, l.telefone), l.celular && h('span', { class: 'tag tel-celular' }, 'Celular'), l.enviado && h('span', { class: 'ja' }, 'No kanban')),
+    h(
+      'p',
+      { class: 'lm-linha2' },
+      l.categoria && h('span', { class: 'lm-cat' }, l.categoria),
+      l.telefone && h('span', { class: 'lm-tel' }, l.telefone),
+      l.celular && h('span', { class: 'tag tel-celular' }, 'Celular'),
+      l.parecido && h('span', { class: 'tag parecido', title: `Nome parecido com o cliente ativo ${l.parecido}` }, 'Parece cliente'),
+      l.enviado && h('span', { class: 'ja' }, 'No kanban'),
+    ),
   )
 }
 
@@ -663,6 +706,8 @@ function fichaDoLugar(l) {
     // o nome abre a ficha; segmento e categoria vêm logo abaixo, sem rótulo miúdo por cima do nome
     h('p', { class: 'fp-nome' }, h('strong', {}, l.nome)),
     h('p', { class: 'fp-seg' }, h('span', { class: `ponto seg-${l.seg}` }), [l.segmentos.join(', '), l.categoria].filter(Boolean).join(' · ')),
+    // o nome é comparado com a lista de clientes ativos: parecido não esconde, só avisa (dado inferido)
+    l.parecido && h('p', { class: 'fp-aviso' }, icone('alerta', 14), h('span', {}, 'Nome parecido com o cliente ativo ', h('strong', {}, l.parecido), '. Confira antes de mandar ao kanban.')),
     l.avaliacao != null && h('p', {}, avaliacao(l.avaliacao), h('span', { class: 'muted' }, ' no Google')),
     l.endereco && h('p', {}, l.endereco),
     // o tipo do telefone é deduzido pelo formato do número (dado inferido, avisado na etiqueta)

@@ -60,3 +60,18 @@ test('marca quais empresas da busca já foram mandadas ao kanban, uma parte de c
   assert.deepEqual(s.leadsDaBusca(b.id).map((l) => l.enviado), [true, true, true])
   assert.deepEqual(createStore(file).leadsDaBusca(b.id).map((l) => l.enviado), [true, true, true])
 })
+
+test('a busca sai do PC depois que o resultado foi guardado no CRM online, ou quando falhou; a que está rodando fica', () => {
+  const file = arquivo()
+  const s = createStore(file)
+  const rodando = s.createBusca(validarBusca({ keywords: 'x' }), 'job-1')
+  assert.throws(() => s.removerBusca(rodando.id), /rodando/)
+  const pronta = s.createBusca(validarBusca({ keywords: 'y' }), 'job-2')
+  s.updateBusca(pronta.id, { status: 'importado', encontrados: 1, leads: [{ nome: 'A', place_id: 'a' }] })
+  const falhou = s.createBusca(validarBusca({ keywords: 'z' }), 'job-3')
+  s.updateBusca(falhou.id, { status: 'falhou', erro: 'o scraper marcou o job como falho' })
+  s.removerBusca(pronta.id)
+  s.removerBusca(falhou.id)
+  assert.deepEqual(createStore(file).listBuscas().itens.map((b) => b.id), [rodando.id])
+  assert.throws(() => s.removerBusca(pronta.id), NotFoundError)
+})

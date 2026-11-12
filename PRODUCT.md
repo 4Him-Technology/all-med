@@ -8,7 +8,7 @@ web
 
 ## Users
 
-O Filipe e uma equipe pequena de vendas (B2B). Cada pessoa tem o próprio login e vê só os próprios leads. O uso principal é no computador, sentado, montando listas de empresas e trabalhando o funil; o celular é secundário.
+O Filipe e uma equipe pequena de vendas (B2B). Cada pessoa tem o próprio login, a equipe trabalha os mesmos leads e o administrador escolhe quais telas cada um abre (por exemplo, quem só prospecta fica com Prospecção e Google Maps). O uso principal é no computador, sentado, montando listas de empresas e trabalhando o funil; o celular é secundário.
 
 ## Product Purpose
 
@@ -26,7 +26,7 @@ Junta, num lugar só e sem IA, a pesquisa profunda de empresas que ferramentas c
 
 ## Capabilities and Constraints
 
-- Funciona hoje: prospecção com todos os filtros (dados de demonstração até a base real ser carregada), envio ao kanban sem duplicar, kanban com arrastar e teclado, lista de leads, ficha com histórico imutável, arquivamento, buscas no Google Maps (só com Docker), mapa das empresas do Google Maps guardadas no CRM online (abre também no site), lista de clientes ativos que some das pesquisas (reconhecida pelo nome, porque a lista do cliente só tem a razão social).
+- Funciona hoje: prospecção com todos os filtros (dados de demonstração até a base real ser carregada), envio ao kanban sem duplicar, kanban com arrastar e teclado, lista de leads, ficha com histórico imutável, arquivamento, buscas no Google Maps (rodam no PC com Docker; com o túnel, começam também pelo site), mapa das empresas do Google Maps guardadas no CRM online (abre também no site; cada busca do PC entra nele sozinha quando termina, e a lista "Buscas feitas" mostra e exclui cada busca), lista de clientes ativos que some das pesquisas (reconhecida pelo nome, porque a lista do cliente só tem a razão social), com aviso "Parece cliente" no mapa para nome parecido, acessos por tela escolhidos pelo administrador (o banco e o PC também recusam, não só a tela).
 - Restrições: o fornecedor do banco não pode aparecer em nenhum texto da interface. Sessão de login no sessionStorage (site estático). Dados de sócios e contatos de empresário individual são dado pessoal (LGPD).
 - Decisões em aberto: nome do produto (ideias: Garimpo, Radar, Prospecta, Rota, Lastro); se a equipe vai precisar ver leads uns dos outros; exportação de listas para Excel/CSV.
 

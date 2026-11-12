@@ -88,6 +88,11 @@ test('busca no Maps fica guardada no PC até a tela enviar ao kanban online', as
   assert.equal((await req(`/api/buscas/${criada.json.id}`, { method: 'PATCH', body: { place_ids: ['nao-existe'], novos: 0 } })).status, 422)
   assert.equal((await req(`/api/buscas/${crypto.randomUUID()}/leads`)).status, 404)
   assert.equal((await req('/api/buscas/123/leads')).status, 404)
+
+  // guardada no CRM online, a busca sai do PC
+  assert.equal((await req(`/api/buscas/${criada.json.id}`, { method: 'DELETE' })).status, 204)
+  assert.equal((await req(`/api/buscas/${criada.json.id}/leads`)).status, 404)
+  assert.equal((await req(`/api/buscas/${criada.json.id}`, { method: 'DELETE' })).status, 404)
 })
 
 test('prospecção chama só as funções liberadas da base de CNPJ', async () => {
@@ -152,7 +157,7 @@ test('pela internet: a API do PC exige o login do CRM e só libera CORS para o s
     log: silencioso,
     config,
     hostsPermitidos: ['localhost', '127.0.0.1', 'pc.exemplo.com'],
-    autenticar: async (token) => (token === 'token-bom' ? { id: 'u1' } : null),
+    autenticar: async (token) => (token === 'token-bom' ? { id: 'u1', telas: ['buscas'] } : null),
     origensWeb: ['https://crm.exemplo.com'],
   })
   const porta = await ouvir(pc.server)
@@ -170,8 +175,51 @@ test('pela internet: a API do PC exige o login do CRM e só libera CORS para o s
     const pre = await bruto(porta, '/api/buscas', { method: 'OPTIONS', headers: { ...site, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' } })
     assert.equal(pre.status, 204)
     assert.match(pre.headers['access-control-allow-headers'], /authorization/)
+    assert.match(pre.headers['access-control-allow-methods'], /DELETE/)
     // a tela em si continua pública, como o site: só a API mexe na base e no scraper
     assert.equal((await bruto(porta, '/', { headers: { host: 'pc.exemplo.com' } })).status, 200)
+  } finally {
+    pc.server.close()
+  }
+})
+
+test('a API do PC confere a tela: a base de CNPJ pede Prospecção e as buscas do Google pedem Google Maps', async () => {
+  const telas = { 'token-prospecta': ['prospeccao'], 'token-maps': ['buscas'], 'token-kanban': ['kanban'] }
+  const pc = createApp({
+    store: createStore(join(dir, 'telas.json')),
+    scraper: createScraperClient('http://127.0.0.1:9'),
+    cnpj: criarCnpj(consultaPglite(await criarBancoCnpj())),
+    publicDir,
+    log: silencioso,
+    config,
+    autenticar: async (token) => (telas[token] ? { id: 'u1', telas: telas[token] } : null),
+  })
+  const porta = await ouvir(pc.server)
+  const chamar = (path, token, metodo = 'GET') => bruto(porta, path, { method: metodo, headers: { host: 'localhost', authorization: `Bearer ${token}`, 'content-type': 'application/json' } })
+  try {
+    assert.equal((await chamar('/api/buscas', 'token-maps')).status, 200)
+    assert.equal((await chamar('/api/buscas', 'token-prospecta')).status, 403)
+    assert.equal((await chamar('/api/buscas', 'token-kanban')).status, 403)
+    const busca = `/api/buscas/${'0'.repeat(8)}-0000-4000-8000-${'0'.repeat(12)}`
+    assert.equal((await chamar(`${busca}/leads`, 'token-prospecta')).status, 403)
+    // excluir a busca do PC também é da tela Google Maps
+    assert.equal((await chamar(busca, 'token-prospecta', 'DELETE')).status, 403)
+    assert.notEqual((await chamar(busca, 'token-maps', 'DELETE')).status, 403)
+    assert.notEqual((await chamar('/api/rpc/filtros_prospeccao', 'token-prospecta', 'POST')).status, 403)
+    assert.equal((await chamar('/api/rpc/filtros_prospeccao', 'token-maps', 'POST')).status, 403)
+    assert.equal((await chamar('/api/rpc/filtros_prospeccao', 'token-ruim', 'POST')).status, 401)
+  } finally {
+    pc.server.close()
+  }
+})
+
+test('a recusa por falta de tela explica o motivo', async () => {
+  const pc = createApp({ store: createStore(join(dir, 'telas2.json')), scraper: createScraperClient('http://127.0.0.1:9'), publicDir, log: silencioso, config, autenticar: async () => ({ id: 'u1', telas: [] }) })
+  const porta = await ouvir(pc.server)
+  try {
+    const res = await fetch(`http://127.0.0.1:${porta}/api/buscas`, { headers: { authorization: 'Bearer x' } })
+    assert.equal(res.status, 403)
+    assert.match((await res.json()).erro, /Google Maps.*administrador/)
   } finally {
     pc.server.close()
   }

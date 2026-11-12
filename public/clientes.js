@@ -53,3 +53,23 @@ export function clienteDe(nome, preparados) {
   }
   return null
 }
+
+// palavras que abrem muito nome de empresa sem dizer de quem é: não contam como marca no aviso de nome parecido
+const COMUNS = new Set('posto hotel escola colegio academia oficina mecanica studio estudio espaco salao barbearia pizzaria lanchonete consultorio hospital condominio igreja associacao sindicato edificio residencial pousada veterinario veterinaria farmacia drogaria center centro shopping avenida jardim vila parque nossa senhora santa santo'.split(' '))
+const marcante = (p) => !RAMO.has(p) && !COMUNS.has(p) && !/^\d+$/.test(p)
+
+// Nome parecido com um cliente ativo, para o mapa avisar (a empresa continua aparecendo; quem confere é a pessoa).
+// Parecido: a marca do cliente (a primeira palavra marcante dele, com 5 letras ou mais) está no nome da empresa,
+// ou os dois têm duas palavras marcantes em comum. Quem já é o cliente (clienteDe) nem aparece no mapa: aqui fica null.
+export function parecidoCom(nome, preparados) {
+  if (clienteDe(nome, preparados)) return null
+  const l = palavras(nome)
+  const marcantes = new Set(l.filter(marcante))
+  for (const { cliente, c } of preparados) {
+    const doCliente = c.filter(marcante)
+    if (!doCliente.length) continue
+    if (doCliente[0].length >= 5 && l.includes(doCliente[0])) return cliente
+    if (doCliente.filter((p) => marcantes.has(p)).length >= 2) return cliente
+  }
+  return null
+}
