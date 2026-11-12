@@ -38,7 +38,7 @@ const uuid = (id) => {
 }
 
 const LOCAIS = new Set(['localhost', '127.0.0.1'])
-const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, PATCH', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
+const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, PATCH, DELETE', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
 
 // config: { supabaseUrl, supabaseKey, urlWeb } (só a chave pública; ver validarConfigSupabase)
 // autenticar: (token) => usuário ou null; com ele, toda chamada da API exige o login do CRM (é o que deixa abrir o PC pelo túnel)
@@ -79,6 +79,7 @@ export function createApp({ store, scraper, cnpj, publicDir, log, config = null,
     ],
     ['GET', /^\/api\/buscas\/([^/]+)\/leads$/, (_req, _url, id) => [200, store.leadsDaBusca(uuid(id))]],
     ['PATCH', /^\/api\/buscas\/([^/]+)$/, async (req, _url, id) => [200, store.marcarEnviados(uuid(id), await corpo(req))]],
+    ['DELETE', /^\/api\/buscas\/([^/]+)$/, (_req, _url, id) => (store.removerBusca(uuid(id)), [204])],
     [
       'POST',
       /^\/api\/rpc\/([a-z_]+)$/,

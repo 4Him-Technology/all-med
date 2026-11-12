@@ -1,3 +1,4 @@
+import { acompanharBuscas, iniciarBuscas } from './buscas-mapa.js'
 import { buscaMaps, camposLead, resumoBusca, ultimoContato } from './campos.js'
 import { clienteDe, prepararClientes } from './clientes.js'
 import * as crm from './crm.js'
@@ -429,8 +430,9 @@ function abrirNovoLead() {
 }
 
 // ---------- aba Google Maps ----------
-// A tela é o mapa das empresas guardadas no CRM online (mapa.js). As buscas novas pelo scraper do PC ficam
-// atrás do botão "Nova busca pelo PC": cada busca é um cartão, e a pronta abre com a lista do que achou e o mapa.
+// A tela é o mapa das empresas guardadas no CRM online (mapa.js). "Nova busca pelo PC" abre o formulário numa janela;
+// quando a busca termina, as empresas entram no mapa sozinhas e a busca vai para a lista "Buscas feitas" (buscas-mapa.js).
+// Sem o CRM online (só o PC), a aba é a lista de cartões das buscas, cada uma com a lista do que achou e o mapa.
 // Prospecção e buscas novas rodam no PC com Docker; no site da internet aparecem quando há o túnel até ele (urlPc)
 const temPc = config.local || Boolean(config.urlPc)
 // só quem está logado e na equipe lê as empresas do CRM online; os outros veem apenas as buscas do PC
@@ -440,9 +442,9 @@ const cartoes = new Map() // id da busca -> <section>; o cartão sobrevive à at
 const abertas = new Map() // id -> { id, leads, marcadas: Set de place_id, mapa, pinos: Map place_id -> marcador, corpo, ui }
 
 function abrirGoogleMaps() {
-  if (!mapaLigado) mostrarBuscasPc(true)
-  else if ($('#buscas-pc').hidden) abrirMapa()
-  else carregarBuscas()
+  if (!mapaLigado) return mostrarBuscasPc(true)
+  abrirMapa()
+  iniciarBuscas(temPc)
 }
 
 function mostrarBuscasPc(sim) {
@@ -861,6 +863,10 @@ async function iniciar() {
   $('#menu-sair').prepend(icone('sair'))
   $('#fechar-usuarios').append(icone('x', 20))
   $('#fechar-usuarios').addEventListener('click', () => fecharDialogo($('#dlg-usuarios')))
+  for (const [botao, dlg] of [['#fechar-busca', '#dlg-busca'], ['#fechar-buscas', '#dlg-buscas']]) {
+    $(botao).append(icone('x', 20))
+    $(botao).addEventListener('click', () => fecharDialogo($(dlg)))
+  }
   $('#link-web').append(icone('externo', 14))
   $('#btn-iniciar-busca').prepend(icone('buscar'))
   $('#voltar-mapa').prepend(icone('seta', 14))
@@ -910,12 +916,16 @@ async function iniciar() {
   }
   // a aba Google Maps mostra o mapa das empresas guardadas no CRM online, que não depende do PC
   mapaLigado = logado
-  if (logado) $('.aba[data-aba="buscas"]').hidden = false
-  else if (!temPc) delete abas.buscas
-  // o botão do topo leva às buscas do PC de qualquer aba; trocar de tela leva o foco junto
+  if (logado) {
+    $('.aba[data-aba="buscas"]').hidden = false
+    // com o mapa, o formulário da busca nova abre numa janela por cima dele
+    $('#dlg-busca-corpo').append($('#form-busca'))
+  } else if (!temPc) delete abas.buscas
+  // o botão do topo abre a busca nova de qualquer aba, por cima do mapa; trocar de tela leva o foco junto
   $('#btn-busca-pc').addEventListener('click', () => {
     if (abaAtual !== 'buscas') abrirAba('buscas')
-    mostrarBuscasPc(true)
+    if (mapaLigado) $('#dlg-busca').showModal()
+    else mostrarBuscasPc(true)
     $('#form-busca').elements.ramos.focus()
   })
   $('#voltar-mapa').addEventListener('click', () => {
@@ -963,11 +973,15 @@ async function iniciar() {
     'submit',
     enviar(
       async ({ ramos, cidade, bairro, ...opcoes }, form) => {
-        await api('/api/buscas', { method: 'POST', body: { ...opcoes, ...buscaMaps({ ramos, cidade, bairro }), email: form.elements.email.checked } })
+        // uma busca por ramo: no mapa, cada uma vira um segmento daquele lugar
+        const lista = [...new Set(String(ramos).split(/[,\n]/).map((r) => r.trim()).filter(Boolean))]
+        for (const ramo of lista) await api('/api/buscas', { method: 'POST', body: { ...opcoes, ...buscaMaps({ ramos: ramo, cidade, bairro }), email: form.elements.email.checked } })
         form.elements.ramos.value = ''
-        carregarBuscas()
+        if (!mapaLigado) return carregarBuscas()
+        fecharDialogo($('#dlg-busca'))
+        acompanharBuscas()
       },
-      'Busca enviada. Quando ela ficar pronta, envie os leads ao kanban.',
+      'Busca enviada ao PC. Quando ela terminar, as empresas que ela achar aparecem aqui.',
       'Enviando…',
     ),
   )

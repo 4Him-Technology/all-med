@@ -159,6 +159,63 @@ export const leadDoLugar = (l) => ({
   observacoes: [`Pesquisa no Google Maps: ${l.segmentos.join(', ')} em ${l.locais.map(rotuloLocal).join(', ')}`, l.servicos.length > 0 && `Serviço: ${l.servicos.join(', ')}`].filter(Boolean).join('\n'),
 })
 
+// ---------- busca nova pelo PC entrando no mapa do CRM online ----------
+const inicial = (t) => t.charAt(0).toLocaleUpperCase('pt-BR') + t.slice(1)
+
+// O termo da busca é "<ramo> em <bairro>, <cidade>" (buscaMaps, em campos.js): o ramo vira o segmento e o resto, o local.
+// O local é o que vem depois do último " em ", porque o ramo pode ter "em" no meio. Sem local, null.
+export function origemDaBusca(busca) {
+  const partes = (busca.keywords ?? []).map((k) => String(k).match(/^(.+) em (.+)$/)).filter(Boolean)
+  if (!partes.length) return null
+  const segmento = [...new Set(partes.map((m) => inicial(m[1].trim())))].join(', ').slice(0, 100)
+  const local_busca = partes[0][2]
+    .split(',')
+    .map((p) => inicial(p.trim()))
+    .filter(Boolean)
+    .join(', ')
+    .slice(0, 200)
+  return segmento && local_busca ? { segmento, local_busca } : null
+}
+
+const corte = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
+const link = (v, max) => (typeof v === 'string' && /^https?:\/\//i.test(v.trim()) && v.trim().length <= max ? v.trim() : null)
+
+// Empresas que a busca do PC achou, no formato da tabela maps_lugares. Entra só quem tem endereço, telefone e nota,
+// como na carga das planilhas (o banco recusa o resto); fora conta as que ficaram de fora. Uma linha por lugar,
+// porque o upsert falha com a mesma chave duas vezes; deleted_at null traz de volta a empresa de uma busca excluída.
+export function lugaresDaBusca(busca, leads) {
+  const origem = origemDaBusca(busca)
+  const porId = new Map()
+  let fora = 0
+  for (const l of leads) {
+    const [place_id, nome, endereco, telefone] = [corte(l.place_id, 300), corte(l.nome, 200), corte(l.endereco, 500), corte(l.telefone, 50)]
+    const avaliacao = l.avaliacao == null ? Number.NaN : Number(l.avaliacao)
+    if (!origem || !place_id || !nome || !endereco || !telefone || !(avaliacao >= 0 && avaliacao <= 5)) {
+      fora++
+      continue
+    }
+    if (porId.has(place_id)) continue
+    const [lat, lng, total] = [Number(l.latitude), Number(l.longitude), Number(l.total_avaliacoes)]
+    const noMapa = l.latitude != null && l.longitude != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+    porId.set(place_id, {
+      place_id,
+      ...origem,
+      nome,
+      categoria: corte(l.categoria, 200),
+      endereco,
+      telefone,
+      site: link(l.site, 500),
+      avaliacao: Math.round(avaliacao * 10) / 10,
+      total_avaliacoes: l.total_avaliacoes != null && Number.isInteger(total) && total >= 0 ? total : null,
+      latitude: noMapa ? lat : null,
+      longitude: noMapa ? lng : null,
+      link_maps: link(l.link_maps, 1000),
+      deleted_at: null,
+    })
+  }
+  return { linhas: [...porId.values()], fora }
+}
+
 // Lê todas as páginas de uma consulta: a API devolve um teto de linhas por vez (1000 no padrão do CRM online)
 // pagina(de, ate) devolve { data, count }
 export async function lerTudo(pagina, tamanho = 1000) {

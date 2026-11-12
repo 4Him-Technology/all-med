@@ -209,13 +209,51 @@ test('Google Maps no CRM online: a equipe vê as empresas por local e segmento, 
   }
 })
 
-test('Google Maps no CRM online: o app só lê; quem grava é a carga', async () => {
-  await assert.rejects(como(ANA, `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xmaps3:0x3', 'S', 'L', 'N', 'E', 'T', 3)`), /permission denied/)
-  await assert.rejects(como(ANA, `update public.maps_lugares set nome = 'x'`), /permission denied/)
+// o que o site manda ao guardar uma busca do PC: upsert do PostgREST, que regrava todas as colunas enviadas
+const guardarDaBusca = (uid, extra = {}) => {
+  const c = { place_id: '0xbusca1:0x1', segmento: 'Veterinário', local_busca: 'Centro, Guarulhos', nome: 'Vet A', categoria: 'Veterinário', endereco: 'R. B, 2', telefone: '(11) 2222-3333', site: null, avaliacao: 4.9, total_avaliacoes: 247, latitude: -23.4, longitude: -46.5, link_maps: null, deleted_at: null, ...extra }
+  const cols = Object.keys(c)
+  return como(
+    uid,
+    `insert into public.maps_lugares (${cols.join(',')}) values (${cols.map((_, i) => `$${i + 1}`).join(',')})
+     on conflict (place_id, segmento, local_busca) do update set ${cols.map((k) => `${k} = excluded.${k}`).join(', ')} returning nome`,
+    Object.values(c),
+  )
+}
+const daBusca = (uid) => como(uid, `select nome from public.maps_empresas where local_busca = 'Centro, Guarulhos' order by nome`)
+
+test('Google Maps no CRM online: a equipe guarda o resultado de uma busca do PC e exclui a busca inteira', async () => {
+  await guardarDaBusca(BRUNO)
+  await guardarDaBusca(BRUNO, { place_id: '0xbusca2:0x2', nome: 'Vet B' })
+  // a mesma busca de novo atualiza, sem duplicar
+  await guardarDaBusca(ANA, { nome: 'Vet A (novo nome)' })
+  assert.deepEqual(await daBusca(ANA), [{ nome: 'Vet A (novo nome)' }, { nome: 'Vet B' }])
+  const [grupo] = await como(ANA, `select segmento, encontrados, ultima from public.maps_grupos where local_busca = 'Centro, Guarulhos'`)
+  assert.equal(grupo.segmento, 'Veterinário')
+  assert.equal(grupo.encontrados, 2)
+  assert.ok(grupo.ultima instanceof Date)
+
+  // excluir a busca é preencher deleted_at nas empresas dela; o lead que já foi para o kanban não é tocado
+  const excluir = `update public.maps_lugares set deleted_at = now() where segmento = 'Veterinário' and local_busca = 'Centro, Guarulhos' and deleted_at is null returning id`
+  assert.equal((await como(ANA, excluir)).length, 2)
+  assert.deepEqual(await daBusca(BRUNO), [])
+  // repetir a busca traz a empresa de volta
+  await guardarDaBusca(BRUNO)
+  assert.deepEqual(await daBusca(ANA), [{ nome: 'Vet A' }])
+})
+
+test('Google Maps no CRM online: quem está fora da equipe não grava; ninguém apaga de verdade nem mexe nas datas', async () => {
+  for (const fora of [CARLA, DANI]) {
+    await assert.rejects(guardarDaBusca(fora, { place_id: '0xfora:0x1' }), /row-level security/)
+    assert.equal((await como(fora, 'update public.maps_lugares set deleted_at = now() returning id')).length, 0)
+  }
   await assert.rejects(como(ANA, 'delete from public.maps_lugares'), /permission denied/)
+  await assert.rejects(como(ANA, 'update public.maps_lugares set created_at = now()'), /permission denied/)
+  await assert.rejects(guardarDaBusca(ANA, { place_id: '0xinvalida:0x1', telefone: null }), /telefone/)
   await db.exec('set role anon')
   try {
     await assert.rejects(db.query('select * from public.maps_empresas'), /permission denied/)
+    await assert.rejects(db.query(`insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xanon:0x1', 'S', 'L', 'N', 'E', 'T', 3)`), /permission denied/)
   } finally {
     await db.exec('reset role')
   }

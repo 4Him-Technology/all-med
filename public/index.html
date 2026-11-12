@@ -131,6 +131,8 @@
         <div id="mapa-empresas" class="mapa-tela">
           <aside id="painel-mapa" class="painel-mapa" aria-label="Busca, filtros e lista das empresas">
             <div id="pm-topo" class="pm-topo"></div>
+            <!-- buscas do PC: as que rodam, o que entrou no mapa e o botão da lista "Buscas feitas" (buscas-mapa.js) -->
+            <div id="pm-buscas" class="pm-buscas" hidden></div>
             <div id="pm-resumo" class="pm-resumo" hidden></div>
             <ul id="pm-lista" class="pm-lista" aria-label="Empresas na área do mapa"></ul>
           </aside>
@@ -146,7 +148,9 @@
           </div>
         </div>
 
-        <!-- buscas novas pelo scraper do PC: abrem pelo botão "Nova busca pelo PC", no topo -->
+        <!-- sem o CRM online (só o PC): a aba é o formulário e os cartões das buscas. Com o CRM online, o formulário
+             vai para a janela dlg-busca e as buscas entram no mapa acima -->
+
         <div id="buscas-pc" hidden>
           <p class="voltar-mapa"><button type="button" id="voltar-mapa" class="link">Voltar ao mapa das empresas</button></p>
         <form id="form-busca" class="nova-busca" data-local>
@@ -199,6 +203,34 @@
 
     <dialog id="drawer" class="drawer" aria-labelledby="drawer-titulo"></dialog>
     <dialog id="dlg-novo" class="modal" aria-labelledby="novo-titulo"></dialog>
+    <!-- com o CRM online, o formulário da busca nova (form-busca) vem para cá ao entrar -->
+    <dialog id="dlg-busca" class="modal modal-largo" aria-labelledby="busca-titulo">
+      <header class="drawer-topo">
+        <div>
+          <h2 id="busca-titulo">Nova busca pelo PC</h2>
+          <p class="muted">A busca roda no PC e leva alguns minutos. Quando ela terminar, as empresas entram no mapa sozinhas, mesmo que você troque de tela.</p>
+        </div>
+        <button type="button" class="fechar" id="fechar-busca" aria-label="Fechar"></button>
+      </header>
+      <div id="dlg-busca-corpo"></div>
+    </dialog>
+    <dialog id="dlg-buscas" class="modal modal-largo" aria-labelledby="buscas-titulo">
+      <header class="drawer-topo">
+        <div>
+          <h2 id="buscas-titulo">Buscas feitas</h2>
+          <p class="muted">Cada busca é um ramo procurado num lugar. Excluir tira as empresas dela do mapa; o que já foi para o kanban continua lá.</p>
+        </div>
+        <button type="button" class="fechar" id="fechar-buscas" aria-label="Fechar"></button>
+      </header>
+      <div class="tabela-wrap">
+        <table class="tabela tabela-buscas">
+          <thead>
+            <tr><th scope="col">Busca</th><th scope="col">Empresas</th><th scope="col">Guardada em</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
+          </thead>
+          <tbody id="lista-buscas-feitas"></tbody>
+        </table>
+      </div>
+    </dialog>
     <dialog id="dlg-usuarios" class="modal modal-largo" aria-labelledby="usuarios-titulo">
       <header class="drawer-topo">
         <h2 id="usuarios-titulo">Usuários da equipe</h2>

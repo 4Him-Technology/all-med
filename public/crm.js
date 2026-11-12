@@ -102,6 +102,23 @@ export const empresasMaps = () =>
     ),
   )
 
+// Guarda no CRM online as empresas de uma busca do PC (lugaresDaBusca). A mesma busca de novo atualiza as que já
+// estavam e traz de volta as de uma busca excluída; vai em partes para não passar do tamanho de uma chamada.
+export async function guardarBusca(linhas) {
+  for (let i = 0; i < linhas.length; i += 500) ok(await cliente().from('maps_lugares').upsert(linhas.slice(i, i + 500), { onConflict: 'place_id,segmento,local_busca' }))
+}
+
+// As buscas guardadas, uma por segmento e local, da mais nova para a mais antiga
+// shortcut: lê até 1000 buscas; acima disso, ler em páginas com lerTudo
+export const buscasGuardadas = async () =>
+  ok(await cliente().from('maps_grupos').select('local_busca,segmento,encontrados,enviados,ultima').order('ultima', { ascending: false }).limit(1000)).data
+
+// Excluir a busca tira as empresas dela do mapa (deleted_at); o que já virou lead continua no kanban. Devolve quantas saíram.
+export async function excluirBusca({ segmento, local_busca }) {
+  const { data } = ok(await cliente().from('maps_lugares').update({ deleted_at: new Date().toISOString() }).eq('segmento', segmento).eq('local_busca', local_busca).is('deleted_at', null).select('id'))
+  return data.length
+}
+
 // ---------- clientes ativos ----------
 // Uma lista só, lida inteira e guardada até alguém mudar: o mapa, as buscas do PC e a Prospecção conferem nela.
 // shortcut: lê até 1000 clientes de uma vez; acima disso, ler em páginas com lerTudo

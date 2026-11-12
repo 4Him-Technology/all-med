@@ -2505,6 +2505,153 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   color: var(--perigo);
 }
 
+/* nome parecido com um cliente ativo: só um aviso, em âmbar, porque o dado é inferido pelo nome */
+.tag.parecido {
+  background: var(--aviso-suave);
+  color: var(--proposta);
+}
+
+.pm-clientes .tag {
+  font-size: 10px;
+}
+
+.fp-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--raio-p);
+  background: var(--aviso-suave);
+  color: var(--proposta);
+  font-size: 13px;
+}
+
+.fp-aviso .ico {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ---------- buscas do PC no painel do mapa ---------- */
+/* as que rodam, o que entrou no mapa e o botão da lista; cada aviso entra só quando muda o estado */
+.pm-buscas {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+.pb-itens {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pb-itens:empty {
+  display: none;
+}
+
+.pb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: var(--raio-p);
+  background: var(--bg-topo);
+  font-size: 13px;
+  animation: surgir var(--dur-media) var(--ease-out);
+}
+
+.pb-item .prog {
+  flex: none;
+  width: 44px;
+}
+
+.pb-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.pb-ok {
+  background: color-mix(in srgb, var(--ganho) 9%, var(--bg-2));
+}
+
+.pb-ok > .ico {
+  flex: none;
+  color: var(--ganho);
+}
+
+.pb-erro {
+  background: var(--perigo-suave);
+  color: var(--perigo);
+}
+
+.pb-erro > .ico {
+  flex: none;
+}
+
+.pb-item .link {
+  flex: none;
+  font-size: 13px;
+}
+
+.pb-fechar {
+  flex: none;
+  min-height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.pb-fechar:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.pb-lista {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+/* lista "Buscas feitas" */
+#dlg-buscas .tabela-wrap {
+  max-height: min(60vh, 560px);
+  overflow: auto;
+}
+
+.tabela-buscas .num {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabela-buscas .acao {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tabela-buscas .acao button {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.tabela-buscas .acao button + button {
+  margin-left: 6px;
+}
+
+/* na janela, o formulário não é um cartão dentro de outro */
+#dlg-busca .nova-busca {
+  padding: 0;
+  margin: 0;
+  background: none;
+  box-shadow: none;
+}
+
 /* ---------- clientes ativos ---------- */
 .clientes-layout {
   display: flex;
@@ -2724,8 +2871,10 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   }
 }
 
-@media (max-width: 900px) {
-  /* marca, quatro abas e botões não cabem numa linha só: as abas descem */
+/* marca, cinco abas e os botões do topo só cabem numa linha a partir de uns 1.200px: abaixo disso as abas descem
+   para uma linha própria, que rola para o lado se precisar. Antes a regra valia só abaixo de 900px, e entre 900 e
+   1.150px a página inteira rolava para o lado */
+@media (max-width: 1199px) {
   .topo {
     flex-wrap: wrap;
     gap: 10px 16px;
@@ -2739,6 +2888,13 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   .conta {
     margin-left: auto;
   }
+  /* o topo em duas linhas fica uns 46px mais alto: o mapa encolhe o mesmo tanto para caber na tela */
+  .mapa-tela {
+    height: calc(100dvh - 165px);
+  }
+}
+
+@media (max-width: 900px) {
   .linha-usuario {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -2807,8 +2963,54 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   .tabela-clientes {
     min-width: 560px;
   }
-  .tabela-clientes .acao button {
+  .tabela-clientes .acao button,
+  .tabela-buscas .acao button,
+  .pb-lista {
     min-height: 44px;
+  }
+  .pb-fechar {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* "Buscas feitas" no celular: cada busca empilhada (nome e quantas; a data embaixo; os botões numa linha só) */
+  .tabela-buscas thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .tabela-buscas,
+  .tabela-buscas tbody {
+    display: block;
+    min-width: 0;
+  }
+  .tabela-buscas tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 12px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--borda);
+  }
+  .tabela-buscas td {
+    padding: 0;
+    border: 0;
+  }
+  .tabela-buscas td[colspan],
+  .tabela-buscas .acao {
+    grid-column: 1 / -1;
+  }
+  .tabela-buscas .acao {
+    display: flex;
+    gap: 8px;
+    width: auto;
+    margin-top: 8px;
+  }
+  .tabela-buscas .acao button {
+    flex: 1;
+  }
+  .tabela-buscas .acao button + button {
+    margin-left: 0;
   }
   .menu-conta {
     right: 16px;

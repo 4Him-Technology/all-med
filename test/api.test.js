@@ -88,6 +88,11 @@ test('busca no Maps fica guardada no PC até a tela enviar ao kanban online', as
   assert.equal((await req(`/api/buscas/${criada.json.id}`, { method: 'PATCH', body: { place_ids: ['nao-existe'], novos: 0 } })).status, 422)
   assert.equal((await req(`/api/buscas/${crypto.randomUUID()}/leads`)).status, 404)
   assert.equal((await req('/api/buscas/123/leads')).status, 404)
+
+  // guardada no CRM online, a busca sai do PC
+  assert.equal((await req(`/api/buscas/${criada.json.id}`, { method: 'DELETE' })).status, 204)
+  assert.equal((await req(`/api/buscas/${criada.json.id}/leads`)).status, 404)
+  assert.equal((await req(`/api/buscas/${criada.json.id}`, { method: 'DELETE' })).status, 404)
 })
 
 test('prospecção chama só as funções liberadas da base de CNPJ', async () => {
@@ -170,6 +175,7 @@ test('pela internet: a API do PC exige o login do CRM e só libera CORS para o s
     const pre = await bruto(porta, '/api/buscas', { method: 'OPTIONS', headers: { ...site, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' } })
     assert.equal(pre.status, 204)
     assert.match(pre.headers['access-control-allow-headers'], /authorization/)
+    assert.match(pre.headers['access-control-allow-methods'], /DELETE/)
     // a tela em si continua pública, como o site: só a API mexe na base e no scraper
     assert.equal((await bruto(porta, '/', { headers: { host: 'pc.exemplo.com' } })).status, 200)
   } finally {

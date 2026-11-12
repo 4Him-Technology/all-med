@@ -91,6 +91,14 @@ export function createStore(file) {
       return resumo(b)
     },
 
+    // a tela tira a busca daqui depois de guardar o resultado no CRM online, ou quando ela falhou; a que roda fica
+    removerBusca(id) {
+      const b = achar(id)
+      if (b.status === 'pendente' || b.status === 'executando') throw new ValidationError('a busca ainda está rodando')
+      data.buscas = data.buscas.filter((x) => x !== b)
+      salvar()
+    },
+
     leadsDaBusca(id) {
       const b = achar(id)
       const enviados = new Set(b.enviados_ids ?? [])

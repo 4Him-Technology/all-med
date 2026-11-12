@@ -175,6 +175,18 @@ Faça os três em sequência: com só uma parte no ar, o cadastro e o primeiro a
 
 Para desfazer: os scripts de volta estão no topo das duas migrations; a função se apaga em **Edge Functions**; e o código volta revertendo o PR.
 
+## Buscas do PC entrando no mapa
+
+Desde 12/11/2026, quando uma busca do Google termina, as empresas dela entram sozinhas no mapa da aba Google Maps, e a lista "Buscas feitas" mostra e exclui cada busca. Para ligar, nesta ordem:
+
+1. No painel do CRM online, em **SQL Editor**, rode `supabase/migrations/20261112120000_maps_buscas_do_pc.sql` numa consulta nova. Ela deixa a equipe gravar as empresas das buscas e excluir uma busca.
+2. Aprove o PR no GitHub. O site atualiza sozinho.
+3. Neste PC, abra o sistema pelo .bat, que já faz `git pull` e sobe a versão nova, ou rode `git pull` e `docker compose --profile maps --profile tunel up -d --build`.
+
+A ordem importa: sem o passo 1, a tela não consegue guardar as empresas, e a busca fica no PC com o aviso do erro. Nesse caso, não clique em "Tirar", senão o resultado se perde: rode a migration e abra a aba de novo.
+
+Para desfazer: o script de volta está no topo da migration, e o código volta revertendo o PR. As empresas que já entraram no mapa continuam lá.
+
 ## Dia a dia
 
 - Com o Docker Desktop abrindo no login, o sistema sobe sozinho com o PC. É só abrir http://localhost:3000.
