@@ -3338,10 +3338,10 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   }
 }
 
-/* marca, cinco abas e os botões do topo só cabem numa linha a partir de uns 1.200px: abaixo disso as abas descem
-   para uma linha própria, que rola para o lado se precisar. Antes a regra valia só abaixo de 900px, e entre 900 e
-   1.150px a página inteira rolava para o lado */
-@media (max-width: 1199px) {
+/* marca, seis abas e os botões do topo só cabem numa linha a partir de uns 1.230px (com a barra de rolagem): abaixo
+   disso as abas descem para uma linha própria, que rola para o lado se precisar. Antes a regra valia só abaixo de 900px,
+   e entre 900 e 1.150px a página inteira rolava para o lado; com a aba Painel, 1.199px deixava 9px de sobra para fora */
+@media (max-width: 1279px) {
   .topo {
     flex-wrap: wrap;
     gap: 10px 16px;
