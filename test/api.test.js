@@ -200,7 +200,11 @@ test('a API do PC confere a tela: a base de CNPJ pede Prospecção e as buscas d
     assert.equal((await chamar('/api/buscas', 'token-maps')).status, 200)
     assert.equal((await chamar('/api/buscas', 'token-prospecta')).status, 403)
     assert.equal((await chamar('/api/buscas', 'token-kanban')).status, 403)
-    assert.equal((await chamar(`/api/buscas/${'0'.repeat(8)}-0000-4000-8000-${'0'.repeat(12)}/leads`, 'token-prospecta')).status, 403)
+    const busca = `/api/buscas/${'0'.repeat(8)}-0000-4000-8000-${'0'.repeat(12)}`
+    assert.equal((await chamar(`${busca}/leads`, 'token-prospecta')).status, 403)
+    // excluir a busca do PC também é da tela Google Maps
+    assert.equal((await chamar(busca, 'token-prospecta', 'DELETE')).status, 403)
+    assert.notEqual((await chamar(busca, 'token-maps', 'DELETE')).status, 403)
     assert.notEqual((await chamar('/api/rpc/filtros_prospeccao', 'token-prospecta', 'POST')).status, 403)
     assert.equal((await chamar('/api/rpc/filtros_prospeccao', 'token-maps', 'POST')).status, 403)
     assert.equal((await chamar('/api/rpc/filtros_prospeccao', 'token-ruim', 'POST')).status, 401)

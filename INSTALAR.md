@@ -197,7 +197,7 @@ Ao instalar, quem já está na equipe recebe as cinco telas: nada muda até voc�
 |---|---|
 | Kanban, Leads | Ler, editar e arquivar os leads da equipe, o histórico e o botão Novo lead (qualquer uma das duas basta) |
 | Prospecção | A base de CNPJ no PC; mandar empresas ao kanban; ler a lista de clientes ativos (para marcar quem já é cliente) |
-| Google Maps | O mapa das empresas, as buscas novas pelo PC; mandar ao kanban; ler a lista de clientes ativos (para esconder quem já é cliente) |
+| Google Maps | O mapa das empresas; as buscas novas pelo PC, guardar o resultado delas no mapa e excluir uma busca em "Buscas feitas"; mandar ao kanban; ler a lista de clientes ativos (para esconder quem já é cliente) |
 | Clientes ativos | Cadastrar e tirar clientes; ler as empresas do mapa, para a coluna "Escondidas no mapa" |
 
 Detalhes:

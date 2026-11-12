@@ -7,7 +7,8 @@
 -- Que tabela cada tela abre:
 --   leads e atendimentos     Kanban ou Leads (ler, editar, registrar atendimento)
 --   leads (criar)            Kanban, Leads, Prospecção ou Google Maps; quem só prospecta vê apenas os leads que ele criou
---   maps_lugares             Google Maps, e Clientes ativos (a coluna "Escondidas no mapa")
+--   maps_lugares (ler)       Google Maps, e Clientes ativos (a coluna "Escondidas no mapa")
+--   maps_lugares (gravar)    Google Maps (guardar e excluir as buscas do PC); roda depois de 20261112110000_maps_buscas_do_pc.sql
 --   clientes_ativos (ler)    Clientes ativos, Prospecção e Google Maps (é o que esconde quem já é cliente)
 --   clientes_ativos (gravar) Clientes ativos
 --
@@ -19,6 +20,8 @@
 -- drop policy "atendimentos: lê quem abre a tela" on public.atendimentos;
 -- drop policy "atendimentos: registra quem abre a tela" on public.atendimentos;
 -- drop policy "maps_lugares: lê quem abre a tela" on public.maps_lugares;
+-- drop policy "maps_lugares: guarda quem abre a tela" on public.maps_lugares;
+-- drop policy "maps_lugares: atualiza e exclui quem abre a tela" on public.maps_lugares;
 -- drop policy "clientes_ativos: lê quem abre a tela" on public.clientes_ativos;
 -- drop policy "clientes_ativos: cadastra quem abre a tela" on public.clientes_ativos;
 -- drop policy "clientes_ativos: altera quem abre a tela" on public.clientes_ativos;
@@ -28,6 +31,8 @@
 -- create policy "atendimentos: equipe lê" on public.atendimentos for select to authenticated using ((select crm.membro_ativo()));
 -- create policy "atendimentos: equipe registra" on public.atendimentos for insert to authenticated with check ((select crm.membro_ativo()) and user_id = (select auth.uid()) and tipo <> 'status' and exists (select 1 from public.leads l where l.id = lead_id and l.deleted_at is null));
 -- create policy "maps_lugares: equipe lê" on public.maps_lugares for select to authenticated using ((select crm.membro_ativo()));
+-- create policy "maps_lugares: equipe guarda" on public.maps_lugares for insert to authenticated with check ((select crm.membro_ativo()));
+-- create policy "maps_lugares: equipe atualiza e exclui" on public.maps_lugares for update to authenticated using ((select crm.membro_ativo())) with check ((select crm.membro_ativo()));
 -- create policy "clientes_ativos: equipe lê" on public.clientes_ativos for select to authenticated using ((select crm.membro_ativo()));
 -- create policy "clientes_ativos: equipe cadastra" on public.clientes_ativos for insert to authenticated with check ((select crm.membro_ativo()));
 -- create policy "clientes_ativos: equipe altera" on public.clientes_ativos for update to authenticated using ((select crm.membro_ativo())) with check ((select crm.membro_ativo()));
@@ -133,9 +138,16 @@ create policy "atendimentos: registra quem abre a tela" on public.atendimentos
   );
 
 -- ---------- empresas do Google Maps ----------
+-- guardar e excluir as buscas do PC (20261112110000_maps_buscas_do_pc.sql) é da tela Google Maps
 drop policy "maps_lugares: equipe lê" on public.maps_lugares;
+drop policy "maps_lugares: equipe guarda" on public.maps_lugares;
+drop policy "maps_lugares: equipe atualiza e exclui" on public.maps_lugares;
 create policy "maps_lugares: lê quem abre a tela" on public.maps_lugares
   for select to authenticated using ((select crm.pode('buscas', 'clientes')));
+create policy "maps_lugares: guarda quem abre a tela" on public.maps_lugares
+  for insert to authenticated with check ((select crm.pode('buscas')));
+create policy "maps_lugares: atualiza e exclui quem abre a tela" on public.maps_lugares
+  for update to authenticated using ((select crm.pode('buscas'))) with check ((select crm.pode('buscas')));
 
 -- ---------- clientes ativos ----------
 drop policy "clientes_ativos: equipe lê" on public.clientes_ativos;

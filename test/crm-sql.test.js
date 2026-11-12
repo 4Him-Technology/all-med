@@ -368,6 +368,21 @@ test('Acessos: Google Maps e Clientes ativos só abrem para quem tem a tela', as
   assert.deepEqual(await clientesAtivos(FABI), [])
 })
 
+test('Acessos: só quem abre o Google Maps guarda e exclui as buscas do PC no mapa', async () => {
+  const local = { local_busca: 'Acesso, Osasco' }
+  const excluir = `update public.maps_lugares set deleted_at = now() where local_busca = 'Acesso, Osasco' and deleted_at is null returning id`
+  const ativas = async () => (await db.query(`select id from public.maps_lugares where local_busca = 'Acesso, Osasco' and deleted_at is null`)).rows.length
+  assert.deepEqual(await guardarDaBusca(EDU, { ...local, place_id: '0xacesso4:0x4' }), [{ nome: 'Vet A' }])
+  // só com o Kanban: não guarda nem exclui, nem com o comando que não lê nada de volta (esse não passa pela regra de leitura)
+  await assert.rejects(como(FABI, `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xacesso5:0x5', 'S', 'Acesso, Osasco', 'N', 'E', 'T', 3)`), /row-level security/)
+  await assert.rejects(guardarDaBusca(FABI, { ...local, place_id: '0xacesso4:0x4', nome: 'Trocado' }), /row-level security/)
+  await como(FABI, 'update public.maps_lugares set deleted_at = now()')
+  assert.equal(await ativas(), 1)
+  assert.equal((await como(FABI, excluir)).length, 0)
+  assert.equal((await como(EDU, excluir)).length, 1)
+  assert.equal(await ativas(), 0)
+})
+
 test('Acessos: só o administrador muda as telas de alguém; cada um vê só as próprias', async () => {
   // a tela Clientes ativos mostra o que cada cliente esconde no mapa: ela também lê as empresas do mapa
   await como(ANA, `insert into public.membro_telas (user_id, tela) values ($1, 'clientes')`, [FABI])
@@ -413,20 +428,24 @@ test('Acessos: o script de volta do topo da migration devolve tudo a quem é da 
   await migrar(banco)
   await banco.query(`insert into auth.users values ($1, 'gil@x.com')`, [FABI])
   await banco.query(`insert into public.membros (user_id, email, nome) values ($1, 'gil@x.com', 'Gil')`, [FABI])
-  const ler = async () => {
+  const gravar = async (sql) => {
     await banco.exec('set role authenticated')
     await banco.query(`select set_config('request.jwt.claim.sub', $1, false)`, [FABI])
     try {
-      return (await banco.query(`insert into public.leads (nome) values ('Depois da volta') returning nome`)).rows
+      return (await banco.query(sql)).rows
     } finally {
       await banco.exec('reset role')
     }
   }
+  const lead = `insert into public.leads (nome) values ('Depois da volta') returning nome`
+  const lugar = `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xvolta:0x1', 'S', 'L', 'N', 'E', 'T', 3)`
   // sem tela nenhuma o banco recusa
-  await assert.rejects(ler(), /row-level security/)
+  await assert.rejects(gravar(lead), /row-level security/)
+  await assert.rejects(gravar(lugar), /row-level security/)
   const migration = readFileSync(new URL(ARQUIVOS.find((n) => n.endsWith('_acessos.sql')), MIGRATIONS), 'utf8')
   const volta = migration.split('\n').filter((l) => /^-- (drop|create) /.test(l)).map((l) => l.slice(3)).join('\n')
   await banco.exec(volta)
-  assert.deepEqual(await ler(), [{ nome: 'Depois da volta' }])
+  assert.deepEqual(await gravar(lead), [{ nome: 'Depois da volta' }])
+  await gravar(lugar)
   assert.equal((await banco.query(`select to_regclass('public.membro_telas') as t`)).rows[0].t, null)
 })
