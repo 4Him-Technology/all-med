@@ -43,16 +43,20 @@ export function validarUrlPc(url) {
 
 const FORMATO_JWT = /^[\w-]+\.[\w-]+\.[\w-]+$/
 
-// Confere o token do login no próprio Auth do Supabase (a mesma conta do CRM). Guarda a resposta por 1 minuto
-// para não consultar a cada chamada; um token revogado vale no máximo até lá.
+// Confere o token do login no próprio Auth do Supabase (a mesma conta do CRM) e lê as telas que a pessoa abre
+// (public.minhas_telas). Guarda a resposta por 1 minuto para não consultar a cada chamada; um token revogado ou uma
+// tela tirada pelo administrador valem no máximo até lá.
 export function criarVerificadorSupabase({ supabaseUrl, supabaseKey, fetchImpl = globalThis.fetch, validadeMs = 60_000 }) {
   const cache = new Map()
   return async (token) => {
     if (typeof token !== 'string' || token.length > 4096 || !FORMATO_JWT.test(token)) return null
     const guardado = cache.get(token)
     if (guardado && guardado.expira > Date.now()) return guardado.usuario
-    const res = await fetchImpl(new URL('/auth/v1/user', supabaseUrl), { headers: { apikey: supabaseKey, authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) })
-    const usuario = res.ok ? { id: (await res.json()).id } : null
+    const pedir = (caminho) => fetchImpl(new URL(caminho, supabaseUrl), { headers: { apikey: supabaseKey, authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) })
+    const [res, resTelas] = await Promise.all([pedir('/auth/v1/user'), pedir('/rest/v1/rpc/minhas_telas')])
+    // login bom sem a lista de telas não libera nada nem fica guardado: a próxima chamada tenta de novo
+    if (res.ok && !resTelas.ok) throw new Error(`minhas_telas respondeu ${resTelas.status}`)
+    const usuario = res.ok ? { id: (await res.json()).id, telas: await resTelas.json() } : null
     // tokens inventados em série não enchem a memória: passou do teto, o cache recomeça
     if (cache.size >= 1000) cache.clear()
     cache.set(token, { usuario, expira: Date.now() + validadeMs })

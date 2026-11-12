@@ -38,6 +38,7 @@ const uuid = (id) => {
 }
 
 const LOCAIS = new Set(['localhost', '127.0.0.1'])
+const NOME_TELA = { prospeccao: 'Prospecção', buscas: 'Google Maps' }
 const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, PATCH, DELETE', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
 
 // config: { supabaseUrl, supabaseKey, urlWeb } (só a chave pública; ver validarConfigSupabase)
@@ -112,13 +113,15 @@ export function createApp({ store, scraper, cnpj, publicDir, log, config = null,
     res.writeHead(status, { ...seguranca, ...extra, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(body))
   }
 
-  // null quando pode seguir; senão a resposta de recusa
-  async function barrar(req, host) {
+  // null quando pode seguir; senão a resposta de recusa. tela: a que a rota serve, conferida na lista do CRM online
+  async function barrar(req, host, tela) {
     if (excedeu(req)) return [429, { erro: 'Muitas chamadas seguidas. Espere um minuto e tente de novo.' }]
     if (!autenticar) return LOCAIS.has(host) ? null : [403, { erro: 'Sem o CRM online configurado, só o próprio PC usa a prospecção.' }]
     const token = String(req.headers.authorization ?? '').replace(/^Bearer /, '')
     try {
-      return (await autenticar(token)) ? null : [401, { erro: 'Sua sessão expirou. Entre de novo para usar a prospecção.' }]
+      const usuario = await autenticar(token)
+      if (!usuario) return [401, { erro: 'Sua sessão expirou. Entre de novo para usar a prospecção.' }]
+      return usuario.telas.includes(tela) ? null : [403, { erro: `Sua conta não abre a tela ${NOME_TELA[tela]}. Peça o acesso ao administrador.` }]
     } catch (err) {
       log.error(`conferir login: ${err.message}`)
       return [503, { erro: 'Não consegui conferir o seu login agora. Tente de novo em instantes.' }]
@@ -136,7 +139,8 @@ export function createApp({ store, scraper, cnpj, publicDir, log, config = null,
     try {
       if (api) {
         if (req.method === 'OPTIONS') return cors['access-control-allow-origin'] ? res.writeHead(204, { ...seguranca, ...cors, ...PREFLIGHT }).end() : responder(res, 403, { erro: 'Origem não permitida' })
-        const recusa = await barrar(req, host)
+        // a base de CNPJ é a Prospecção; o resto da API são as buscas do Google Maps
+        const recusa = await barrar(req, host, url.pathname.startsWith('/api/rpc/') ? 'prospeccao' : 'buscas')
         if (recusa) return responder(res, ...recusa, cors)
         for (const [metodo, padrao, handler] of rotas) {
           const m = url.pathname.match(padrao)

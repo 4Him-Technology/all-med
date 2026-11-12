@@ -31,24 +31,33 @@ test('site na internet: CSP libera o endereço do PC, que precisa ser https', ()
   assert.throws(() => validarUrlPc('http://pc.exemplo.com'), /https/)
 })
 
-test('confere o login no CRM online e guarda a resposta por um tempo', async () => {
+test('confere o login e as telas da pessoa no CRM online, e guarda a resposta por um tempo', async () => {
   const BOM = 'aaa.bbb.ccc'
-  let chamadas = 0
+  const chamadas = []
   const fetchFalso = async (url, init) => {
-    chamadas++
-    assert.equal(String(url), 'https://abc.supabase.co/auth/v1/user')
+    chamadas.push(String(url))
     assert.equal(init.headers.apikey, 'sb_publishable_x')
-    return init.headers.authorization === `Bearer ${BOM}` ? new Response(JSON.stringify({ id: 'u1', email: 'a@b.com' })) : new Response('{}', { status: 401 })
+    if (init.headers.authorization !== `Bearer ${BOM}`) return new Response('{}', { status: 401 })
+    return new Response(JSON.stringify(String(url).endsWith('/auth/v1/user') ? { id: 'u1', email: 'a@b.com' } : ['prospeccao', 'buscas']))
   }
   const verificar = criarVerificadorSupabase({ supabaseUrl: 'https://abc.supabase.co', supabaseKey: 'sb_publishable_x', fetchImpl: fetchFalso })
-  assert.deepEqual(await verificar(BOM), { id: 'u1' })
-  assert.deepEqual(await verificar(BOM), { id: 'u1' })
-  assert.equal(chamadas, 1)
+  assert.deepEqual(await verificar(BOM), { id: 'u1', telas: ['prospeccao', 'buscas'] })
+  assert.deepEqual(await verificar(BOM), { id: 'u1', telas: ['prospeccao', 'buscas'] })
+  assert.deepEqual(chamadas.sort(), ['https://abc.supabase.co/auth/v1/user', 'https://abc.supabase.co/rest/v1/rpc/minhas_telas'])
   assert.equal(await verificar('ddd.eee.fff'), null)
   // o que nem tem formato de token não chega a consultar o CRM
   assert.equal(await verificar('nao-e-token'), null)
   assert.equal(await verificar(undefined), null)
-  assert.equal(chamadas, 2)
+  assert.equal(chamadas.length, 4)
+})
+
+test('sem conseguir ler as telas (CRM fora do ar ou sem a migration de acessos), não libera e tenta de novo na próxima', async () => {
+  let telas = 404
+  const fetchFalso = async (url) => (String(url).endsWith('/auth/v1/user') ? new Response(JSON.stringify({ id: 'u1' })) : telas === 200 ? new Response('["buscas"]') : new Response('{}', { status: telas }))
+  const verificar = criarVerificadorSupabase({ supabaseUrl: 'https://abc.supabase.co', supabaseKey: 'sb_publishable_x', fetchImpl: fetchFalso })
+  await assert.rejects(verificar('aaa.bbb.ccc'), /minhas_telas/)
+  telas = 200
+  assert.deepEqual(await verificar('aaa.bbb.ccc'), { id: 'u1', telas: ['buscas'] })
 })
 
 test('CSP libera o mapa da aba Google Maps: CSS do Leaflet no CDN fixo e os tiles do OpenStreetMap', () => {
