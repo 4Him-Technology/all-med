@@ -23,6 +23,7 @@ Depois, as migrations seguintes da mesma pasta, em ordem, e a função de cadast
 O que as migrations garantem no banco, testado em [test/crm-sql.test.js](test/crm-sql.test.js):
 
 - a equipe (membros ativos) vê e trabalha os mesmos leads e atendimentos (RLS); conta fora da equipe, membro desativado e visitante sem login não leem nada;
+- cada pessoa abre só as telas que o administrador liberou (tabela `membro_telas`; as policies pedem `crm.pode('<tela>')`); o administrador abre todas; sem a tela, o banco não entrega os dados dela (migration `20261112120000_acessos.sql`, detalhes em [INSTALAR.md](INSTALAR.md), "Acessos por tela");
 - só a função `usuarios`, com a chave secreta, cadastra e desativa membros, e só a pedido de um admin; o primeiro acesso (a pessoa cadastrada cria a própria senha digitando o e-mail) vale uma vez só, com tentativas limitadas ([test/usuarios.test.js](test/usuarios.test.js));
 - quem criou, origem, CNPJ e datas não podem ser alterados depois de criados (permissão por coluna);
 - nada é apagado de verdade: arquivar preenche `deleted_at`, e o histórico de atendimentos é imutável;
@@ -148,7 +149,8 @@ A carga inicial é um arquivo SQL gerado da planilha, rodado no SQL Editor e for
 ## Segurança
 
 - Tela local: presa em `127.0.0.1`, checagem do cabeçalho Host (contra DNS rebinding), POST só com `application/json`, CSP restrita, DOM montado sem `innerHTML`, sem stack trace nas respostas.
-- CRM online: autorização toda no banco (RLS e permissão por coluna); o navegador só tem a chave pública.
+- CRM online: autorização toda no banco (RLS e permissão por coluna); o navegador só tem a chave pública. Esconder a aba de quem não tem a tela é só conforto: quem barra é a RLS.
+- API do PC (Prospecção e buscas do Google, também pelo túnel): com o CRM online ligado, toda chamada confere o login e a tela no próprio CRM (`public.minhas_telas`): a base de CNPJ pede a tela Prospecção e as buscas pedem Google Maps. Sem essa conferência, quem perdeu a tela continuaria abrindo a base de CNPJ e disparando buscas no Google pelo túnel, porque o PC não passa pela RLS. A resposta fica guardada por 1 minuto.
 - **Sessão de login**: fica no `sessionStorage` (some ao fechar a aba), não em cookie HttpOnly. Num site estático o cookie HttpOnly exige uma função no servidor intermediando o login. O risco que sobra é XSS, contido pela CSP (só o próprio site e o supabase-js em versão fixa no jsDelivr). Se quiser o cookie HttpOnly, dá para colocar essa função no Netlify ou no Cloudflare Pages.
 - Tentativas de login: o Supabase Auth já limita por IP. Dá para ligar CAPTCHA no painel se o site ficar público.
 

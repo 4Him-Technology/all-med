@@ -219,8 +219,10 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - Leads: o título da coluna ordena; a coluna ordenada mostra a seta em petróleo e aria-sort.
 
 ### Conta e usuários
-- Ícone de usuário redondo no canto direito do topo. Abre um menu (popover nativo, fecha com Esc e clique fora) com nome e e-mail, Trocar senha, Usuários da equipe (só admin) e Sair.
-- Usuários da equipe é um popup largo (860px): formulário de uma linha (Nome, E-mail, Papel, Cadastrar) e a lista com a situação em pílula: Ativo (verde), Aguardando primeiro acesso (âmbar), Desativado (vermelho).
+- Ícone de usuário redondo no canto direito do topo. Abre um menu (popover nativo, fecha com Esc e clique fora) com nome e e-mail, Trocar senha, Usuários e acessos (só admin) e Sair.
+- Usuários e acessos é um popup largo (1120px): formulário de uma linha (Nome, E-mail, Papel, Cadastrar) e a lista com Pessoa (nome e, embaixo, o e-mail), Papel, a situação em pílula (Ativo verde, Aguardando primeiro acesso âmbar, Desativado vermelho), uma coluna por tela com a caixa de marcar no meio e o botão Desativar ou Reativar.
+- As colunas de tela são as abas do topo, com o mesmo nome; aba nova entra sozinha. Na linha do administrador, as caixas dão lugar a "Abre todas as telas". Marcar grava na hora, com o aviso "Bruno agora abre Leads"; se o banco recusar, a caixa volta e o aviso diz o erro. Pelo teclado, o foco fica na caixa.
+- A aba e o botão (Novo lead, Nova busca pelo PC) de tela não liberada somem do topo. Sem nenhuma tela, fica só o aviso para pedir acesso ao administrador.
 - Login com dois cartões que se alternam: Entrar e Primeiro acesso (o e-mail digitado passa de um para o outro).
 
 ### Ficha ao lado (Leads)
