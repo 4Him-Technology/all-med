@@ -419,6 +419,7 @@ const guardarDaBusca = (uid, extra = {}) => {
 const daBusca = (uid) => como(uid, `select nome from public.maps_empresas where local_busca = 'Centro, Guarulhos' order by nome`)
 
 test('Google Maps no CRM online: a equipe guarda o resultado de uma busca do PC e exclui a busca inteira', async () => {
+  const inicio = new Date(Date.now() - 1000).toISOString() // a busca do PC terminou antes de ser guardada
   await guardarDaBusca(BRUNO)
   await guardarDaBusca(BRUNO, { place_id: '0xbusca2:0x2', nome: 'Vet B' })
   // a mesma busca de novo atualiza, sem duplicar
@@ -433,6 +434,10 @@ test('Google Maps no CRM online: a equipe guarda o resultado de uma busca do PC 
   const excluir = `update public.maps_lugares set deleted_at = now() where segmento = 'Veterinário' and local_busca = 'Centro, Guarulhos' and deleted_at is null returning id`
   assert.equal((await como(ANA, excluir)).length, 2)
   assert.deepEqual(await daBusca(BRUNO), [])
+  // a busca excluída continua contando como guardada: o site não grava de novo a busca que o PC ainda mostra
+  const jaGuardada = `select 1 from public.maps_lugares where segmento = 'Veterinário' and local_busca = 'Centro, Guarulhos' and updated_at >= $1 limit 1`
+  assert.equal((await como(BRUNO, jaGuardada, [inicio])).length, 1)
+  assert.equal((await como(BRUNO, jaGuardada, [new Date(Date.now() + 60_000).toISOString()])).length, 0)
   // repetir a busca traz a empresa de volta
   await guardarDaBusca(BRUNO)
   assert.deepEqual(await daBusca(ANA), [{ nome: 'Vet A' }])

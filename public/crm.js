@@ -108,6 +108,12 @@ export async function guardarBusca(linhas) {
   for (let i = 0; i < linhas.length; i += 500) ok(await cliente().from('maps_lugares').upsert(linhas.slice(i, i + 500), { onConflict: 'place_id,segmento,local_busca' }))
 }
 
+// A busca do PC já foi guardada (mesmo que excluída depois) se alguma empresa dela foi gravada depois que ela terminou.
+// O PC antigo não apaga a busca guardada: sem isto, o site gravaria de novo, e traria de volta a excluída, a cada visita.
+export async function buscaJaGuardada({ segmento, local_busca }, terminouEm) {
+  return ok(await cliente().from('maps_lugares').select('id').eq('segmento', segmento).eq('local_busca', local_busca).gte('updated_at', terminouEm).limit(1)).data.length > 0
+}
+
 // As buscas guardadas, uma por segmento e local, da mais nova para a mais antiga
 // shortcut: lê até 1000 buscas; acima disso, ler em páginas com lerTudo
 export const buscasGuardadas = async () =>

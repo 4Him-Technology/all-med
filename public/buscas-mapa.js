@@ -3,7 +3,7 @@
 // lugares.js), tira a busca do PC e o mapa relê as empresas. A faixa no painel do mapa mostra as buscas que rodam e o
 // que entrou; "Buscas feitas" lista cada busca guardada (um ramo num lugar), com Ver no mapa e Excluir.
 import { resumoBusca } from './campos.js'
-import { buscasGuardadas, excluirBusca, guardarBusca } from './crm.js'
+import { buscaJaGuardada, buscasGuardadas, excluirBusca, guardarBusca } from './crm.js'
 import { lugaresDaBusca, origemDaBusca } from './lugares.js'
 import { mostrarBusca, recarregarMapa } from './mapa.js'
 import { $, api, carregando, esqueleto, estado, fecharDialogo, h, icone, toast } from './ui.js'
@@ -49,16 +49,46 @@ export async function acompanharBuscas() {
   if (noPc.some(rodando)) timer = setTimeout(acompanharBuscas, ESPERA)
 }
 
+// buscas que este navegador já guardou: cobre a busca que não trouxe nenhuma empresa completa, que não deixa rastro no banco
+const VISTAS = 'buscas-do-pc-guardadas'
+const vistas = (() => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(VISTAS) ?? '[]'))
+  } catch {
+    return new Set()
+  }
+})()
+function marcarVista(id) {
+  vistas.add(id)
+  try {
+    localStorage.setItem(VISTAS, JSON.stringify([...vistas].slice(-500)))
+  } catch {}
+}
+const tentouTirar = new Set() // no PC antigo a saída falha: tenta uma vez por visita, sem encher o console
+
+// guardada, sai do PC; o PC numa versão sem essa rota recusa, e a busca fica lá (buscaJaGuardada evita gravar de novo)
+function tirarGuardada(b) {
+  if (tentouTirar.has(b.id)) return
+  tentouTirar.add(b.id)
+  return api(`/api/buscas/${b.id}`, { method: 'DELETE' }).catch((err) => console.error('busca guardada, mas não saiu do PC:', err.message))
+}
+
 async function guardar(b) {
   if (guardando.has(b.id)) return
   guardando.add(b.id)
   try {
     const origem = origemDaBusca(b)
     if (!origem) throw new Error('a busca não diz o lugar, então não dá para pôr no mapa')
+    // já guardada antes (e talvez excluída depois): não grava de novo nem anuncia
+    if (vistas.has(b.id) || (await buscaJaGuardada(origem, b.updated_at))) {
+      marcarVista(b.id)
+      await tirarGuardada(b)
+      return
+    }
     const { linhas, fora } = lugaresDaBusca(b, await api(`/api/buscas/${b.id}/leads`))
     if (linhas.length) await guardarBusca(linhas)
-    // guardada, sai do PC; se a saída falhar, a próxima conferência guarda de novo (sem duplicar) e tenta outra vez
-    await api(`/api/buscas/${b.id}`, { method: 'DELETE' }).catch((err) => console.error('busca guardada, mas não saiu do PC:', err.message))
+    marcarVista(b.id)
+    await tirarGuardada(b)
     problemas.delete(b.id)
     avisos = [{ ...origem, n: linhas.length, fora }, ...avisos.filter((a) => a.segmento !== origem.segmento || a.local_busca !== origem.local_busca)].slice(0, 3)
     await recarregarMapa()
