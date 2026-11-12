@@ -149,6 +149,18 @@ export async function tirarCliente(id) {
 export const meuPerfil = async (userId) => ok(await cliente().from('membros').select('nome,papel,ativo').eq('user_id', userId).maybeSingle()).data
 export const listarMembros = async () => ok(await cliente().from('membros').select('user_id,nome,email,papel,ativo,ativado_em').order('nome')).data
 
+// ---------- acessos por tela ----------
+// as telas que a pessoa logada abre (administrador: todas); o banco confere de novo em cada tabela
+export const minhasTelas = async () => ok(await cliente().rpc('minhas_telas')).data
+// só o administrador lê as telas de todos e muda (RLS de membro_telas)
+export const listarAcessos = async () => ok(await cliente().from('membro_telas').select('user_id,tela')).data
+export async function definirAcesso(userId, tela, liberar) {
+  const tabela = cliente().from('membro_telas')
+  const { error } = liberar ? await tabela.insert({ user_id: userId, tela }) : await tabela.delete().eq('user_id', userId).eq('tela', tela)
+  // já liberada (outro administrador ao mesmo tempo): o resultado é o mesmo
+  if (error?.code !== '23505') ok({ error })
+}
+
 // cadastrar, desativar e reativar passam pela função "usuarios", a única com a chave secreta
 export async function gerirUsuario(corpo) {
   const { data, error } = await cliente().functions.invoke('usuarios', { body: corpo })

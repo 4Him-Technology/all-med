@@ -1526,7 +1526,7 @@ th[aria-sort="ascending"] .ordenar .ico {
 /* ---------- usuários da equipe ---------- */
 /* popup largo: cabeçalho, formulário de novo usuário e a lista da equipe, um embaixo do outro */
 .modal-largo {
-  width: min(860px, calc(100vw - 32px));
+  width: min(1120px, calc(100vw - 32px));
   padding: 22px 24px;
 }
 
@@ -1558,7 +1558,24 @@ th[aria-sort="ascending"] .ordenar .ico {
 }
 
 #dlg-usuarios .tabela {
-  min-width: 620px;
+  min-width: 960px;
+}
+
+/* acessos: uma coluna por tela, com a caixa no meio; o nome da tela quebra em duas linhas se precisar */
+.tabela-usuarios th.col-tela {
+  white-space: normal;
+  text-align: center;
+  width: 92px;
+  padding-inline: 8px;
+}
+
+.tabela-usuarios td.col-tela {
+  text-align: center;
+  padding-inline: 8px;
+}
+
+.tabela-usuarios td.todas-telas {
+  text-align: center;
 }
 
 .pill.membro-pendente {

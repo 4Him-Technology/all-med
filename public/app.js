@@ -22,7 +22,9 @@ const agoraLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 
 const botaoFechar = (el) => h('button', { type: 'button', class: 'fechar', 'aria-label': 'Fechar', onclick: () => (el.tagName === 'DIALOG' ? fecharDialogo(el) : fecharFicha()) }, icone('x', 20))
 
 // ---------- abas ----------
-const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead }), buscas: abrirGoogleMaps, clientes: carregarClientes }
+// quem não abre Kanban nem Leads ainda manda empresas ao kanban pela Prospecção, mas a ficha do lead não abre para ele
+let abreLeads = true
+const abas = { kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead: abreLeads ? abrirLead : null }), buscas: abrirGoogleMaps, clientes: carregarClientes }
 let abaAtual = 'kanban'
 
 function abrirAba(nome) {
@@ -710,8 +712,10 @@ async function mandarDaBusca(a, botao) {
   carregarBuscas()
 }
 
-// ---------- usuários da equipe (só admin, num popup) ----------
+// ---------- usuários e acessos (só admin, num popup) ----------
 const PAPEL = { admin: 'Administrador', membro: 'Membro' }
+// as telas são as abas do topo: uma aba nova (como o Painel gerencial) entra sozinha na lista de acessos
+const telasDoSistema = () => [...document.querySelectorAll('.aba')].map((b) => ({ tela: b.dataset.aba, nome: b.textContent.trim() }))
 
 function abrirUsuarios() {
   $('#menu-conta').hidePopover()
@@ -721,26 +725,59 @@ function abrirUsuarios() {
 
 async function carregarUsuarios() {
   const corpo = $('#lista-usuarios')
-  if (!corpo.childElementCount) corpo.replaceChildren(...Array.from({ length: 3 }, () => h('tr', {}, h('td', { colspan: '5' }, esqueleto('linha')))))
+  const telas = telasDoSistema()
+  const linhaInteira = (conteudo) => h('tr', {}, h('td', { colspan: String(telas.length + 4) }, conteudo))
+  $('#cabecalho-usuarios').replaceChildren(
+    ...['Pessoa', 'Papel', 'Situação'].map((t) => h('th', { scope: 'col' }, t)),
+    ...telas.map((t) => h('th', { scope: 'col', class: 'col-tela' }, t.nome)),
+    h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Ações')),
+  )
+  if (!corpo.childElementCount) corpo.replaceChildren(...Array.from({ length: 3 }, () => linhaInteira(esqueleto('linha'))))
   try {
-    const [membros, { data }] = await Promise.all([crm.listarMembros(), supabase.auth.getSession()])
-    corpo.replaceChildren(...membros.map((m) => linhaUsuario(m, data.session?.user.id)))
+    const [membros, acessos, { data }] = await Promise.all([crm.listarMembros(), crm.listarAcessos(), supabase.auth.getSession()])
+    const liberadas = new Set(acessos.map((a) => `${a.user_id} ${a.tela}`))
+    corpo.replaceChildren(...membros.map((m) => linhaUsuario(m, data.session?.user.id, telas, liberadas)))
   } catch (err) {
-    corpo.replaceChildren(h('tr', {}, h('td', { colspan: '5' }, estado({ tipo: 'erro', titulo: 'Não foi possível carregar a equipe', texto: err.message, acao: h('button', { type: 'button', onclick: carregarUsuarios }, 'Tentar de novo') }))))
+    corpo.replaceChildren(linhaInteira(estado({ tipo: 'erro', titulo: 'Não foi possível carregar a equipe', texto: err.message, acao: h('button', { type: 'button', onclick: carregarUsuarios }, 'Tentar de novo') })))
   }
 }
 
-const linhaUsuario = (m, eu) =>
+const linhaUsuario = (m, eu, telas, liberadas) =>
   h(
     'tr',
     { class: m.ativo ? '' : 'inativo' },
-    h('td', {}, h('strong', {}, m.nome), m.user_id === eu && h('span', { class: 'muted pequeno' }, ' (você)')),
-    h('td', {}, m.email),
+    h('td', {}, h('strong', {}, m.nome), m.user_id === eu && h('span', { class: 'muted pequeno' }, ' (você)'), h('div', { class: 'muted pequeno' }, m.email)),
     h('td', {}, PAPEL[m.papel]),
     h('td', {}, situacaoUsuario(m)),
+    // administrador abre todas as telas, sem precisar marcar (o banco faz a mesma conta)
+    ...(m.papel === 'admin'
+      ? [h('td', { colspan: String(telas.length), class: 'todas-telas muted' }, 'Abre todas as telas')]
+      : telas.map((t) =>
+          h(
+            'td',
+            { class: 'col-tela' },
+            h('input', { type: 'checkbox', checked: liberadas.has(`${m.user_id} ${t.tela}`), 'aria-label': `${m.nome} abre ${t.nome}`, onchange: (e) => alternarTela(m, t, e.currentTarget) }),
+          ),
+        )),
     // a própria conta não se desativa (a função também recusa): ninguém fica trancado fora sem querer
     h('td', { class: 'acoes-linha' }, m.user_id !== eu && h('button', { type: 'button', onclick: (e) => alternarUsuario(m, e.currentTarget) }, m.ativo ? 'Desativar' : 'Reativar')),
   )
+
+// grava na hora, uma tela por vez; se o banco recusar, a caixa volta ao que era
+async function alternarTela(m, t, caixa) {
+  const liberar = caixa.checked
+  const tinhaFoco = document.activeElement === caixa
+  caixa.disabled = true
+  try {
+    await crm.definirAcesso(m.user_id, t.tela, liberar)
+    toast(liberar ? `${m.nome} agora abre ${t.nome}` : `${m.nome} não abre mais ${t.nome}`)
+  } catch (err) {
+    caixa.checked = !liberar
+    toast(err.message, 'erro')
+  }
+  caixa.disabled = false
+  if (tinhaFoco) caixa.focus()
+}
 
 // "Aguardando primeiro acesso" deixa à vista quem ainda pode ter a senha criada por quem souber o e-mail
 const situacaoUsuario = (m) =>
@@ -874,6 +911,7 @@ async function iniciar() {
   if (!temPc) delete abas.prospeccao
 
   let logado = false
+  let telas = null // as telas que a pessoa abre; null quando não há a lista
   if (supabase) {
     const { data } = await supabase.auth.getSession()
     if (!data.session) return mostrarLogin()
@@ -892,7 +930,12 @@ async function iniciar() {
 
     // equipe: só membro ativo entra nos leads; admin cadastra e desativa usuários
     try {
-      const perfil = await crm.meuPerfil(data.session.user.id)
+      const [perfil, minhas] = await Promise.all([
+        crm.meuPerfil(data.session.user.id),
+        // sem a lista (CRM fora do ar, ou a migration de acessos ainda não rodou), as abas ficam como antes: quem barra é o banco
+        crm.minhasTelas().catch((err) => (console.error('acessos:', err.message), null)),
+      ])
+      telas = minhas && new Set(minhas)
       if (perfil) $('#conta-nome').textContent = perfil.nome
       if (!perfil?.ativo) {
         logado = false
@@ -921,6 +964,17 @@ async function iniciar() {
     // com o mapa, o formulário da busca nova abre numa janela por cima dele
     $('#dlg-busca-corpo').append($('#form-busca'))
   } else if (!temPc) delete abas.buscas
+  // acessos por tela: a aba e o botão da tela que a pessoa não abre somem (o banco e a API do PC recusam do mesmo jeito)
+  if (logado && telas) {
+    for (const b of document.querySelectorAll('.aba')) {
+      if (telas.has(b.dataset.aba)) continue
+      b.hidden = true
+      delete abas[b.dataset.aba]
+    }
+    abreLeads = telas.has('kanban') || telas.has('leads')
+    $('#btn-novo-lead').hidden = !abreLeads
+    if (!telas.has('buscas')) $('#btn-busca-pc').hidden = true
+  }
   // o botão do topo abre a busca nova de qualquer aba, por cima do mapa; trocar de tela leva o foco junto
   $('#btn-busca-pc').addEventListener('click', () => {
     if (abaAtual !== 'buscas') abrirAba('buscas')
@@ -964,7 +1018,7 @@ async function iniciar() {
         form.reset()
         carregarUsuarios()
       },
-      'Usuário cadastrado. Avise a pessoa para entrar em "Primeiro acesso" com este e-mail.',
+      'Usuário cadastrado. Marque na lista as telas que a pessoa abre e avise para ela entrar em "Primeiro acesso" com este e-mail.',
       'Cadastrando…',
     ),
   )
@@ -989,6 +1043,7 @@ async function iniciar() {
   const inicial = location.hash.slice(1)
   // sem nenhuma aba (conta fora da equipe, no site) fica só o aviso
   if (Object.keys(abas).length) abrirAba(Object.hasOwn(abas, inicial) ? inicial : Object.keys(abas)[0])
+  else if (logado) aviso('Sua conta ainda não abre nenhuma tela. Peça o acesso ao administrador.')
 }
 
 iniciar()

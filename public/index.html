@@ -46,7 +46,7 @@
         <button type="button" id="btn-conta" class="btn-conta" popovertarget="menu-conta" aria-label="Minha conta" hidden></button>
         <div id="menu-conta" class="menu-conta" popover>
           <p class="menu-conta-quem"><strong id="conta-nome"></strong><span id="conta-email" class="muted pequeno"></span></p>
-          <button type="button" id="menu-usuarios" class="item-menu" hidden>Usuários da equipe</button>
+          <button type="button" id="menu-usuarios" class="item-menu" hidden>Usuários e acessos</button>
           <button type="button" id="menu-senha" class="item-menu">Trocar senha</button>
           <button type="button" id="menu-sair" class="item-menu">Sair</button>
         </div>
@@ -233,7 +233,7 @@
     </dialog>
     <dialog id="dlg-usuarios" class="modal modal-largo" aria-labelledby="usuarios-titulo">
       <header class="drawer-topo">
-        <h2 id="usuarios-titulo">Usuários da equipe</h2>
+        <h2 id="usuarios-titulo">Usuários e acessos</h2>
         <button type="button" class="fechar" id="fechar-usuarios" aria-label="Fechar"></button>
       </header>
       <form id="form-usuario" class="novo-usuario" aria-label="Novo usuário">
@@ -248,12 +248,12 @@
           </label>
           <button class="primario">Cadastrar</button>
         </div>
-        <p class="muted pequeno">Depois de cadastrada, a pessoa abre o sistema, clica em "Primeiro acesso", digita este e-mail e cria a própria senha. Todos da equipe veem e trabalham os mesmos leads; administrador também cadastra e desativa usuários.</p>
+        <p class="muted pequeno">Depois de cadastrada, a pessoa abre o sistema, clica em "Primeiro acesso", digita este e-mail e cria a própria senha. Na lista, marque as telas que cada pessoa abre: a mudança vale na hora, e quem não tem a tela não vê a aba nem os dados dela. Administrador abre todas e também cadastra e desativa usuários.</p>
       </form>
       <div class="tabela-wrap">
-        <table class="tabela">
+        <table class="tabela tabela-usuarios">
           <thead>
-            <tr><th scope="col">Nome</th><th scope="col">E-mail</th><th scope="col">Papel</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr>
+            <tr id="cabecalho-usuarios"></tr>
           </thead>
           <tbody id="lista-usuarios"></tbody>
         </table>
