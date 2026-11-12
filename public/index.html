@@ -15,7 +15,9 @@
         Leads = tabela ordenável com a ficha do lead ao lado;
         Google Maps = o mapa ocupa a tela, com o painel de busca, segmentos, filtros e lista à esquerda; a lista mostra o que está na área do mapa
         (pedido do Filipe em 11/11/2026, no lugar de um cartão por local e segmento);
-        Clientes ativos = cadastro numa linha e a tabela com o que cada cliente esconde no mapa (pedido do Filipe em 11/11/2026).
+        Clientes ativos = cadastro numa linha e a tabela com o que cada cliente esconde no mapa (pedido do Filipe em 11/11/2026);
+        Painel = relatório numa coluna de leitura: a frase do período, atividade, funil, onde rende e o que precisa de atenção
+        (pedido do Filipe em 12/11/2026; estrutura escolhida por ele entre três, seed a787f312; sem placar por pessoa, porque uma pessoa só faz a captação).
       FORM: Prospecção barra no topo (seed bb63c07d), Leads tabela com ficha ao lado (seed 5d3c6ead),
         Google Maps mapa com painel ao lado (2 de 7, seed 00ad34c9); os cartões que abrem com mapa (seed d9b4c1ec) ficaram só nas buscas do PC.
       FINISH: barra escura de lote fixa embaixo, movimento só para mudança de estado (140 a 220 ms, ease-out), teclado e leitor de tela em tudo, contraste AA.
@@ -31,6 +33,7 @@
     <header class="topo">
       <h1 class="marca" translate="no">Leads <span>Maps</span></h1>
       <nav class="abas" aria-label="Seções">
+        <button type="button" class="aba" data-aba="painel" data-crm>Painel</button>
         <button type="button" class="aba" data-aba="kanban" data-crm>Kanban</button>
         <button type="button" class="aba" data-aba="leads" data-crm>Leads</button>
         <button type="button" class="aba" data-aba="prospeccao" data-local hidden>Prospecção</button>
@@ -96,6 +99,17 @@
           <nav id="paginacao-empresas" class="paginacao" aria-label="Paginação dos resultados"></nav>
         </div>
         <div id="barra-lote" class="barra-lote" role="region" aria-label="Empresas marcadas" hidden></div>
+      </section>
+
+      <section id="aba-painel" aria-label="Painel gerencial" hidden>
+        <!-- relatório do período numa coluna de leitura: frase com os números, atividade, funil, onde rende e o que precisa de atenção -->
+        <div class="painel">
+          <div class="pn-topo">
+            <div id="painel-periodos" class="pn-periodos" role="group" aria-label="Período do painel"></div>
+            <p id="painel-hora" class="muted pequeno"></p>
+          </div>
+          <div id="painel-corpo" class="pn-corpo"></div>
+        </div>
       </section>
 
       <section id="aba-kanban" aria-label="Kanban de acompanhamento" hidden>

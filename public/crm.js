@@ -144,6 +144,14 @@ export async function tirarCliente(id) {
   pedidoClientes = null
 }
 
+// ---------- painel gerencial ----------
+// As contas são feitas no banco (public.painel_gerencial) e chegam prontas num JSON; sem início, desde o começo
+export async function painelGerencial({ de, ate }) {
+  const { data } = ok(await cliente().rpc('painel_gerencial', { p_de: de, p_ate: ate }))
+  if (!data) throw new Error('Sua conta não tem acesso ao painel. Fale com o administrador do sistema.')
+  return data
+}
+
 // ---------- equipe ----------
 // a linha de quem está logado diz se ele entra nos leads (ativo) e se cadastra usuários (admin)
 export const meuPerfil = async (userId) => ok(await cliente().from('membros').select('nome,papel,ativo').eq('user_id', userId).maybeSingle()).data

@@ -2734,6 +2734,456 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   font-size: 13px;
 }
 
+/* ---------- painel gerencial ---------- */
+/* Relatório numa coluna de leitura. Barras de dado em petróleo de destaque (uma série só por gráfico, sem legenda).
+   No funil, que é uma sequência, todas as etapas têm o mesmo tom e só o Ganho fica verde (o verde de "ganho" do sistema):
+   as cores das etapas do kanban, lado a lado, ficam parecidas demais para servir de barra (validador da skill dataviz). */
+.painel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1000px;
+}
+
+.pn-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.pn-topo p {
+  margin: 0;
+}
+
+.pn-periodos {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-2);
+  border-radius: var(--raio-p);
+  box-shadow: var(--sombra-fina);
+}
+
+.pn-periodos button {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 0;
+  /* o raio de dentro acompanha o do grupo, menos o respiro de 3px */
+  border-radius: calc(var(--raio-p) - 3px);
+  background: none;
+}
+
+.pn-periodos button[aria-pressed="true"] {
+  background: var(--destaque-suave);
+  font-weight: 600;
+}
+
+.pn-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* trocar o período segura o painel anterior esmaecido, sem pular a tela, até o novo chegar */
+.pn-corpo[aria-busy="true"] > :not(.skel) {
+  opacity: 0.55;
+  transition: opacity var(--dur-rapida) var(--ease-out);
+}
+
+/* o único movimento do painel: a primeira chegada dos números */
+.pn-corpo.chegou {
+  animation: aparecer var(--dur-media) var(--ease-out);
+}
+
+.pn-manchete,
+.pn-secao {
+  background: var(--bg-2);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-fina);
+  padding: 22px 24px;
+}
+
+.pn-manchete h2 {
+  font-size: 24px;
+  line-height: 1.3;
+  max-width: 34ch;
+}
+
+.pn-linhas {
+  margin: 8px 0 0;
+  color: var(--muted);
+  max-width: 72ch;
+}
+
+.pn-numeros,
+.pn-faixas {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--borda);
+}
+
+.pn-comparado {
+  margin: 20px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--borda);
+}
+
+.pn-comparado + .pn-numeros {
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pn-numeros dd,
+.pn-faixas dd {
+  margin: 0;
+}
+
+.pn-numeros dt,
+.pn-faixas dt {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.pn-valor,
+.pn-faixas dd {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.pn-delta {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.pn-delta .ico {
+  flex: none;
+  margin-top: 1px;
+}
+
+.pn-subiu {
+  color: var(--ganho);
+}
+
+.pn-subiu .ico {
+  rotate: 180deg;
+}
+
+.pn-caiu {
+  color: var(--perigo);
+}
+
+.pn-igual {
+  color: var(--muted);
+}
+
+.pn-secao h3 {
+  font-size: 18px;
+}
+
+.pn-secao h3 {
+  scroll-margin-top: 96px;
+}
+
+.pn-secao h3:focus {
+  outline: none;
+}
+
+.pn-nota {
+  margin: 4px 0 16px;
+  max-width: 80ch;
+}
+
+.pn-secao h4 {
+  margin: 20px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pn-secao .tabela-wrap {
+  box-shadow: 0 0 0 1px var(--borda);
+}
+
+.pn-secao .estado {
+  border-style: solid;
+  border-color: var(--borda);
+}
+
+/* ---- gráfico de colunas: uma coluna por dia, semana ou mês ---- */
+.pn-graficos,
+.pn-duas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 32px;
+}
+
+.pn-colunas {
+  margin: 0;
+}
+
+.pn-colunas figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.pn-leitura {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pn-leitura strong {
+  color: var(--fg);
+}
+
+.pn-barras {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  height: 132px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  column-gap: 2px;
+  align-items: end;
+  border-bottom: 1px solid var(--borda-forte);
+}
+
+/* a coluna inteira é o alvo do ponteiro, não só a barra */
+.pn-barras li {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 4px 4px 0 0;
+  transition: background-color var(--dur-rapida) var(--ease-out);
+}
+
+.pn-barras li:hover,
+.pn-barras li:focus-visible {
+  background: color-mix(in srgb, var(--destaque) 9%, transparent);
+}
+
+.pn-barras li:focus-visible {
+  outline-offset: 0;
+}
+
+.pn-barra {
+  width: min(24px, 100%);
+  height: calc(var(--v) * 100%);
+  background: var(--destaque);
+  border-radius: 4px 4px 0 0;
+  transition: background-color var(--dur-rapida) var(--ease-out);
+}
+
+.pn-barras li:hover .pn-barra,
+.pn-barras li:focus-visible .pn-barra {
+  background: var(--primaria);
+}
+
+.pn-eixo {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pn-tabela {
+  margin-top: 18px;
+}
+
+.pn-tabela summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primaria);
+  width: fit-content;
+}
+
+.pn-tabela .tabela-wrap {
+  margin-top: 10px;
+}
+
+/* ---- medidores e funil: nome, barra e número na mesma linha ---- */
+.pn-medidores,
+.pn-funil,
+.pn-etapas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pn-medidores,
+.pn-funil {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+/* colunas de largura fixa: o trilho tem o mesmo tamanho em todas as linhas, senão as barras não se comparam */
+.pn-medidores li,
+.pn-funil li {
+  display: grid;
+  grid-template-columns: minmax(7rem, 12rem) minmax(0, 1fr) 8.5rem;
+  gap: 4px 14px;
+  align-items: center;
+}
+
+.pn-funil li {
+  grid-template-columns: minmax(7rem, 12rem) minmax(0, 1fr) 13rem;
+}
+
+.pn-duas .pn-medidores li {
+  grid-template-columns: minmax(0, 1fr) 5rem 9.5rem;
+}
+
+.pn-duas .pn-fig {
+  text-align: right;
+}
+
+.pn-nome {
+  overflow-wrap: anywhere;
+}
+
+.pn-fig {
+  font-variant-numeric: tabular-nums;
+}
+
+.pn-trilho {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--destaque-suave);
+  overflow: hidden;
+}
+
+.pn-trilho > span {
+  display: block;
+  height: 100%;
+  width: calc(var(--v) * 100%);
+  background: var(--destaque);
+  border-radius: 99px;
+}
+
+.pn-funil .pn-nome {
+  font-weight: 600;
+}
+
+/* no funil a barra nasce de uma base só, à esquerda, com a ponta arredondada */
+.pn-funil .pn-trilho {
+  height: 20px;
+  background: none;
+  border-radius: 0;
+}
+
+.pn-funil .pn-trilho > span {
+  border-radius: 0 4px 4px 0;
+}
+
+.pn-funil .st-ganho .pn-trilho > span {
+  background: var(--ganho);
+}
+
+.pn-pe,
+.pn-garimpo,
+.pn-temperaturas {
+  margin: 14px 0 0;
+  font-size: 14px;
+}
+
+.pn-garimpo {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.pn-faixas {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 16px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pn-faixas dd {
+  font-size: 22px;
+}
+
+.pn-etapas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.pn-etapas li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pn-temperaturas .tag {
+  margin-left: 4px;
+}
+
+@media (max-width: 900px) {
+  .pn-numeros {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .pn-duas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .pn-manchete,
+  .pn-secao {
+    padding: 18px 16px;
+  }
+  .pn-manchete h2 {
+    font-size: 21px;
+  }
+  .pn-numeros,
+  .pn-faixas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pn-graficos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pn-periodos button {
+    min-height: 44px;
+  }
+  /* estreito: o nome e o número na linha de cima, a barra embaixo */
+  .pn-medidores li,
+  .pn-funil li,
+  .pn-duas .pn-medidores li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .pn-medidores .pn-trilho,
+  .pn-funil .pn-trilho {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .pn-funil .pn-fig {
+    text-align: right;
+  }
+}
+
 /* ---------- login ---------- */
 .tela-login {
   display: grid;

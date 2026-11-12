@@ -1,0 +1,75 @@
+// Contas e textos da aba Painel, sem DOM (os números vêm prontos do banco: public.painel_gerencial)
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { comparar, conversoes, duracao, manchete, PERIODOS, periodo, rotuloBalde, semContato, taxa } from '../public/painel.js'
+
+const agora = new Date(2026, 10, 12, 15, 30) // 12/11/2026 15:30, hora local
+
+test('período: começa à meia-noite de N-1 dias atrás e vai até agora; "Desde o começo" não tem início', () => {
+  assert.deepEqual(Object.keys(PERIODOS), ['7', '30', '90', '365', 'tudo'])
+  assert.equal(PERIODOS['7'].frase, 'nos últimos 7 dias')
+  assert.equal(periodo('7', agora).de, new Date(2026, 10, 6).toISOString())
+  assert.equal(periodo('30', agora).de, new Date(2026, 9, 14).toISOString())
+  assert.equal(periodo('7', agora).ate, null)
+  assert.equal(periodo('tudo', agora).de, null)
+  // chave desconhecida (link velho, endereço digitado) cai nos 30 dias
+  assert.equal(periodo('abc', agora).chave, '30')
+})
+
+test('comparação com o período anterior em número absoluto, porque com poucos leads a porcentagem engana; o texto é curto', () => {
+  assert.deepEqual(comparar(48, 36), { sentido: 'subiu', texto: '12 a mais' })
+  assert.deepEqual(comparar(1, 3), { sentido: 'caiu', texto: '2 a menos' })
+  assert.deepEqual(comparar(5, 5), { sentido: 'igual', texto: 'igual' })
+  assert.equal(comparar(5, undefined), null)
+})
+
+test('conversão de uma etapa para a seguinte; etapa anterior vazia não tem taxa', () => {
+  const etapas = [{ status: 'novo', leads: 10 }, { status: 'contato', leads: 4 }, { status: 'qualificado', leads: 0 }, { status: 'proposta', leads: 0 }]
+  assert.deepEqual(conversoes(etapas).map((e) => e.taxa), [null, 0.4, 0, null])
+  assert.equal(taxa(1, 3), '33%')
+  assert.equal(taxa(0, 0), null)
+  assert.equal(taxa(2, 2000), '0,1%')
+})
+
+test('duração em horas até 2 dias, depois em dias', () => {
+  assert.equal(duracao(0.4), 'menos de 1 h')
+  assert.equal(duracao(16.5), '17 h')
+  assert.equal(duracao(47.9), '48 h')
+  assert.equal(duracao(60), '2,5 dias')
+  assert.equal(duracao(null), null)
+})
+
+test('lead parado: há quantos dias sem contato, ou que nunca teve contato', () => {
+  assert.equal(semContato({ dias: 1, nunca: false }), '1 dia sem contato')
+  assert.equal(semContato({ dias: 63, nunca: false }), '63 dias sem contato')
+  assert.equal(semContato({ dias: 9, nunca: true }), 'nunca teve contato, entrou há 9 dias')
+})
+
+test('rótulo do dia, da semana ou do mês no eixo do gráfico', () => {
+  assert.equal(rotuloBalde('2026-09-08', 'day'), '08/09')
+  assert.equal(rotuloBalde('2026-09-07', 'week'), 'sem. 07/09')
+  assert.equal(rotuloBalde('2026-09-01', 'month'), 'set/26')
+})
+
+const base = {
+  periodo: { compara: true },
+  atual: { contatos: 48, leads_novos: 9, avancos: 6, ganhos: 1, perdidos: 0, empresas_novas: 120 },
+  anterior: { contatos: 36, leads_novos: 9, avancos: 2, ganhos: 0, perdidos: 1, empresas_novas: 0 },
+  hoje: { parados: { faixas: { ate_7: 3, de_8_a_14: 4, de_15_a_30: 2, mais_de_30: 1 } } },
+}
+
+test('manchete diz o que foi feito no período, compara os contatos e aponta os parados', () => {
+  const m = manchete(base, PERIODOS['7'])
+  assert.equal(m.titulo, '48 contatos, 9 leads novos e 1 ganho nos últimos 7 dias.')
+  assert.deepEqual(m.linhas, ['São 12 contatos a mais que nos 7 dias anteriores.', '7 leads em andamento estão há mais de 7 dias sem contato.'])
+})
+
+test('manchete sem atividade e sem comparação (desde o começo) não inventa número', () => {
+  const vazio = { periodo: { compara: false }, atual: { contatos: 0, leads_novos: 0, avancos: 0, ganhos: 0, perdidos: 0, empresas_novas: 0 }, anterior: null, hoje: { parados: { faixas: { ate_7: 0, de_8_a_14: 0, de_15_a_30: 0, mais_de_30: 0 } } } }
+  const m = manchete(vazio, PERIODOS.tudo)
+  assert.equal(m.titulo, 'Nenhum contato registrado desde o começo.')
+  assert.deepEqual(m.linhas, ['Nenhum lead em andamento está parado há mais de 7 dias.'])
+  const um = manchete({ ...vazio, atual: { ...vazio.atual, contatos: 1, leads_novos: 1 }, hoje: { parados: { faixas: { ...vazio.hoje.parados.faixas, mais_de_30: 1 } } } }, PERIODOS['30'])
+  assert.equal(um.titulo, '1 contato e 1 lead novo nos últimos 30 dias.')
+  assert.deepEqual(um.linhas, ['1 lead em andamento está há mais de 7 dias sem contato.'])
+})
