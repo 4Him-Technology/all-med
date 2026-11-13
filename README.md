@@ -150,19 +150,18 @@ A carga inicial é um arquivo SQL gerado da planilha, rodado no SQL Editor e for
 
 ## Painel gerencial
 
-A aba Painel é a primeira tela de quem entra: o relatório que a gerência acompanha, na largura toda da tela, em duas colunas (uma no celular). Os números são calculados no banco pela função `public.painel_gerencial` (migrations `20261112150000_painel_gerencial.sql` e `20261112200000_painel_mais_cortes.sql`, a segunda versão com mais cortes), que devolve só totais num JSON; o navegador não baixa as linhas. A captação é feita por uma pessoa só, então o painel não separa os números por pessoa.
+A aba Painel é a primeira tela de quem entra, e abre para toda a equipe: o relatório que a gerência acompanha, na largura toda da tela, em duas colunas (uma no celular). Os números são calculados no banco pela função `public.painel_gerencial` (migrations `20261112150000_painel_gerencial.sql` e `20261112200000_painel_mais_cortes.sql`, a segunda versão com mais cortes), que devolve só totais num JSON; o navegador não baixa as linhas. A captação é feita por uma pessoa só, então o painel não separa os números por pessoa.
 
 O que aparece, nesta ordem:
 
-- **A frase do período** (7, 30 ou 90 dias, 12 meses ou desde o começo): contatos, leads novos e ganhos, a comparação dos contatos com o período anterior do mesmo tamanho e quantos leads em andamento estão parados. Embaixo, oito números com a diferença para o período anterior: contatos feitos, dias com contato, leads novos, avanços de etapa, ganhos (e perdidos), arquivados, tempo até o primeiro contato (mediana) e empresas novas encontradas no Google Maps.
+- **Os números do período** (7, 30 ou 90 dias, 12 meses ou desde o começo), sem frase em cima: contatos feitos, dias com contato, leads novos, avanços de etapa, ganhos (e perdidos), arquivados, tempo até o primeiro contato (mediana), empresas novas encontradas no Google Maps e leads parados há mais de 7 dias, cada um com a diferença para o período anterior do mesmo tamanho (menos arquivados e parados, que não têm lado bom ou ruim).
+- **Ritmo dos contatos:** o primeiro gráfico, logo abaixo dos números: mapa de calor por dia da semana e hora, dias com contato e média por dia trabalhado; ao lado, os tipos de contato (ligação, WhatsApp...) e a temperatura por etapa.
 - **Leads em cada etapa** (hoje): quantos estão em Novo, Em contato, Qualificado, Proposta, Negociação, Ganho e Perdido, a parte de cada etapa nos em andamento, a conversão de uma etapa para a seguinte (de todos os leads, desde o começo) e há quanto tempo os de cada etapa estão nela.
 - **Funil do período:** dos leads que entraram no período, quantos chegaram pelo menos até cada etapa, a conversão, a taxa de ganho e a tabela por origem (Google Maps, Prospecção por CNPJ, cadastro manual) com contato, qualificados, ganhos e perdidos.
 - **Tempo em cada etapa:** quanto tempo o lead fica em cada etapa antes de mudar (mediana das saídas no período) e o ciclo até o ganho (dias desde que o lead entrou e contatos até ser ganho).
 - **Atividade:** contatos, leads novos e ganhos por dia, semana ou mês, com a tabela dos mesmos números.
-- **Ritmo dos contatos:** mapa de calor por dia da semana e hora, dias com contato e média por dia trabalhado; ao lado, os tipos de contato (ligação, WhatsApp...) e a temperatura por etapa.
 - **Onde rende** (desde o começo): das empresas do Google Maps, quantas viraram lead, tiveram contato, chegaram a Qualificado e foram ganhas, e a matriz segmento por local da busca.
 - **Precisa de atenção** (hoje): os leads em andamento por tempo sem contato (até 7, 8 a 14, 15 a 30 e mais de 30 dias) e os 10 parados há mais tempo (o nome abre a ficha).
-- **O que o painel ainda não mede:** motivo da perda, valor da proposta e do ganho, meta, se o contato foi atendido e segmento dos leads que não vieram do Google Maps. O sistema não registra esses dados, então o painel diz que faltam em vez de inventar.
 
 Regras das contas, testadas em [test/crm-sql.test.js](test/crm-sql.test.js) (períodos, textos e mapas de calor em [public/painel.js](public/painel.js), testados em [test/painel.test.js](test/painel.test.js)):
 
@@ -175,7 +174,7 @@ Regras das contas, testadas em [test/crm-sql.test.js](test/crm-sql.test.js) (per
 - tempos são medianas, que não se deixam levar por um lead esquecido por meses;
 - na matriz segmento por local, a cor mais escura vem das células com 10 empresas ou mais, para uma célula de 1 empresa não virar a referência.
 
-Quem vê: a função roda como dona das tabelas (security definer) e confere a permissão dentro dela, porque o Painel é a tela da gerência e mostra os números de todos os leads mesmo para quem não abre o Kanban. A regra é a do acesso por tela, `crm.pode('painel')`: o administrador abre sempre, e os outros só depois que ele marcar o Painel em "Usuários e acessos". Para quem não abre o Painel, a aba some e a primeira tela passa a ser a primeira aba liberada; se chamar a função mesmo assim, recebe null. Quem abre o Painel sem Kanban e sem Leads vê o nome dos leads parados sem link, porque a ficha não abriria para ele. Visitante sem login não chama a função.
+Quem vê: todo membro ativo da equipe (pedido do Filipe em 12/11/2026: "a tela gerencial literalmente é para todos verem"), sem precisar marcar nada em "Usuários e acessos", onde o Painel nem aparece. A função roda como dona das tabelas (security definer) e confere `crm.membro_ativo()` dentro dela, porque mostra os números de todos os leads mesmo para quem não abre o Kanban; `public.minhas_telas()` devolve `painel` para todo membro ativo, e é por ela que o site mostra as abas. Desativado e quem está fora da equipe não veem a aba e, se chamarem a função, recebem null; visitante sem login não chama. Quem abre o Painel sem Kanban e sem Leads vê o nome dos leads parados sem link, porque a ficha não abriria para ele.
 
 ## Segurança
 

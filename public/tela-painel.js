@@ -1,10 +1,10 @@
 // Aba Painel: o relatório que a gerência acompanha (pedido do Filipe em 12/11/2026; segunda versão no mesmo dia, porque a
-// primeira "ficou muito basica"). Usa a largura toda, em duas colunas: a frase do período, os leads em cada etapa, funil e
-// tempo em cada etapa, atividade, ritmo e tipos de contato, onde rende, o que precisa de atenção, temperatura por etapa e o
-// que o sistema ainda não mede. Uma pessoa só faz a captação, então não há placar por pessoa.
+// primeira "ficou muito basica"). Usa a largura toda, em duas colunas: os números do período, o ritmo dos contatos ao lado dos
+// tipos de contato e da temperatura por etapa, os leads em cada etapa, funil e tempo em cada etapa, atividade, onde rende,
+// e o que precisa de atenção. Uma pessoa só faz a captação, então não há placar por pessoa.
 // Os números vêm prontos do banco (public.painel_gerencial); os textos e as contas pequenas, de painel.js.
 import { painelGerencial } from './crm.js'
-import { comparar, conversoes, duracao, grade, manchete, nivel, PERIODOS, parados, periodo, rotuloBalde, semContato, taxa } from './painel.js'
+import { comparar, conversoes, duracao, grade, nivel, PERIODOS, parados, periodo, rotuloBalde, semContato, taxa } from './painel.js'
 import { ROTULOS as R } from './rotulos.js'
 import { $, esqueleto, estado, h, icone } from './ui.js'
 
@@ -45,7 +45,7 @@ export async function carregarPainel({ abrirLead: abrir }) {
   for (const b of document.querySelectorAll('#painel-periodos button')) b.setAttribute('aria-pressed', String(b.dataset.periodo === per.chave))
   const corpo = $('#painel-corpo')
   // na primeira vez, esqueleto com o desenho da grade; ao trocar de período, o painel anterior fica esmaecido até o novo chegar
-  if (!desenhado) corpo.replaceChildren(...['titulo pn-largo', 'bloco pn-largo', 'bloco', 'bloco', 'bloco pn-largo', 'bloco', 'bloco'].map(esqueleto))
+  if (!desenhado) corpo.replaceChildren(...['titulo pn-largo', 'bloco', 'bloco', 'bloco pn-largo', 'bloco', 'bloco'].map(esqueleto))
   corpo.setAttribute('aria-busy', 'true')
   const meu = ++pedido
   try {
@@ -56,16 +56,16 @@ export async function carregarPainel({ abrirLead: abrir }) {
         // a função antiga do banco não traz os cortes novos: avisa em vez de desenhar zero
         !p.pipeline && largo(estado({ titulo: 'Faltam os números novos do painel', texto: 'O CRM online ainda está com a versão anterior do painel: alguns quadros não aparecem. Fale com o administrador do sistema.' })),
         blocoManchete(p, per),
+        // o ritmo dos contatos é o primeiro gráfico (pedido do Filipe): já na primeira tela, logo abaixo dos números
+        blocoRitmo(p, per),
+        // dois quadros curtos empilhados ao lado do ritmo, para nenhum esticar com espaço vazio
+        h('div', { class: 'pn-pilha' }, blocoTipos(p, per), blocoTemperatura(p)),
         blocoEtapas(p),
         blocoFunil(p, per),
         blocoTempo(p, per),
         blocoAtividade(p, per),
-        blocoRitmo(p, per),
-        // dois quadros curtos empilhados ao lado do ritmo, para nenhum esticar com espaço vazio
-        h('div', { class: 'pn-pilha' }, blocoTipos(p, per), blocoTemperatura(p)),
         blocoOndeRende(p),
         largo(blocoAtencao(p)),
-        blocoFalta(),
       ].filter(Boolean),
     )
     corpo.classList.toggle('chegou', !desenhado)
@@ -134,18 +134,16 @@ const emTabela = (cabecalho, linhas) =>
     ),
   )
 
-// ---------- a frase do período e os números dela ----------
+// ---------- os números do período (só os números: a frase que os repetia saiu a pedido do Filipe) ----------
 function blocoManchete(p, per) {
-  const { titulo, linhas } = manchete(p, per)
-  const n = parados(p.hoje.parados.faixas)
   const pc = p.primeiro_contato
   const diasPeriodo = Math.ceil((Date.parse(p.periodo.ate) - Date.parse(p.periodo.de)) / 864e5)
   return largo(
     h(
       'section',
       { class: 'pn-manchete', 'aria-labelledby': 'pn-manchete-titulo' },
-      h('h2', { id: 'pn-manchete-titulo' }, titulo),
-      h('p', { class: 'pn-linhas' }, linhas.join(' '), n > 0 && ' ', n > 0 && h('button', { type: 'button', class: 'link', onclick: () => $('#pn-atencao-titulo')?.focus() }, 'Ver os parados')),
+      // o título fica só para o leitor de tela; na tela, o período já está nos botões de cima
+      h('h2', { id: 'pn-manchete-titulo', class: 'sr-only' }, `Números ${per.frase}`),
       p.anterior && h('p', { class: 'muted pequeno pn-comparado' }, `Setas: comparação com os ${per.anteriores}.`),
       h(
         'dl',
@@ -158,6 +156,7 @@ function blocoManchete(p, per) {
         p.atual.arquivados != null && figura('Arquivados', p.atual.arquivados, null, 'saem das contas de leads'),
         figura('Até o primeiro contato', null, null, pc.com_contato ? `mediana de ${plural(pc.com_contato, 'lead', 'leads')}${pc.sem_contato ? `; ${numero(pc.sem_contato)} sem contato` : ''}` : pc.leads ? `nenhum dos ${numero(pc.leads)} teve contato` : 'nenhum lead novo', duracao(pc.mediana_horas) ?? 'sem dado'),
         figura('Empresas encontradas', p.atual.empresas_novas, p.anterior?.empresas_novas, 'novas no Google Maps'),
+        figura('Parados há mais de 7 dias', parados(p.hoje.parados.faixas), null, 'em andamento, hoje'),
       ),
     ),
   )
@@ -618,24 +617,5 @@ function blocoTemperatura(p) {
           ),
         )
       : estado({ titulo: 'Nenhum lead no CRM', texto: 'Quando houver leads, aqui aparece quantos estão quentes, mornos e frios em cada etapa.' }),
-  )
-}
-
-// ---------- o que o sistema ainda não registra ----------
-function blocoFalta() {
-  const itens = [
-    ['Motivo da perda', 'o lead vai para Perdido sem dizer por quê; com um campo de motivo, o painel mostraria por que se perde.'],
-    ['Valor da proposta e do ganho', 'não há campo de valor; sem ele não dá para somar o que está em negociação nem o que foi fechado.'],
-    ['Meta do período', 'não há meta cadastrada; os números se comparam só com o período anterior.'],
-    ['Se o contato foi atendido', 'o atendimento registra que houve contato, não se a pessoa respondeu; por isso não há taxa de resposta.'],
-    ['Segmento e região dos leads de CNPJ e manuais', 'só as empresas do Google Maps guardam segmento e local da busca.'],
-  ]
-  return largo(
-    secao(
-      'pn-falta',
-      'O que o painel ainda não mede',
-      'Números que a gerência costuma pedir e que o sistema não tem como calcular hoje, porque o dado não é registrado.',
-      h('ul', { class: 'pn-falta' }, itens.map(([t, txt]) => h('li', {}, h('strong', {}, t), `: ${txt}`))),
-    ),
   )
 }

@@ -4,7 +4,7 @@
 const numero = (n) => n.toLocaleString('pt-BR')
 const plural = (n, um, varios) => `${numero(n)} ${n === 1 ? um : varios}`
 
-// rotulo vai no botão; frase entra no meio da manchete; anteriores diz com o que se compara
+// rotulo vai no botão; frase entra nos textos dos quadros; anteriores diz com o que se compara
 export const PERIODOS = {
   7: { rotulo: '7 dias', frase: 'nos últimos 7 dias', anteriores: '7 dias anteriores', dias: 7 },
   30: { rotulo: '30 dias', frase: 'nos últimos 30 dias', anteriores: '30 dias anteriores', dias: 30 },
@@ -57,19 +57,6 @@ export function rotuloBalde(inicio, unidade) {
 }
 
 export const parados = (faixas) => faixas.de_8_a_14 + faixas.de_15_a_30 + faixas.mais_de_30
-
-// A frase que abre o painel: o que foi feito no período, como os contatos se comparam e quantos leads esperam contato
-export function manchete({ periodo: per, atual, anterior, hoje }, { frase, anteriores }) {
-  const feitos = [plural(atual.contatos, 'contato', 'contatos'), atual.leads_novos && plural(atual.leads_novos, 'lead novo', 'leads novos'), atual.ganhos && plural(atual.ganhos, 'ganho', 'ganhos')].filter(Boolean)
-  const titulo = atual.contatos || atual.leads_novos || atual.ganhos ? `${feitos.slice(0, -1).join(', ')}${feitos.length > 1 ? ' e ' : ''}${feitos.at(-1)} ${frase}.` : `Nenhum contato registrado ${frase}.`
-  const linhas = []
-  const d = per.compara && anterior ? atual.contatos - anterior.contatos : 0
-  if (d) linhas.push(`${Math.abs(d) === 1 ? 'É' : 'São'} ${plural(Math.abs(d), 'contato', 'contatos')} a ${d > 0 ? 'mais' : 'menos'} que nos ${anteriores}.`)
-  else if (per.compara && anterior && atual.contatos) linhas.push(`O mesmo número de contatos dos ${anteriores}.`)
-  const n = parados(hoje.parados.faixas)
-  linhas.push(n ? `${plural(n, 'lead em andamento está', 'leads em andamento estão')} há mais de 7 dias sem contato.` : 'Nenhum lead em andamento está parado há mais de 7 dias.')
-  return { titulo, linhas }
-}
 
 // tom do mapa de calor, de 1 a 5, pela parte do maior valor; zero fica 0 (sem cor), para não parecer pouco o que é nada
 export const nivel = (v, max) => (v > 0 && max > 0 ? Math.min(5, Math.max(1, Math.ceil((v / max) * 5))) : 0)
