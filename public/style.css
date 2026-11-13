@@ -2735,14 +2735,15 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
 }
 
 /* ---------- painel gerencial ---------- */
-/* Relatório numa coluna de leitura. Barras de dado em petróleo de destaque (uma série só por gráfico, sem legenda).
-   No funil, que é uma sequência, todas as etapas têm o mesmo tom e só o Ganho fica verde (o verde de "ganho" do sistema):
-   as cores das etapas do kanban, lado a lado, ficam parecidas demais para servir de barra (validador da skill dataviz). */
+/* Relatório em grade de duas colunas que usa a largura toda; quadros largos ocupam as duas. Barras de dado em petróleo de
+   destaque (uma série só por gráfico, sem legenda). No funil e nas etapas, todas as etapas têm o mesmo tom e só Ganho
+   (verde) e Perdido (vermelho) mudam: as cores das etapas do kanban, lado a lado, ficam parecidas demais para servir de
+   barra (validador da skill dataviz). Mapas de calor numa escala de um tom só, validada como ordinal: texto marinho nos
+   três tons claros e branco nos dois escuros, todos AA. */
 .painel {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 1000px;
 }
 
 .pn-topo {
@@ -2782,9 +2783,24 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
 }
 
 .pn-corpo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pn-largo {
+  grid-column: 1 / -1;
+}
+
+.pn-pilha {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+}
+
+.pn-pilha > .pn-secao {
+  flex: 1;
 }
 
 /* trocar o período segura o painel anterior esmaecido, sem pular a tela, até o novo chegar */
@@ -2804,24 +2820,25 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   border-radius: var(--raio);
   box-shadow: var(--sombra-fina);
   padding: 22px 24px;
+  min-width: 0;
 }
 
 .pn-manchete h2 {
   font-size: 24px;
   line-height: 1.3;
-  max-width: 34ch;
+  max-width: 40ch;
 }
 
 .pn-linhas {
   margin: 8px 0 0;
   color: var(--muted);
-  max-width: 72ch;
+  max-width: 90ch;
 }
 
 .pn-numeros,
 .pn-faixas {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 16px 20px;
   margin: 20px 0 0;
   padding-top: 16px;
@@ -2892,9 +2909,6 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
 
 .pn-secao h3 {
   font-size: 18px;
-}
-
-.pn-secao h3 {
   scroll-margin-top: 96px;
 }
 
@@ -2904,7 +2918,7 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
 
 .pn-nota {
   margin: 4px 0 16px;
-  max-width: 80ch;
+  max-width: 90ch;
 }
 
 .pn-secao h4 {
@@ -2917,16 +2931,83 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   box-shadow: 0 0 0 1px var(--borda);
 }
 
+/* tabelas dentro dos quadros: um pouco mais justas, e o título da coluna quebra em vez de alargar a tabela */
+.pn-secao .tabela th,
+.pn-secao .tabela td {
+  padding: 10px;
+}
+
+.pn-secao .tabela thead th {
+  white-space: normal;
+}
+
+/* cabeçalho de linha nas tabelas do painel: nome normal, não o rótulo de coluna em maiúsculas */
+.pn-secao .tabela tbody th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  background: none;
+}
+
 .pn-secao .estado {
   border-style: solid;
   border-color: var(--borda);
 }
 
-/* ---- gráfico de colunas: uma coluna por dia, semana ou mês ---- */
-.pn-graficos,
-.pn-duas {
+.pn-sub {
+  display: block;
+  font-size: 12px;
+}
+
+/* ---- leads em cada etapa: uma coluna por etapa, separadas por um fio ---- */
+.pn-pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px 0;
+}
+
+.pn-pipeline li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 16px;
+  border-left: 1px solid var(--borda);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.pn-pipeline li:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.pn-pipeline .pn-valor {
+  font-size: 30px;
+}
+
+.pn-pipeline .pn-trilho {
+  align-self: stretch;
+  height: 6px;
+}
+
+.pn-pipeline .st-ganho .pn-trilho > span {
+  background: var(--ganho);
+}
+
+.pn-pipeline .st-perdido .pn-trilho > span {
+  background: var(--perdido);
+}
+
+/* ---- gráfico de colunas: uma coluna por dia, semana ou mês ---- */
+.pn-graficos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px 32px;
 }
 
@@ -2934,7 +3015,8 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   margin: 0;
 }
 
-.pn-colunas figcaption {
+.pn-colunas figcaption,
+.pn-calor-fig figcaption {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2945,6 +3027,7 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   font-size: 13px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  min-height: 1.35em;
 }
 
 .pn-leitura strong {
@@ -3021,10 +3104,90 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   margin-top: 10px;
 }
 
+/* ---- mapa de calor: escala de um tom, do mais claro ao mais escuro ---- */
+.pn-celula.n1 { background: #8cbacb; }
+.pn-celula.n2 { background: #6aa3b8; }
+.pn-celula.n3 { background: #4e90a7; }
+.pn-celula.n4 { background: #38788e; color: #ffffff; }
+.pn-celula.n5 { background: #255a6c; color: #ffffff; }
+
+.pn-calor-fig {
+  margin: 0;
+}
+
+.pn-calor {
+  display: grid;
+  grid-template-columns: 2.4rem repeat(24, minmax(0, 1fr)) 2.4rem;
+  gap: 2px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pn-calor .pn-celula {
+  aspect-ratio: 1;
+  min-height: 9px;
+  border-radius: 3px;
+  background-color: var(--bg-3);
+}
+
+.pn-calor .pn-celula.n1 { background-color: #8cbacb; }
+.pn-calor .pn-celula.n2 { background-color: #6aa3b8; }
+.pn-calor .pn-celula.n3 { background-color: #4e90a7; }
+.pn-calor .pn-celula.n4 { background-color: #38788e; }
+.pn-calor .pn-celula.n5 { background-color: #255a6c; }
+
+.pn-calor .pn-celula:hover {
+  outline: 2px solid var(--fg);
+  outline-offset: -1px;
+}
+
+.pn-calor-hora {
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.pn-calor-total {
+  text-align: right;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.pn-legenda {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0 0;
+}
+
+.pn-legenda .pn-celula {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+/* matrizes (temperatura por etapa, segmento por local): número na célula, cor pelo tom */
+.pn-matriz td.pn-celula {
+  font-weight: 600;
+}
+
+.pn-matriz td,
+.pn-matriz th {
+  padding: 9px 12px;
+}
+
+.pn-matriz .pn-total {
+  font-weight: 600;
+  background: var(--bg-topo);
+}
+
 /* ---- medidores e funil: nome, barra e número na mesma linha ---- */
 .pn-medidores,
 .pn-funil,
-.pn-etapas {
+.pn-falta {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -3042,21 +3205,17 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
 .pn-medidores li,
 .pn-funil li {
   display: grid;
-  grid-template-columns: minmax(7rem, 12rem) minmax(0, 1fr) 8.5rem;
+  grid-template-columns: minmax(6rem, 10rem) minmax(0, 1fr) 8.5rem;
   gap: 4px 14px;
   align-items: center;
 }
 
 .pn-funil li {
-  grid-template-columns: minmax(7rem, 12rem) minmax(0, 1fr) 13rem;
+  grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr) 12.5rem;
 }
 
-.pn-duas .pn-medidores li {
-  grid-template-columns: minmax(0, 1fr) 5rem 9.5rem;
-}
-
-.pn-duas .pn-fig {
-  text-align: right;
+.pn-tempos li {
+  grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr) 11rem;
 }
 
 .pn-nome {
@@ -3101,16 +3260,18 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   background: var(--ganho);
 }
 
-.pn-pe,
-.pn-garimpo,
-.pn-temperaturas {
-  margin: 14px 0 0;
-  font-size: 14px;
+.pn-garimpo {
+  margin-bottom: 8px;
 }
 
-.pn-garimpo {
-  margin: 0 0 8px;
-  font-size: 15px;
+.pn-pe {
+  margin: 14px 0 0;
+  font-size: 14px;
+  max-width: 90ch;
+}
+
+.pn-ritmo-resumo {
+  margin: 0 0 6px;
 }
 
 .pn-faixas {
@@ -3124,28 +3285,21 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   font-size: 22px;
 }
 
-.pn-etapas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
+.pn-falta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 10px 28px;
+  font-size: 14px;
 }
 
-.pn-etapas li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-variant-numeric: tabular-nums;
-}
-
-.pn-temperaturas .tag {
-  margin-left: 4px;
+@media (max-width: 1099px) {
+  .pn-corpo {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 900px) {
-  .pn-numeros {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .pn-duas {
+  .pn-graficos {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -3162,16 +3316,26 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   .pn-faixas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .pn-graficos {
-    grid-template-columns: minmax(0, 1fr);
+  .pn-pipeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pn-pipeline li,
+  .pn-pipeline li:first-child {
+    border-left: 0;
+    padding: 0;
   }
   .pn-periodos button {
     min-height: 44px;
   }
+  .pn-calor {
+    grid-template-columns: 2rem repeat(24, minmax(0, 1fr)) 1.6rem;
+    gap: 1px;
+    font-size: 10px;
+  }
   /* estreito: o nome e o número na linha de cima, a barra embaixo */
   .pn-medidores li,
   .pn-funil li,
-  .pn-duas .pn-medidores li {
+  .pn-tempos li {
     grid-template-columns: minmax(0, 1fr) auto;
   }
   .pn-medidores .pn-trilho,
@@ -3179,7 +3343,8 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
     grid-column: 1 / -1;
     grid-row: 2;
   }
-  .pn-funil .pn-fig {
+  .pn-funil .pn-fig,
+  .pn-tempos .pn-fig {
     text-align: right;
   }
 }

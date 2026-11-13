@@ -70,3 +70,13 @@ export function manchete({ periodo: per, atual, anterior, hoje }, { frase, anter
   linhas.push(n ? `${plural(n, 'lead em andamento está', 'leads em andamento estão')} há mais de 7 dias sem contato.` : 'Nenhum lead em andamento está parado há mais de 7 dias.')
   return { titulo, linhas }
 }
+
+// tom do mapa de calor, de 1 a 5, pela parte do maior valor; zero fica 0 (sem cor), para não parecer pouco o que é nada
+export const nivel = (v, max) => (v > 0 && max > 0 ? Math.min(5, Math.max(1, Math.ceil((v / max) * 5))) : 0)
+
+// os contatos por dia da semana (1 = segunda, 7 = domingo) e hora, numa grade de 7 por 24 com os vazios em zero
+export function grade(celulas) {
+  const g = Array.from({ length: 7 }, () => Array(24).fill(0))
+  for (const c of celulas) g[c.dia - 1][c.hora] = c.contatos
+  return g
+}
