@@ -1,5 +1,5 @@
 -- Painel gerencial, segunda versão (pedido do Filipe em 12/11/2026: "o painel gerencial ficou muito basico"): a mesma
--- função public.painel_gerencial, com a mesma trava (crm.pode('painel')) e as mesmas chaves de antes, mais estes cortes:
+-- função public.painel_gerencial, com as mesmas chaves de antes, mais estes cortes:
 -- - atual e anterior: arquivados no período e dias com contato;
 -- - pipeline: dos leads não arquivados, de qualquer data, quantos chegaram pelo menos até cada etapa;
 -- - tempo_etapas: por etapa, as passagens que terminaram no período (mediana em dias) e, hoje, quantos estão nela e há quanto tempo;
@@ -10,10 +10,20 @@
 -- - garimpo: das empresas do Google Maps, quantas viraram lead, tiveram contato, chegaram a Qualificado e foram ganhas;
 -- - origens: também quantos chegaram a Qualificado; hoje: também o total de arquivados.
 -- O tempo numa etapa vem do histórico de mudança de etapa (só o trigger grava); a primeira passagem começa quando o lead entrou.
--- Só troca a função: não muda tabela nem dado. Roda depois da 20261112150000_painel_gerencial.sql.
 --
--- Rollback: rode de novo a função da migration 20261112150000_painel_gerencial.sql, trocando "create function" por
---           "create or replace function" (a tela nova mostra "sem dado" nos cortes que a função antiga não devolve).
+-- Quem vê (Filipe, 12/11/2026: "a tela gerencial literalmente é para todos verem"): todo membro ativo da equipe, sem
+-- precisar marcar nada em "Usuários e acessos". A trava passa de crm.pode('painel') para crm.membro_ativo(), e
+-- public.minhas_telas() passa a incluir 'painel' para todo membro ativo, porque é por ela que o site decide as abas.
+-- Desativado e quem está fora da equipe continuam sem nada. As linhas 'painel' que já existam em membro_telas ficam
+-- sem efeito e não são apagadas (se um dia o Painel voltar a ser por pessoa, quem tinha continua tendo).
+-- Só troca as duas funções: não muda tabela nem dado. Roda depois da 20261112150000_painel_gerencial.sql.
+--
+-- Rollback (o Painel volta a ser só de quem tem a tela marcada, e a tela volta aos quadros antigos):
+--   1. rode de novo a função da migration 20261112150000_painel_gerencial.sql, trocando "create function" por
+--      "create or replace function" (só o bloco da função, até $fn$;);
+--   2. rode de novo a public.minhas_telas da migration 20261112120000_acessos.sql, do mesmo jeito
+--      (create or replace function public.minhas_telas() ... $fn$;).
+--   O site novo mostra "Faltam os números novos do painel" com a função antiga: reverta também o PR.
 
 create or replace function public.painel_gerencial(p_de timestamptz default null, p_ate timestamptz default null)
 returns jsonb
@@ -235,13 +245,21 @@ select jsonb_build_object(
                  count(distinct place_id) filter (where ganho) as ganhos
           from lugares group by local_busca) r), '[]')
 )
--- quem não abre a tela Painel não recebe nada
-where (select crm.pode('painel'))
+-- o Painel é para toda a equipe: quem não é membro ativo não recebe nada
+where (select crm.membro_ativo())
 $fn$;
 
 comment on function public.painel_gerencial(timestamptz, timestamptz) is
-  'Números da aba Painel no período [p_de, p_ate] (sem p_de: desde o começo; sem p_ate: agora). Só para quem abre a tela Painel (crm.pode); os outros recebem null.';
+  'Números da aba Painel no período [p_de, p_ate] (sem p_de: desde o começo; sem p_ate: agora). Para todo membro ativo da equipe; os outros recebem null.';
 
 -- No Supabase as funções novas em public já nascem liberadas para anon: tira de todos e devolve só para quem está logado
 revoke all on function public.painel_gerencial(timestamptz, timestamptz) from public, anon, authenticated;
 grant execute on function public.painel_gerencial(timestamptz, timestamptz) to authenticated;
+
+-- as telas que a pessoa abre: as marcadas pelo administrador (administrador: todas) e o Painel, que é de todo membro ativo
+create or replace function public.minhas_telas() returns text[]
+language sql stable set search_path = '' as $fn$
+  select coalesce(array_agg(t::text order by t), '{}')
+  from unnest(enum_range(null::public.tela)) as t
+  where crm.pode(t) or (t = 'painel' and crm.membro_ativo())
+$fn$;

@@ -377,23 +377,32 @@ test('Painel: sem período escolhido vai desde o começo e não compara', async 
   assert.equal(p.periodo.de.slice(0, 10), '2026-08-01')
 })
 
-test('Painel: só quem abre a tela Painel recebe os números, mesmo sem abrir o Kanban; os outros recebem null', async () => {
+test('Painel: abre para todo membro ativo, mesmo sem nenhuma tela marcada; desativado e quem está fora recebem null', async () => {
   const b = await painelPronto()
-  // Bruno é membro ativo, mas sem tela nenhuma: o administrador ainda não liberou o Painel para ele
-  for (const fora of [BRUNO, CARLA, DANI]) assert.equal(await painelComo(fora, ...PERIODO), null)
-  await b.query(`insert into public.membro_telas (user_id, tela) values ($1, 'painel'), ($2, 'painel')`, [BRUNO, DANI])
-  try {
-    // com só o Painel, ele vê os números de todos os leads, que a RLS não deixa ele ler direto
-    assert.deepEqual((await painelComo(BRUNO, ...PERIODO)).atual, (await painelComo(ANA, ...PERIODO)).atual)
+  // Bruno é membro ativo sem tela nenhuma marcada: vê os números de todos os leads, que a RLS não deixa ele ler direto
+  assert.deepEqual((await painelComo(BRUNO, ...PERIODO)).atual, (await painelComo(ANA, ...PERIODO)).atual)
+  const comoNoPainel = async (uid, sql) => {
     await b.exec('set role authenticated')
-    await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [BRUNO])
-    assert.equal((await b.query('select id from public.leads')).rows.length, 0)
-    await b.exec('reset role')
-    // desativado não abre, nem com a tela marcada
+    await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid])
+    try {
+      return (await b.query(sql)).rows
+    } finally {
+      await b.exec('reset role')
+    }
+  }
+  assert.equal((await comoNoPainel(BRUNO, 'select id from public.leads')).length, 0)
+  // o site decide as abas por minhas_telas: o Painel entra para todo membro ativo
+  assert.deepEqual((await comoNoPainel(BRUNO, 'select public.minhas_telas() as t'))[0].t, ['painel'])
+  for (const fora of [CARLA, DANI]) {
+    assert.equal(await painelComo(fora, ...PERIODO), null)
+    assert.deepEqual((await comoNoPainel(fora, 'select public.minhas_telas() as t'))[0].t, [])
+  }
+  // desativado não abre nem com o Painel marcado em membro_telas (linhas antigas ficam sem efeito)
+  await b.query(`insert into public.membro_telas (user_id, tela) values ($1, 'painel')`, [DANI])
+  try {
     assert.equal(await painelComo(DANI, ...PERIODO), null)
   } finally {
-    await b.exec('reset role')
-    await b.query('delete from public.membro_telas where user_id in ($1, $2)', [BRUNO, DANI])
+    await b.query('delete from public.membro_telas where user_id = $1', [DANI])
   }
   await b.exec('set role anon')
   try {
@@ -553,11 +562,11 @@ test('Clientes ativos: o mesmo nome não entra duas vezes na lista, mas volta de
 // ---------- acessos: quais telas cada pessoa abre ----------
 const minhasTelas = async (uid) => (await como(uid, 'select public.minhas_telas() as t'))[0].t
 
-test('Acessos: cada membro abre só as telas liberadas; administrador abre todas, inclusive as que vierem depois', async () => {
+test('Acessos: cada membro abre só as telas liberadas, mais o Painel, que abre para todos; administrador abre todas', async () => {
   assert.deepEqual(await minhasTelas(ANA), [...TODAS, 'painel'])
-  assert.deepEqual(await minhasTelas(BRUNO), TODAS)
-  assert.deepEqual(await minhasTelas(EDU), ['prospeccao', 'buscas'])
-  assert.deepEqual(await minhasTelas(FABI), ['kanban'])
+  assert.deepEqual(await minhasTelas(BRUNO), [...TODAS, 'painel'])
+  assert.deepEqual(await minhasTelas(EDU), ['prospeccao', 'buscas', 'painel'])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'painel'])
   // fora da equipe e desativado (mesmo com telas liberadas) não abrem nada
   assert.deepEqual(await minhasTelas(CARLA), [])
   assert.deepEqual(await minhasTelas(DANI), [])
@@ -620,11 +629,11 @@ test('Acessos: só quem abre o Google Maps guarda e exclui as buscas do PC no ma
 test('Acessos: só o administrador muda as telas de alguém; cada um vê só as próprias', async () => {
   // a tela Clientes ativos mostra o que cada cliente esconde no mapa: ela também lê as empresas do mapa
   await como(ANA, `insert into public.membro_telas (user_id, tela) values ($1, 'clientes')`, [FABI])
-  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'clientes'])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'clientes', 'painel'])
   assert.ok((await como(FABI, 'select * from public.maps_lugares')).length > 0)
   await como(FABI, `insert into public.clientes_ativos (nome) values ('Cliente da Fabi')`)
   await como(ANA, `delete from public.membro_telas where user_id = $1 and tela = 'clientes'`, [FABI])
-  assert.deepEqual(await minhasTelas(FABI), ['kanban'])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'painel'])
   // membro não se dá tela nem tira a dos outros, e só enxerga as próprias
   await assert.rejects(como(EDU, `insert into public.membro_telas (user_id, tela) values ($1, 'kanban')`, [EDU]), /row-level security/)
   assert.equal((await como(EDU, 'delete from public.membro_telas where user_id = $1 returning tela', [BRUNO])).length, 0)

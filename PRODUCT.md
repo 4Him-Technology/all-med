@@ -23,13 +23,13 @@ Junta, num lugar só e sem IA, a pesquisa profunda de empresas que ferramentas c
 - Parte local (PC com Docker): prospecção na base de CNPJ, importador mensal da Receita, scraper do Google Maps.
 - Parte online (site estático + banco com login): kanban, lista de leads, ficha do lead e histórico.
 - O fluxo diário: filtrar empresas, mandar as boas para a coluna Novo, ligar ou mandar mensagem, registrar o atendimento, mover o card pelas colunas (Novo, Em contato, Qualificado, Proposta, Negociação, Ganho, Perdido).
-- A captação (prospecção e contatos) é feita por uma pessoa só (Filipe, 12/11/2026). A gerência acompanha o trabalho dela pelo Painel gerencial, a primeira tela de quem tem acesso a ele (o administrador libera em "Usuários e acessos"), sem placar por pessoa.
+- A captação (prospecção e contatos) é feita por uma pessoa só (Filipe, 12/11/2026). A gerência acompanha o trabalho dela pelo Painel gerencial, a primeira tela de quem entra, sem placar por pessoa. O Painel é para toda a equipe ver: abre para todo membro ativo, sem depender dos acessos por tela.
 
 ## Capabilities and Constraints
 
 - Funciona hoje: prospecção com todos os filtros (dados de demonstração até a base real ser carregada), envio ao kanban sem duplicar, kanban com arrastar e teclado, lista de leads, ficha com histórico imutável, arquivamento, buscas no Google Maps (rodam no PC com Docker; com o túnel, começam também pelo site), mapa das empresas do Google Maps guardadas no CRM online (abre também no site; cada busca do PC entra nele sozinha quando termina, e a lista "Buscas feitas" mostra e exclui cada busca), lista de clientes ativos que some das pesquisas (reconhecida pelo nome, porque a lista do cliente só tem a razão social), com aviso "Parece cliente" no mapa para nome parecido, acessos por tela escolhidos pelo administrador (o banco e o PC também recusam, não só a tela).
 - Restrições: o fornecedor do banco não pode aparecer em nenhum texto da interface. Sessão de login no sessionStorage (site estático). Dados de sócios e contatos de empresário individual são dado pessoal (LGPD).
-- Dados que o sistema não registra e que o Painel diz que faltam: motivo da perda, valor da proposta e do ganho, meta do período, se o contato foi atendido e segmento dos leads que não vieram do Google Maps.
+- Dados que o sistema não registra, e que por isso o Painel não mostra: motivo da perda, valor da proposta e do ganho, meta do período, se o contato foi atendido e segmento dos leads que não vieram do Google Maps.
 - Decisões em aberto: nome do produto (ideias: Garimpo, Radar, Prospecta, Rota, Lastro); se a equipe vai precisar ver leads uns dos outros; exportação de listas para Excel/CSV.
 
 ## Brand Commitments

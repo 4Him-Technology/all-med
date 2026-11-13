@@ -717,8 +717,9 @@ async function mandarDaBusca(a, botao) {
 
 // ---------- usuários e acessos (só admin, num popup) ----------
 const PAPEL = { admin: 'Administrador', membro: 'Membro' }
-// as telas são as abas do topo: uma aba nova (como o Painel gerencial) entra sozinha na lista de acessos
-const telasDoSistema = () => [...document.querySelectorAll('.aba')].map((b) => ({ tela: b.dataset.aba, nome: b.textContent.trim() }))
+// as telas são as abas do topo: uma aba nova entra sozinha na lista de acessos. O Painel fica fora: abre para todo membro
+// ativo (o banco devolve 'painel' em minhas_telas para todos), e uma caixa que não muda nada só confundiria
+const telasDoSistema = () => [...document.querySelectorAll('.aba')].filter((b) => b.dataset.aba !== 'painel').map((b) => ({ tela: b.dataset.aba, nome: b.textContent.trim() }))
 
 function abrirUsuarios() {
   $('#menu-conta').hidePopover()
