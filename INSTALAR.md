@@ -237,6 +237,17 @@ Se o site for atualizado antes do banco, o Painel abre com o aviso "O painel nã
 
 Para voltar atrás: no **SQL Editor**, rode `drop function public.painel_gerencial(timestamptz, timestamptz);` e reverta o PR no GitHub. Nenhum dado se perde, porque a função só lê.
 
+### Segunda versão do painel (mais cortes)
+
+Leads em cada etapa, tempo em cada etapa, ritmo dos contatos, temperatura por etapa, segmento por local e a tela na largura toda. Não precisa mexer no PC: o Painel só depende do site e do CRM online.
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261112200000_painel_mais_cortes.sql` e clique em **Run**. Ela só troca a função `public.painel_gerencial` (`create or replace`): não muda tabela nem dado, e roda em segundos.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
+
+Rode o banco antes de aprovar o PR. Se o site for atualizado antes, o Painel mostra "Faltam os números novos do painel" e os quadros antigos; ao rodar a migration, os novos aparecem na próxima vez que a página carregar.
+
+Para voltar atrás: reverta o PR e, no **SQL Editor**, rode de novo a função da `20261112150000_painel_gerencial.sql`, trocando `create function` por `create or replace function` (copie só o bloco da função, até `$fn$;`). Nenhum dado se perde.
+
 ## Atualizar o sistema
 
 ```powershell
