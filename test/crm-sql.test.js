@@ -260,8 +260,9 @@ test('Painel: números do período contra o período anterior, sem contar mudan�
   const p = await painelComo(ANA, ...PERIODO)
   assert.equal(p.periodo.unidade, 'day')
   assert.equal(p.periodo.compara, true)
-  assert.deepEqual(p.atual, { contatos: 4, leads_novos: 3, avancos: 4, ganhos: 1, perdidos: 1, empresas_novas: 1 })
-  assert.deepEqual(p.anterior, { contatos: 1, leads_novos: 1, avancos: 1, ganhos: 0, perdidos: 0, empresas_novas: 0 })
+  // o Lead Arquivado saiu no dia 10; os contatos caíram em 4 dias diferentes (no anterior, num só)
+  assert.deepEqual(p.atual, { contatos: 4, leads_novos: 3, avancos: 4, ganhos: 1, perdidos: 1, empresas_novas: 1, arquivados: 1, dias_com_contato: 4 })
+  assert.deepEqual(p.anterior, { contatos: 1, leads_novos: 1, avancos: 1, ganhos: 0, perdidos: 0, empresas_novas: 0, arquivados: 0, dias_com_contato: 1 })
   // dos 3 leads do período, 2 tiveram contato (3 h e 30 h depois de entrar) e 1 ainda não
   assert.deepEqual(p.primeiro_contato, { leads: 3, com_contato: 2, sem_contato: 1, mediana_horas: 16.5 })
   assert.deepEqual(porChave(p.tipos, 'tipo', 'total'), { email: 1, ligacao: 1, visita: 1, whatsapp: 1 })
@@ -276,9 +277,9 @@ test('Painel: funil dos leads que entraram no período conta quem chegou pelo me
   assert.equal(funil.em_aberto, 1)
   const o = Object.fromEntries(origens.map(({ origem, ...resto }) => [origem, resto]))
   assert.deepEqual(o, {
-    maps: { leads: 1, com_contato: 1, ganhos: 1, perdidos: 0 },
-    receita: { leads: 1, com_contato: 1, ganhos: 0, perdidos: 1 },
-    manual: { leads: 1, com_contato: 0, ganhos: 0, perdidos: 0 },
+    maps: { leads: 1, com_contato: 1, qualificados: 1, ganhos: 1, perdidos: 0 },
+    receita: { leads: 1, com_contato: 1, qualificados: 0, ganhos: 0, perdidos: 1 },
+    manual: { leads: 1, com_contato: 0, qualificados: 0, ganhos: 0, perdidos: 0 },
   })
 })
 
@@ -303,6 +304,7 @@ test('Painel: situação de hoje, com os leads em andamento parados há mais de 
   assert.ok(hoje.parados.lista.every((l) => l.dias > 30))
   assert.deepEqual(porChave(hoje.temperatura, 'temperatura', 'leads'), { quente: 1, null: 2 })
   assert.equal(hoje.clientes_ativos, 1)
+  assert.equal(hoje.arquivados, 1)
   assert.equal(hoje.empresas, 3)
   assert.equal(hoje.empresas_lead, 2)
 })
@@ -320,6 +322,49 @@ test('Painel: segmentos e locais de busca do Google Maps, com quantas empresas v
   ])
 })
 
+test('Painel: etapas desde o começo, tempo em cada etapa e o ciclo até o ganho', async () => {
+  const { pipeline, tempo_etapas, ciclo } = await painelComo(ANA, ...PERIODO)
+  // todos os leads que não foram arquivados, de qualquer data: o Lead Recente entrou direto em Qualificado
+  assert.deepEqual(porChave(pipeline, 'status', 'chegaram'), { novo: 5, contato: 4, qualificado: 2, proposta: 1, negociacao: 1, ganho: 1 })
+  // passagens que terminaram no período: Novo (1 dia e 25 h), Em contato (1 dia e 71 h) e Proposta (2 dias)
+  const t = Object.fromEntries(tempo_etapas.map(({ status, ...r }) => [status, r]))
+  assert.deepEqual(Object.keys(t), ['novo', 'contato', 'qualificado', 'proposta', 'negociacao'])
+  assert.deepEqual([t.novo.saidas, t.novo.mediana_dias, t.contato.saidas, t.contato.mediana_dias, t.proposta.saidas, t.proposta.mediana_dias], [2, 1, 2, 2, 1, 2])
+  assert.deepEqual([t.qualificado.saidas, t.qualificado.mediana_dias, t.negociacao.saidas], [0, null, 0])
+  // quem está na etapa agora e há quanto tempo (o Lead Recente está em Qualificado há 3 dias)
+  assert.deepEqual([t.novo.agora, t.contato.agora, t.qualificado.agora, t.proposta.agora, t.proposta.mediana_agora_dias], [1, 1, 1, 0, null])
+  assert.ok(Math.abs(t.qualificado.mediana_agora_dias - 3) < 0.2)
+  // o Lead Um entrou no dia 8 ao meio-dia e foi ganho no dia 12 ao meio-dia, com 2 contatos antes
+  assert.deepEqual(ciclo, { ganhos: 1, mediana_dias: 4, mediana_contatos: 2 })
+})
+
+test('Painel: ritmo por dia da semana e hora, temperatura por etapa, território e o funil do Google Maps', async () => {
+  const p = await painelComo(ANA, ...PERIODO)
+  // dia da semana de 1 (segunda) a 7 (domingo) e hora, no horário de São Paulo (UTC-3, sem horário de verão)
+  const celula = (iso) => {
+    const d = new Date(Date.parse(iso) - 3 * 3600e3)
+    return `${d.getUTCDay() || 7}-${d.getUTCHours()}`
+  }
+  const esperado = Object.fromEntries(['2026-09-08T15:00:00Z', '2026-09-09T14:00:00Z', '2026-09-10T18:00:00Z', '2026-09-12T01:30:00Z'].map((iso) => [celula(iso), 1]))
+  assert.deepEqual(Object.fromEntries(p.ritmo.map((c) => [`${c.dia}-${c.hora}`, c.contatos])), esperado)
+  // temperatura por etapa, dos leads não arquivados
+  assert.deepEqual(Object.fromEntries(p.temperaturas.map((t) => [`${t.temperatura}/${t.status}`, t.leads])), {
+    'quente/novo': 1,
+    'null/contato': 1,
+    'null/qualificado': 1,
+    'null/ganho': 1,
+    'null/perdido': 1,
+  })
+  assert.deepEqual(p.territorio, [
+    { segmento: 'Logística', local_busca: 'Lapa', empresas: 1, leads: 1 },
+    { segmento: 'Padaria', local_busca: 'Lapa', empresas: 1, leads: 0 },
+    { segmento: 'Transportadora', local_busca: 'Lapa', empresas: 1, leads: 1 },
+    { segmento: 'Transportadora', local_busca: 'Osasco', empresas: 1, leads: 1 },
+  ])
+  // das 3 empresas encontradas, 2 viraram lead, as 2 tiveram contato, 1 chegou a Qualificado e 1 foi ganha
+  assert.deepEqual(p.garimpo, { empresas: 3, viraram_lead: 2, com_contato: 2, qualificados: 1, ganhos: 1 })
+})
+
 test('Painel: sem período escolhido vai desde o começo e não compara', async () => {
   const p = await painelComo(ANA, null, null)
   assert.equal(p.periodo.compara, false)
@@ -332,23 +377,32 @@ test('Painel: sem período escolhido vai desde o começo e não compara', async 
   assert.equal(p.periodo.de.slice(0, 10), '2026-08-01')
 })
 
-test('Painel: só quem abre a tela Painel recebe os números, mesmo sem abrir o Kanban; os outros recebem null', async () => {
+test('Painel: abre para todo membro ativo, mesmo sem nenhuma tela marcada; desativado e quem está fora recebem null', async () => {
   const b = await painelPronto()
-  // Bruno é membro ativo, mas sem tela nenhuma: o administrador ainda não liberou o Painel para ele
-  for (const fora of [BRUNO, CARLA, DANI]) assert.equal(await painelComo(fora, ...PERIODO), null)
-  await b.query(`insert into public.membro_telas (user_id, tela) values ($1, 'painel'), ($2, 'painel')`, [BRUNO, DANI])
-  try {
-    // com só o Painel, ele vê os números de todos os leads, que a RLS não deixa ele ler direto
-    assert.deepEqual((await painelComo(BRUNO, ...PERIODO)).atual, (await painelComo(ANA, ...PERIODO)).atual)
+  // Bruno é membro ativo sem tela nenhuma marcada: vê os números de todos os leads, que a RLS não deixa ele ler direto
+  assert.deepEqual((await painelComo(BRUNO, ...PERIODO)).atual, (await painelComo(ANA, ...PERIODO)).atual)
+  const comoNoPainel = async (uid, sql) => {
     await b.exec('set role authenticated')
-    await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [BRUNO])
-    assert.equal((await b.query('select id from public.leads')).rows.length, 0)
-    await b.exec('reset role')
-    // desativado não abre, nem com a tela marcada
+    await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid])
+    try {
+      return (await b.query(sql)).rows
+    } finally {
+      await b.exec('reset role')
+    }
+  }
+  assert.equal((await comoNoPainel(BRUNO, 'select id from public.leads')).length, 0)
+  // o site decide as abas por minhas_telas: o Painel entra para todo membro ativo
+  assert.deepEqual((await comoNoPainel(BRUNO, 'select public.minhas_telas() as t'))[0].t, ['painel'])
+  for (const fora of [CARLA, DANI]) {
+    assert.equal(await painelComo(fora, ...PERIODO), null)
+    assert.deepEqual((await comoNoPainel(fora, 'select public.minhas_telas() as t'))[0].t, [])
+  }
+  // desativado não abre nem com o Painel marcado em membro_telas (linhas antigas ficam sem efeito)
+  await b.query(`insert into public.membro_telas (user_id, tela) values ($1, 'painel')`, [DANI])
+  try {
     assert.equal(await painelComo(DANI, ...PERIODO), null)
   } finally {
-    await b.exec('reset role')
-    await b.query('delete from public.membro_telas where user_id in ($1, $2)', [BRUNO, DANI])
+    await b.query('delete from public.membro_telas where user_id = $1', [DANI])
   }
   await b.exec('set role anon')
   try {
@@ -508,11 +562,11 @@ test('Clientes ativos: o mesmo nome não entra duas vezes na lista, mas volta de
 // ---------- acessos: quais telas cada pessoa abre ----------
 const minhasTelas = async (uid) => (await como(uid, 'select public.minhas_telas() as t'))[0].t
 
-test('Acessos: cada membro abre só as telas liberadas; administrador abre todas, inclusive as que vierem depois', async () => {
+test('Acessos: cada membro abre só as telas liberadas, mais o Painel, que abre para todos; administrador abre todas', async () => {
   assert.deepEqual(await minhasTelas(ANA), [...TODAS, 'painel'])
-  assert.deepEqual(await minhasTelas(BRUNO), TODAS)
-  assert.deepEqual(await minhasTelas(EDU), ['prospeccao', 'buscas'])
-  assert.deepEqual(await minhasTelas(FABI), ['kanban'])
+  assert.deepEqual(await minhasTelas(BRUNO), [...TODAS, 'painel'])
+  assert.deepEqual(await minhasTelas(EDU), ['prospeccao', 'buscas', 'painel'])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'painel'])
   // fora da equipe e desativado (mesmo com telas liberadas) não abrem nada
   assert.deepEqual(await minhasTelas(CARLA), [])
   assert.deepEqual(await minhasTelas(DANI), [])
@@ -575,11 +629,11 @@ test('Acessos: só quem abre o Google Maps guarda e exclui as buscas do PC no ma
 test('Acessos: só o administrador muda as telas de alguém; cada um vê só as próprias', async () => {
   // a tela Clientes ativos mostra o que cada cliente esconde no mapa: ela também lê as empresas do mapa
   await como(ANA, `insert into public.membro_telas (user_id, tela) values ($1, 'clientes')`, [FABI])
-  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'clientes'])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'clientes', 'painel'])
   assert.ok((await como(FABI, 'select * from public.maps_lugares')).length > 0)
   await como(FABI, `insert into public.clientes_ativos (nome) values ('Cliente da Fabi')`)
   await como(ANA, `delete from public.membro_telas where user_id = $1 and tela = 'clientes'`, [FABI])
-  assert.deepEqual(await minhasTelas(FABI), ['kanban'])
+  assert.deepEqual(await minhasTelas(FABI), ['kanban', 'painel'])
   // membro não se dá tela nem tira a dos outros, e só enxerga as próprias
   await assert.rejects(como(EDU, `insert into public.membro_telas (user_id, tela) values ($1, 'kanban')`, [EDU]), /row-level security/)
   assert.equal((await como(EDU, 'delete from public.membro_telas where user_id = $1 returning tela', [BRUNO])).length, 0)

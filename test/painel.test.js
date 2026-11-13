@@ -1,7 +1,7 @@
 // Contas e textos da aba Painel, sem DOM (os números vêm prontos do banco: public.painel_gerencial)
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { comparar, conversoes, duracao, manchete, PERIODOS, periodo, rotuloBalde, semContato, taxa } from '../public/painel.js'
+import { comparar, conversoes, duracao, grade, nivel, PERIODOS, periodo, rotuloBalde, semContato, taxa } from '../public/painel.js'
 
 const agora = new Date(2026, 10, 12, 15, 30) // 12/11/2026 15:30, hora local
 
@@ -51,25 +51,15 @@ test('rótulo do dia, da semana ou do mês no eixo do gráfico', () => {
   assert.equal(rotuloBalde('2026-09-01', 'month'), 'set/26')
 })
 
-const base = {
-  periodo: { compara: true },
-  atual: { contatos: 48, leads_novos: 9, avancos: 6, ganhos: 1, perdidos: 0, empresas_novas: 120 },
-  anterior: { contatos: 36, leads_novos: 9, avancos: 2, ganhos: 0, perdidos: 1, empresas_novas: 0 },
-  hoje: { parados: { faixas: { ate_7: 3, de_8_a_14: 4, de_15_a_30: 2, mais_de_30: 1 } } },
-}
-
-test('manchete diz o que foi feito no período, compara os contatos e aponta os parados', () => {
-  const m = manchete(base, PERIODOS['7'])
-  assert.equal(m.titulo, '48 contatos, 9 leads novos e 1 ganho nos últimos 7 dias.')
-  assert.deepEqual(m.linhas, ['São 12 contatos a mais que nos 7 dias anteriores.', '7 leads em andamento estão há mais de 7 dias sem contato.'])
+test('mapa de calor: zero fica sem cor; o resto vai do tom 1 ao 5 pela parte do maior valor', () => {
+  assert.deepEqual([0, 1, 2, 5, 10].map((v) => nivel(v, 10)), [0, 1, 1, 3, 5])
+  assert.equal(nivel(3, 0), 0)
+  // acima do maior (célula pequena que ficou fora da referência) fica no tom mais escuro
+  assert.equal(nivel(20, 10), 5)
 })
 
-test('manchete sem atividade e sem comparação (desde o começo) não inventa número', () => {
-  const vazio = { periodo: { compara: false }, atual: { contatos: 0, leads_novos: 0, avancos: 0, ganhos: 0, perdidos: 0, empresas_novas: 0 }, anterior: null, hoje: { parados: { faixas: { ate_7: 0, de_8_a_14: 0, de_15_a_30: 0, mais_de_30: 0 } } } }
-  const m = manchete(vazio, PERIODOS.tudo)
-  assert.equal(m.titulo, 'Nenhum contato registrado desde o começo.')
-  assert.deepEqual(m.linhas, ['Nenhum lead em andamento está parado há mais de 7 dias.'])
-  const um = manchete({ ...vazio, atual: { ...vazio.atual, contatos: 1, leads_novos: 1 }, hoje: { parados: { faixas: { ...vazio.hoje.parados.faixas, mais_de_30: 1 } } } }, PERIODOS['30'])
-  assert.equal(um.titulo, '1 contato e 1 lead novo nos últimos 30 dias.')
-  assert.deepEqual(um.linhas, ['1 lead em andamento está há mais de 7 dias sem contato.'])
+test('ritmo: as células do banco viram uma grade de 7 dias (segunda a domingo) por 24 horas', () => {
+  const g = grade([{ dia: 1, hora: 9, contatos: 3 }, { dia: 7, hora: 23, contatos: 1 }])
+  assert.deepEqual([g.length, g.every((d) => d.length === 24)], [7, true])
+  assert.deepEqual([g[0][9], g[6][23], g[0][10], g[3][9]], [3, 1, 0, 0])
 })

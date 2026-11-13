@@ -199,13 +199,13 @@ Ao instalar, quem já está na equipe recebe as cinco telas: nada muda até voc�
 | Prospecção | A base de CNPJ no PC; mandar empresas ao kanban; ler a lista de clientes ativos (para marcar quem já é cliente) |
 | Google Maps | O mapa das empresas; as buscas novas pelo PC, guardar o resultado delas no mapa e excluir uma busca em "Buscas feitas"; mandar ao kanban; ler a lista de clientes ativos (para esconder quem já é cliente) |
 | Clientes ativos | Cadastrar e tirar clientes; ler as empresas do mapa, para a coluna "Escondidas no mapa" |
-| Painel | Os números do Painel gerencial, em totais, de todos os leads e empresas, mesmo sem as outras telas; a lista dos leads parados (a ficha só abre com Kanban ou Leads) |
+| Painel | Não está na lista: abre para todo membro ativo. Mostra os números do Painel gerencial, em totais, de todos os leads e empresas, mesmo sem as outras telas (a ficha do lead parado só abre com Kanban ou Leads) |
 
 Detalhes:
 
 - Quem tem Prospecção ou Google Maps sem Kanban e sem Leads manda empresas para o kanban, mas só enxerga os leads que ele mesmo mandou. "No kanban" aparece só nesses; uma empresa que outra pessoa já mandou o banco ignora no envio, e o aviso conta como "já estava no CRM".
 - O PC confere a tela antes de abrir a base de CNPJ (Prospecção) e as buscas do Google (Google Maps), e guarda a resposta por 1 minuto: uma tela tirada vale no PC em até 1 minuto. No site, a aba some quando a pessoa carrega a página de novo; os dados ela já não consegue ler na hora.
-- O Painel não vem marcado para ninguém: só o administrador o abre até você marcar a coluna Painel na linha da pessoa. Quem abre o Painel sem Kanban e sem Leads vê os números, mas o nome do lead parado fica sem link, porque a ficha não abriria.
+- O Painel abre para toda a equipe e não aparece na lista de telas. Quem o abre sem Kanban e sem Leads vê os números, mas o nome do lead parado fica sem link, porque a ficha não abriria.
 
 Instalação, nesta ordem:
 
@@ -225,7 +225,7 @@ Para voltar atrás: no topo da migration há um script de volta (as linhas que c
 
 ## Painel gerencial
 
-O Painel é a primeira aba de quem pode abri-lo: o administrador sempre; as outras pessoas, depois que você marcar a coluna Painel na linha delas em **Usuários e acessos** (seção "Acessos por tela"). Para quem não abre o Painel, a primeira aba é a primeira liberada. Os números vêm de uma função do CRM online, então ele só mostra números depois de instalar a função.
+O Painel é a primeira aba de quem entra e abre para todo membro ativo da equipe, sem precisar marcar nada em **Usuários e acessos** (com a segunda versão, abaixo; na primeira, só o administrador e quem tivesse a coluna Painel marcada). Os números vêm de uma função do CRM online, então ele só mostra números depois de instalar a função.
 
 Instalação, nesta ordem:
 
@@ -233,9 +233,20 @@ Instalação, nesta ordem:
 2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
 3. **PC:** rode `git pull` e o mesmo `up -d --build` de sempre (com `--profile tunel` se usa o túnel).
 
-Se o site for atualizado antes do banco, o Painel abre com o aviso "O painel não carregou" e as outras abas seguem normais. Para conferir depois de rodar, entre no site com a conta de administrador: a frase do período e os números aparecem no lugar do aviso. Depois marque o Painel para quem mais da gerência for acompanhar.
+Se o site for atualizado antes do banco, o Painel abre com o aviso "O painel não carregou" e as outras abas seguem normais. Para conferir depois de rodar, entre no site com a conta de administrador: os números aparecem no lugar do aviso. Depois marque o Painel para quem mais da gerência for acompanhar.
 
 Para voltar atrás: no **SQL Editor**, rode `drop function public.painel_gerencial(timestamptz, timestamptz);` e reverta o PR no GitHub. Nenhum dado se perde, porque a função só lê.
+
+### Segunda versão do painel (mais cortes)
+
+Só os números no topo, ritmo dos contatos logo abaixo deles, leads em cada etapa, tempo em cada etapa, temperatura por etapa, segmento por local e a tela na largura toda; e o Painel passa a abrir para todo membro ativo (pedido do Filipe: "a tela gerencial literalmente é para todos verem"). Não precisa mexer no PC: o Painel só depende do site e do CRM online.
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261112200000_painel_mais_cortes.sql` e clique em **Run**. Ela só troca duas funções (`create or replace`): `public.painel_gerencial`, com os cortes novos e aberta a todo membro ativo, e `public.minhas_telas`, que passa a incluir o Painel para todo membro ativo. Não muda tabela nem dado, e roda em segundos. As marcas de Painel que já existam em `membro_telas` (como as do insert de hoje) ficam sem efeito e não são apagadas.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
+
+Rode o banco antes de aprovar o PR. Se o site for atualizado antes, o Painel mostra "Faltam os números novos do painel" e os quadros antigos; ao rodar a migration, os novos aparecem na próxima vez que a página carregar.
+
+Para voltar atrás: reverta o PR e, no **SQL Editor**, rode de novo a função `public.painel_gerencial` da `20261112150000_painel_gerencial.sql` e a função `public.minhas_telas` da `20261112120000_acessos.sql`, trocando `create function` por `create or replace function` (copie só o bloco de cada função, até `$fn$;`). O Painel volta a abrir só para o administrador e para quem tiver a coluna Painel marcada (as marcas antigas continuam valendo). Nenhum dado se perde.
 
 ## Atualizar o sistema
 
