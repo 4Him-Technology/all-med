@@ -260,8 +260,9 @@ test('Painel: números do período contra o período anterior, sem contar mudan�
   const p = await painelComo(ANA, ...PERIODO)
   assert.equal(p.periodo.unidade, 'day')
   assert.equal(p.periodo.compara, true)
-  assert.deepEqual(p.atual, { contatos: 4, leads_novos: 3, avancos: 4, ganhos: 1, perdidos: 1, empresas_novas: 1 })
-  assert.deepEqual(p.anterior, { contatos: 1, leads_novos: 1, avancos: 1, ganhos: 0, perdidos: 0, empresas_novas: 0 })
+  // o Lead Arquivado saiu no dia 10; os contatos caíram em 4 dias diferentes (no anterior, num só)
+  assert.deepEqual(p.atual, { contatos: 4, leads_novos: 3, avancos: 4, ganhos: 1, perdidos: 1, empresas_novas: 1, arquivados: 1, dias_com_contato: 4 })
+  assert.deepEqual(p.anterior, { contatos: 1, leads_novos: 1, avancos: 1, ganhos: 0, perdidos: 0, empresas_novas: 0, arquivados: 0, dias_com_contato: 1 })
   // dos 3 leads do período, 2 tiveram contato (3 h e 30 h depois de entrar) e 1 ainda não
   assert.deepEqual(p.primeiro_contato, { leads: 3, com_contato: 2, sem_contato: 1, mediana_horas: 16.5 })
   assert.deepEqual(porChave(p.tipos, 'tipo', 'total'), { email: 1, ligacao: 1, visita: 1, whatsapp: 1 })
@@ -276,9 +277,9 @@ test('Painel: funil dos leads que entraram no período conta quem chegou pelo me
   assert.equal(funil.em_aberto, 1)
   const o = Object.fromEntries(origens.map(({ origem, ...resto }) => [origem, resto]))
   assert.deepEqual(o, {
-    maps: { leads: 1, com_contato: 1, ganhos: 1, perdidos: 0 },
-    receita: { leads: 1, com_contato: 1, ganhos: 0, perdidos: 1 },
-    manual: { leads: 1, com_contato: 0, ganhos: 0, perdidos: 0 },
+    maps: { leads: 1, com_contato: 1, qualificados: 1, ganhos: 1, perdidos: 0 },
+    receita: { leads: 1, com_contato: 1, qualificados: 0, ganhos: 0, perdidos: 1 },
+    manual: { leads: 1, com_contato: 0, qualificados: 0, ganhos: 0, perdidos: 0 },
   })
 })
 
@@ -303,6 +304,7 @@ test('Painel: situação de hoje, com os leads em andamento parados há mais de 
   assert.ok(hoje.parados.lista.every((l) => l.dias > 30))
   assert.deepEqual(porChave(hoje.temperatura, 'temperatura', 'leads'), { quente: 1, null: 2 })
   assert.equal(hoje.clientes_ativos, 1)
+  assert.equal(hoje.arquivados, 1)
   assert.equal(hoje.empresas, 3)
   assert.equal(hoje.empresas_lead, 2)
 })
@@ -318,6 +320,49 @@ test('Painel: segmentos e locais de busca do Google Maps, com quantas empresas v
     { local_busca: 'Lapa', empresas: 2, leads: 1, ganhos: 1 },
     { local_busca: 'Osasco', empresas: 1, leads: 1, ganhos: 0 },
   ])
+})
+
+test('Painel: etapas desde o começo, tempo em cada etapa e o ciclo até o ganho', async () => {
+  const { pipeline, tempo_etapas, ciclo } = await painelComo(ANA, ...PERIODO)
+  // todos os leads que não foram arquivados, de qualquer data: o Lead Recente entrou direto em Qualificado
+  assert.deepEqual(porChave(pipeline, 'status', 'chegaram'), { novo: 5, contato: 4, qualificado: 2, proposta: 1, negociacao: 1, ganho: 1 })
+  // passagens que terminaram no período: Novo (1 dia e 25 h), Em contato (1 dia e 71 h) e Proposta (2 dias)
+  const t = Object.fromEntries(tempo_etapas.map(({ status, ...r }) => [status, r]))
+  assert.deepEqual(Object.keys(t), ['novo', 'contato', 'qualificado', 'proposta', 'negociacao'])
+  assert.deepEqual([t.novo.saidas, t.novo.mediana_dias, t.contato.saidas, t.contato.mediana_dias, t.proposta.saidas, t.proposta.mediana_dias], [2, 1, 2, 2, 1, 2])
+  assert.deepEqual([t.qualificado.saidas, t.qualificado.mediana_dias, t.negociacao.saidas], [0, null, 0])
+  // quem está na etapa agora e há quanto tempo (o Lead Recente está em Qualificado há 3 dias)
+  assert.deepEqual([t.novo.agora, t.contato.agora, t.qualificado.agora, t.proposta.agora, t.proposta.mediana_agora_dias], [1, 1, 1, 0, null])
+  assert.ok(Math.abs(t.qualificado.mediana_agora_dias - 3) < 0.2)
+  // o Lead Um entrou no dia 8 ao meio-dia e foi ganho no dia 12 ao meio-dia, com 2 contatos antes
+  assert.deepEqual(ciclo, { ganhos: 1, mediana_dias: 4, mediana_contatos: 2 })
+})
+
+test('Painel: ritmo por dia da semana e hora, temperatura por etapa, território e o funil do Google Maps', async () => {
+  const p = await painelComo(ANA, ...PERIODO)
+  // dia da semana de 1 (segunda) a 7 (domingo) e hora, no horário de São Paulo (UTC-3, sem horário de verão)
+  const celula = (iso) => {
+    const d = new Date(Date.parse(iso) - 3 * 3600e3)
+    return `${d.getUTCDay() || 7}-${d.getUTCHours()}`
+  }
+  const esperado = Object.fromEntries(['2026-09-08T15:00:00Z', '2026-09-09T14:00:00Z', '2026-09-10T18:00:00Z', '2026-09-12T01:30:00Z'].map((iso) => [celula(iso), 1]))
+  assert.deepEqual(Object.fromEntries(p.ritmo.map((c) => [`${c.dia}-${c.hora}`, c.contatos])), esperado)
+  // temperatura por etapa, dos leads não arquivados
+  assert.deepEqual(Object.fromEntries(p.temperaturas.map((t) => [`${t.temperatura}/${t.status}`, t.leads])), {
+    'quente/novo': 1,
+    'null/contato': 1,
+    'null/qualificado': 1,
+    'null/ganho': 1,
+    'null/perdido': 1,
+  })
+  assert.deepEqual(p.territorio, [
+    { segmento: 'Logística', local_busca: 'Lapa', empresas: 1, leads: 1 },
+    { segmento: 'Padaria', local_busca: 'Lapa', empresas: 1, leads: 0 },
+    { segmento: 'Transportadora', local_busca: 'Lapa', empresas: 1, leads: 1 },
+    { segmento: 'Transportadora', local_busca: 'Osasco', empresas: 1, leads: 1 },
+  ])
+  // das 3 empresas encontradas, 2 viraram lead, as 2 tiveram contato, 1 chegou a Qualificado e 1 foi ganha
+  assert.deepEqual(p.garimpo, { empresas: 3, viraram_lead: 2, com_contato: 2, qualificados: 1, ganhos: 1 })
 })
 
 test('Painel: sem período escolhido vai desde o começo e não compara', async () => {
