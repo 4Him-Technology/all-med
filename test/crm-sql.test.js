@@ -430,6 +430,22 @@ test('Painel: lê as etapas do histórico que o trigger grava de verdade', async
   assert.deepEqual(porChave(p.funil.etapas, 'status', 'leads'), { novo: 1, contato: 1, qualificado: 1, proposta: 1, negociacao: 1, ganho: 1 })
 })
 
+test('Painel: contato excluído do histórico sai das contas', async () => {
+  const b = await painelPronto()
+  const [{ id }] = (await b.query(`select id from public.atendimentos where lead_id = $1 and tipo = 'ligacao'`, [L(1)])).rows
+  await b.exec('set role authenticated')
+  await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [ANA])
+  try {
+    await b.query('select public.excluir_atendimento($1)', [id])
+  } finally {
+    await b.exec('reset role')
+  }
+  const p = await painelComo(ANA, ...PERIODO)
+  // eram 4 contatos no período; a ligação do Lead Um (dia 8) saiu, e com ela o dia com contato
+  assert.deepEqual([p.atual.contatos, p.atual.dias_com_contato], [3, 3])
+  assert.equal(p.tipos.find((t) => t.tipo === 'ligacao'), undefined)
+})
+
 // ---------- Google Maps no CRM online ----------
 // a carga roda no SQL Editor (sem RLS): aqui ela entra direto, como dona das tabelas
 const lugarMaps = (placeId, nome, extra = {}) => {
@@ -691,4 +707,44 @@ test('Acessos: o script de volta do topo da migration devolve tudo a quem é da 
   assert.deepEqual(await gravar(lead), [{ nome: 'Depois da volta' }])
   await gravar(lugar)
   assert.equal((await banco.query(`select to_regclass('public.membro_telas') as t`)).rows[0].t, null)
+})
+
+// ---------- excluir registro do histórico (pedido do Filipe em 16/11/2026) ----------
+// só o administrador, sem prazo, só registro manual; excluir esconde o registro e guarda quem excluiu e quando
+const excluir = (uid, id) => como(uid, 'select public.excluir_atendimento($1)', [id])
+
+test('Histórico: o administrador exclui um registro manual; ele some da ficha e do último contato, mas fica guardado', async () => {
+  const l = await novoLead(ANA, { nome: 'Lead do registro errado' })
+  const [certo] = await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao, data) values ($1, 'ligacao', 'certo', '2026-11-10T12:00:00Z') returning id`, [l.id])
+  const [errado] = await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao, data) values ($1, 'email', 'lead errado', '2026-11-12T12:00:00Z') returning id`, [l.id])
+  await excluir(ANA, errado.id)
+  assert.deepEqual((await como(BRUNO, 'select id from public.atendimentos where lead_id = $1', [l.id])).map((a) => a.id), [certo.id])
+  const [k] = await como(ANA, 'select ultimo_atendimento from public.leads_kanban where id = $1', [l.id])
+  assert.equal(new Date(k.ultimo_atendimento).toISOString(), '2026-11-10T12:00:00.000Z')
+  // no banco o registro continua, com quem excluiu e quando
+  const [guardado] = (await db.query('select descricao, deleted_by, deleted_at from public.atendimentos where id = $1', [errado.id])).rows
+  assert.equal(guardado.descricao, 'lead errado')
+  assert.equal(guardado.deleted_by, ANA)
+  assert.ok(guardado.deleted_at instanceof Date)
+  // excluir de novo avisa, em vez de passar calado
+  await assert.rejects(excluir(ANA, errado.id), /não encontrado/)
+})
+
+test('Histórico: membro não exclui, nem o que ele mesmo registrou; mudança de etapa não se exclui; ninguém marca à mão', async () => {
+  const l = await novoLead(ANA, { nome: 'Lead do histórico fixo' })
+  const [a] = await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'whatsapp', 'oi') returning id`, [l.id])
+  for (const quem of [BRUNO, CARLA, DANI]) await assert.rejects(excluir(quem, a.id), /administrador/)
+  await como(ANA, `update public.leads set status = 'contato' where id = $1`, [l.id])
+  const [st] = (await db.query(`select id from public.atendimentos where lead_id = $1 and tipo = 'status'`, [l.id])).rows
+  await assert.rejects(excluir(ANA, st.id), /mudança de etapa/)
+  // o caminho é só a função: update e delete diretos continuam negados
+  await assert.rejects(como(ANA, 'update public.atendimentos set deleted_at = now() where id = $1', [a.id]), /permission denied/)
+  await assert.rejects(como(ANA, 'delete from public.atendimentos where id = $1', [a.id]), /permission denied/)
+  assert.equal((await como(BRUNO, 'select id from public.atendimentos where id = $1', [a.id])).length, 1)
+  await db.exec('set role anon')
+  try {
+    await assert.rejects(db.query('select public.excluir_atendimento($1)', [a.id]), /permission denied/)
+  } finally {
+    await db.exec('reset role')
+  }
 })

@@ -248,6 +248,19 @@ Rode o banco antes de aprovar o PR. Se o site for atualizado antes, o Painel mos
 
 Para voltar atrás: reverta o PR e, no **SQL Editor**, rode de novo a função `public.painel_gerencial` da `20261112150000_painel_gerencial.sql` e a função `public.minhas_telas` da `20261112120000_acessos.sql`, trocando `create function` por `create or replace function` (copie só o bloco de cada função, até `$fn$;`). O Painel volta a abrir só para o administrador e para quem tiver a coluna Painel marcada (as marcas antigas continuam valendo). Nenhum dado se perde.
 
+## Excluir registro do histórico
+
+O administrador pode excluir um registro do histórico de atendimento (ligação, WhatsApp, e-mail, reunião, visita, outro), sem prazo. A mudança de status não se exclui. O registro some da ficha, do último contato e do Painel, mas fica guardado no banco com quem excluiu e quando. Não precisa mexer no PC.
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261116120000_excluir_atendimento.sql` e clique em **Run**. Ela acrescenta duas colunas em `atendimentos` (`deleted_at` e `deleted_by`), cria a função `public.excluir_atendimento`, faz a leitura do histórico esconder o excluído e troca a função do Painel para não contá-lo. Nenhum registro existente muda.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
+
+Rode o banco antes de aprovar o PR: com o site novo e o banco antigo, o botão aparece mas a exclusão dá erro.
+
+Para ver o que foi excluído: no **SQL Editor**, `select a.*, l.nome from public.atendimentos a join public.leads l on l.id = a.lead_id where a.deleted_at is not null;`. Para devolver um registro: `update public.atendimentos set deleted_at = null, deleted_by = null where id = '<id>';`.
+
+Para voltar atrás: o script de volta está no topo da migration (rode cada linha sem o `-- ` do começo) e reverta o PR. Os registros excluídos voltam a aparecer.
+
 ## Atualizar o sistema
 
 ```powershell

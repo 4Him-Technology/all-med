@@ -74,6 +74,8 @@ export const criarLead = async (campos) => ok(await cliente().from('leads').inse
 export const atualizarLead = async (id, campos) => ok(await cliente().from('leads').update(campos).eq('id', id).select().single()).data
 export const arquivarLead = async (id) => ok(await cliente().from('leads').update({ deleted_at: new Date().toISOString() }).eq('id', id).select('id').single())
 export const registrarAtendimento = async (leadId, a) => ok(await cliente().from('atendimentos').insert({ lead_id: leadId, ...a }).select('id').single())
+// só o administrador, e só registro manual: o banco confere; o registro some do histórico mas fica guardado
+export const excluirAtendimento = async (id) => ok(await cliente().rpc('excluir_atendimento', { p_id: id }))
 
 // Manda leads em lotes; os que já estão no CRM da equipe (mesmo place_id do Maps ou mesmo CNPJ) o banco ignora
 export async function enviarLeads(leads, chave = 'place_id') {

@@ -1005,6 +1005,17 @@ dialog.saindo::backdrop {
   white-space: nowrap;
 }
 
+.ev-topo strong {
+  margin-right: auto;
+}
+
+/* excluir registro (só o administrador vê): discreto ao lado da data; no segundo clique fica vermelho */
+.ev-excluir {
+  min-height: 26px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
 .ev p {
   margin: 2px 0 0;
   white-space: pre-wrap;
