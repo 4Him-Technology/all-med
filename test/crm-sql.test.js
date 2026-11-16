@@ -434,6 +434,22 @@ test('Painel: lê as etapas do histórico que o trigger grava de verdade', async
   assert.deepEqual(porChave(p.funil.etapas, 'status', 'leads'), { novo: 1, contato: 1, qualificado: 1, proposta: 1, negociacao: 1, ganho: 1 })
 })
 
+test('Painel: contato excluído do histórico sai das contas', async () => {
+  const b = await painelPronto()
+  const [{ id }] = (await b.query(`select id from public.atendimentos where lead_id = $1 and tipo = 'ligacao'`, [L(1)])).rows
+  await b.exec('set role authenticated')
+  await b.query(`select set_config('request.jwt.claim.sub', $1, false)`, [ANA])
+  try {
+    await b.query('select public.excluir_atendimento($1)', [id])
+  } finally {
+    await b.exec('reset role')
+  }
+  const p = await painelComo(ANA, ...PERIODO)
+  // eram 4 contatos no período; a ligação do Lead Um (dia 8) saiu, e com ela o dia com contato
+  assert.deepEqual([p.atual.contatos, p.atual.dias_com_contato], [3, 3])
+  assert.equal(p.tipos.find((t) => t.tipo === 'ligacao'), undefined)
+})
+
 // ---------- Google Maps no CRM online ----------
 // a carga roda no SQL Editor (sem RLS): aqui ela entra direto, como dona das tabelas
 const lugarMaps = (placeId, nome, extra = {}) => {
@@ -869,6 +885,54 @@ test('Várias empresas: o Painel de cada empresa conta só os dados dela', async
   assert.equal(await painel(ANA, null), null)
 })
 
+test('Várias empresas: excluir registro do histórico respeita a empresa; o Painel de uma não soma a outra nem o excluído', async () => {
+  const { B, c } = await empresasProntas()
+  const contatos = async (uid, empresa) => (await c(uid, 'select public.painel_gerencial(null, null, $1) as p', [empresa]))[0].p?.atual.contatos
+  const [lb] = await c(GUI, `insert into public.leads (nome) values ('Lead da Empresa B') returning id`)
+  const [ab] = await c(GUI, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'Empresa B') returning id`, [lb.id])
+  const daB = await contatos(GUI, null)
+  // um contato novo na All Med não entra no Painel da Empresa B
+  const [la] = await c(BRUNO, `insert into public.leads (nome) values ('Lead da All Med') returning id`)
+  const [aa] = await c(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'All Med') returning id`, [la.id])
+  assert.equal(await contatos(GUI, null), daB)
+  assert.equal(await contatos(ANA, B), daB)
+  // cada um vê só o histórico da empresa dele, e nenhum membro exclui, nem da própria empresa nem da outra
+  assert.equal((await c(GUI, 'select id from public.atendimentos where id = $1', [aa.id])).length, 0)
+  assert.equal((await c(BRUNO, 'select id from public.atendimentos where id = $1', [ab.id])).length, 0)
+  for (const [quem, id] of [[GUI, aa.id], [BRUNO, ab.id], [GUI, ab.id]]) await assert.rejects(c(quem, 'select public.excluir_atendimento($1)', [id]), /administrador/)
+  // a administradora exclui o da Empresa B: some para o Gui e do Painel da B; o da All Med continua
+  await c(ANA, 'select public.excluir_atendimento($1)', [ab.id])
+  assert.equal((await c(GUI, 'select id from public.atendimentos where id = $1', [ab.id])).length, 0)
+  assert.equal((await c(BRUNO, 'select id from public.atendimentos where id = $1', [aa.id])).length, 1)
+  assert.equal(await contatos(GUI, null), daB - 1)
+  assert.equal(await contatos(ANA, B), daB - 1)
+  // quem é da All Med não abre o Painel da Empresa B
+  assert.equal(await contatos(BRUNO, B), undefined)
+})
+
+// A exclusão antiga (20261116120000, sem empresa) pode ter rodado no CRM online antes da de várias empresas: as colunas
+// e a função já existiriam. A migration da exclusão roda de novo sem erro e continua escondendo o excluído.
+test('Histórico: a migration da exclusão roda de novo sem erro e mantém o filtro do excluído', async () => {
+  const banco = new PGlite()
+  await banco.exec(AUTH_SUPABASE)
+  await migrar(banco)
+  const exclusao = ARQUIVOS.find((n) => n.endsWith('_excluir_atendimento.sql'))
+  assert.ok(ARQUIVOS.indexOf(exclusao) > ARQUIVOS.indexOf(MIGRATION_EMPRESAS), 'a exclusão roda depois de várias empresas')
+  await banco.exec(readFileSync(new URL(exclusao, MIGRATIONS), 'utf8'))
+  await banco.query(`insert into auth.users values ($1, 'ana@x.com'), ($2, 'bruno@x.com')`, [ANA, BRUNO])
+  await banco.query(`insert into public.membros (user_id, email, nome, papel) values ($1, 'ana@x.com', 'Ana', 'admin'), ($2, 'bruno@x.com', 'Bruno', 'membro')`, [ANA, BRUNO])
+  await banco.query('insert into public.membro_telas (user_id, tela) select $1, unnest($2::text[])::public.tela', [BRUNO, TODAS])
+  const [{ id: lead }] = await comoEm(banco, BRUNO, `insert into public.leads (nome) values ('Lead da conferência') returning id`)
+  const [{ id }] = await comoEm(banco, BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'oi') returning id`, [lead])
+  const contatos = async () => (await comoEm(banco, BRUNO, 'select public.painel_gerencial() as p'))[0].p.atual.contatos
+  assert.equal(await contatos(), 1)
+  await comoEm(banco, ANA, 'select public.excluir_atendimento($1)', [id])
+  assert.equal((await comoEm(banco, BRUNO, 'select id from public.atendimentos')).length, 0)
+  assert.equal(await contatos(), 0)
+  // um Painel só, o de três parâmetros: a chamada do site (dois parâmetros) não fica ambígua
+  assert.deepEqual((await banco.query(`select pg_get_function_identity_arguments(oid) as a from pg_proc where proname = 'painel_gerencial'`)).rows.map((r) => r.a), ['p_de timestamp with time zone, p_ate timestamp with time zone, p_empresa uuid'])
+})
+
 test('Várias empresas: cada membro é de uma empresa e vê só a equipe dela; empresa excluída fecha tudo para quem é dela', async () => {
   const { b, B, c } = await empresasProntas()
   const equipe = async (uid) => (await c(uid, 'select nome from public.membros order by nome')).map((m) => m.nome)
@@ -903,4 +967,44 @@ test('Várias empresas: o script de volta tira as empresas e devolve as chaves �
   assert.deepEqual(lote.map((l) => l.nome), ['Novo'])
   assert.equal((await comoEm(banco, ANA, 'select * from public.leads_kanban')).length, 2)
   assert.equal((await comoEm(banco, ANA, 'select public.painel_gerencial(null, null) as p'))[0].p.atual.leads_novos, 2)
+})
+
+// ---------- excluir registro do histórico (pedido do Filipe em 16/11/2026) ----------
+// só o administrador, sem prazo, só registro manual; excluir esconde o registro e guarda quem excluiu e quando
+const excluir = (uid, id) => como(uid, 'select public.excluir_atendimento($1)', [id])
+
+test('Histórico: o administrador exclui um registro manual; ele some da ficha e do último contato, mas fica guardado', async () => {
+  const l = await novoLead(ANA, { nome: 'Lead do registro errado' })
+  const [certo] = await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao, data) values ($1, 'ligacao', 'certo', '2026-11-10T12:00:00Z') returning id`, [l.id])
+  const [errado] = await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao, data) values ($1, 'email', 'lead errado', '2026-11-12T12:00:00Z') returning id`, [l.id])
+  await excluir(ANA, errado.id)
+  assert.deepEqual((await como(BRUNO, 'select id from public.atendimentos where lead_id = $1', [l.id])).map((a) => a.id), [certo.id])
+  const [k] = await como(ANA, 'select ultimo_atendimento from public.leads_kanban where id = $1', [l.id])
+  assert.equal(new Date(k.ultimo_atendimento).toISOString(), '2026-11-10T12:00:00.000Z')
+  // no banco o registro continua, com quem excluiu e quando
+  const [guardado] = (await db.query('select descricao, deleted_by, deleted_at from public.atendimentos where id = $1', [errado.id])).rows
+  assert.equal(guardado.descricao, 'lead errado')
+  assert.equal(guardado.deleted_by, ANA)
+  assert.ok(guardado.deleted_at instanceof Date)
+  // excluir de novo avisa, em vez de passar calado
+  await assert.rejects(excluir(ANA, errado.id), /não encontrado/)
+})
+
+test('Histórico: membro não exclui, nem o que ele mesmo registrou; mudança de etapa não se exclui; ninguém marca à mão', async () => {
+  const l = await novoLead(ANA, { nome: 'Lead do histórico fixo' })
+  const [a] = await como(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'whatsapp', 'oi') returning id`, [l.id])
+  for (const quem of [BRUNO, CARLA, DANI]) await assert.rejects(excluir(quem, a.id), /administrador/)
+  await como(ANA, `update public.leads set status = 'contato' where id = $1`, [l.id])
+  const [st] = (await db.query(`select id from public.atendimentos where lead_id = $1 and tipo = 'status'`, [l.id])).rows
+  await assert.rejects(excluir(ANA, st.id), /mudança de etapa/)
+  // o caminho é só a função: update e delete diretos continuam negados
+  await assert.rejects(como(ANA, 'update public.atendimentos set deleted_at = now() where id = $1', [a.id]), /permission denied/)
+  await assert.rejects(como(ANA, 'delete from public.atendimentos where id = $1', [a.id]), /permission denied/)
+  assert.equal((await como(BRUNO, 'select id from public.atendimentos where id = $1', [a.id])).length, 1)
+  await db.exec('set role anon')
+  try {
+    await assert.rejects(db.query('select public.excluir_atendimento($1)', [a.id]), /permission denied/)
+  } finally {
+    await db.exec('reset role')
+  }
 })

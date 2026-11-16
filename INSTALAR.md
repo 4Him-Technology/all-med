@@ -278,6 +278,19 @@ Cargas no SQL Editor depois desta etapa: as chaves únicas valem dentro de cada 
 
 Para voltar atrás (enquanto só existir a All Med): no topo da migration há um script de volta (as linhas que começam com `-- drop`, `-- alter`, `-- create`, `-- revoke` e `-- grant`). Copie essas linhas sem o `-- ` do começo e rode no **SQL Editor**; depois rode de novo o bloco da função `public.painel_gerencial` da `20261112200000_painel_mais_cortes.sql` (até `$fn$;`, mais as duas linhas de `revoke` e `grant` logo abaixo) e reverta o PR no GitHub. Os dados ficam todos, só sem a empresa.
 
+## Excluir registro do histórico
+
+O administrador pode excluir um registro do histórico de atendimento (ligação, WhatsApp, e-mail, reunião, visita, outro), sem prazo. A mudança de status não se exclui. O registro some da ficha, do último contato e do Painel da empresa dele, mas fica guardado no banco com quem excluiu e quando. Não precisa mexer no PC.
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261116210000_excluir_atendimento.sql` e clique em **Run**. Ela precisa da `20261116200000_varias_empresas.sql` (seção "Várias empresas"), que já rodou. Pode rodar mesmo que a versão antiga da exclusão (`20261116120000`) tenha rodado antes, e pode rodar de novo sem erro. Acrescenta duas colunas em `atendimentos` (`deleted_at` e `deleted_by`), cria a função `public.excluir_atendimento`, faz a leitura do histórico esconder o excluído (a regra por empresa continua igual) e troca a função do Painel de cada empresa para não contá-lo. Nenhum registro existente muda.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho).
+
+Rode o banco antes de aprovar o PR: com o site novo e o banco antigo, o botão aparece mas a exclusão dá erro.
+
+Para ver o que foi excluído: no **SQL Editor**, `select a.*, l.nome from public.atendimentos a join public.leads l on l.id = a.lead_id where a.deleted_at is not null;`. Para devolver um registro: `update public.atendimentos set deleted_at = null, deleted_by = null where id = '<id>';`.
+
+Para voltar atrás: no topo da migration há um script de volta (as linhas que começam com `-- drop`, `-- create` e `-- alter`); rode essas linhas sem o `-- ` do começo, rode de novo a função `public.painel_gerencial` da `20261116200000_varias_empresas.sql` trocando `create function` por `create or replace function` (só o bloco dela, até `$fn$;`) e reverta o PR. Os registros excluídos voltam a aparecer.
+
 ## Atualizar o sistema
 
 ```powershell

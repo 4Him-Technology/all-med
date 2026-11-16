@@ -26,6 +26,8 @@ const botaoFechar = (el) => h('button', { type: 'button', class: 'fechar', 'aria
 // quem não abre Kanban nem Leads ainda manda empresas ao kanban pela Prospecção, mas a ficha do lead não abre para ele
 // (nem pela lista de parados do Painel)
 let abreLeads = true
+// o administrador exclui registros manuais do histórico (o banco confere de novo)
+let souAdmin = false
 // o Painel vem primeiro: é a tela que abre para quem pode; para quem não pode, a primeira aba liberada
 const abas = { painel: () => carregarPainel({ abrirLead: abreLeads ? abrirLead : null }), kanban: carregarKanban, leads: carregarLeads, prospeccao: () => carregarProspeccao({ abrirLead: abreLeads ? abrirLead : null }), buscas: abrirGoogleMaps, clientes: carregarClientes }
 let abaAtual = 'painel'
@@ -357,9 +359,27 @@ function renderLead(dlg, l) {
         h('div', { class: 'acoes largo' }, h('button', { class: 'primario' }, 'Registrar atendimento')),
       ),
 
-      h('h3', {}, `Histórico (${l.atendimentos.length})`),
+      h('h3', { 'data-historico': '', tabindex: '-1' }, `Histórico (${l.atendimentos.length})`),
       l.atendimentos.length
-        ? h('ol', { class: 'timeline' }, l.atendimentos.map((a) => h('li', { class: `ev ev-${a.tipo}` }, h('div', { class: 'ev-topo' }, h('strong', {}, R.tipo[a.tipo]), h('time', { datetime: a.data }, quando(a.data))), h('p', {}, a.descricao))))
+        ? h(
+            'ol',
+            { class: 'timeline' },
+            l.atendimentos.map((a) =>
+              h(
+                'li',
+                { class: `ev ev-${a.tipo}` },
+                h(
+                  'div',
+                  { class: 'ev-topo' },
+                  h('strong', {}, R.tipo[a.tipo]),
+                  h('time', { datetime: a.data }, quando(a.data)),
+                  // a mudança de etapa é o sistema que grava: não tem botão
+                  souAdmin && a.tipo !== 'status' && h('button', { type: 'button', class: 'ev-excluir', 'aria-label': `Excluir o registro de ${R.tipo[a.tipo]} de ${quando(a.data)}`, onclick: (e) => excluirRegistro(l, e.currentTarget, a), onblur: desarmarExclusao }, 'Excluir'),
+                ),
+                h('p', {}, a.descricao),
+              ),
+            ),
+          )
         : h('p', { class: 'muted' }, 'Nenhum atendimento ainda. O primeiro contato que você registrar aparece aqui, junto com cada mudança de coluna.'),
 
       h('h3', {}, 'Dados do lead'),
@@ -386,6 +406,36 @@ function renderLead(dlg, l) {
       ),
     ),
   )
+}
+
+// excluir pede um segundo clique; o registro some do histórico, das contas e do último contato, mas fica guardado no banco
+async function excluirRegistro(l, botao, a) {
+  if (!botao.dataset.confirmar) {
+    botao.dataset.confirmar = 'sim'
+    botao.textContent = 'Confirmar exclusão'
+    botao.classList.add('perigo')
+    return
+  }
+  const restaurar = carregando(botao, 'Excluindo…')
+  try {
+    await crm.excluirAtendimento(a.id)
+    toast('Registro excluído do histórico.')
+    await abrirLead(l.id)
+    recarregarAba()
+    // a ficha foi redesenhada: o foco volta ao título do histórico, e não para o começo da página
+    ;(fichaAoLado() ? $('#ficha-lead') : $('#drawer')).querySelector('[data-historico]')?.focus()
+  } catch (err) {
+    restaurar()
+    toast(err.message, 'erro')
+  }
+}
+
+function desarmarExclusao(e) {
+  const b = e.currentTarget
+  if (!b.dataset.confirmar || b.disabled) return
+  delete b.dataset.confirmar
+  b.textContent = 'Excluir'
+  b.classList.remove('perigo')
 }
 
 async function arquivar(l, botao) {
@@ -945,6 +995,7 @@ async function iniciar() {
         logado = false
         aviso(perfil ? 'Sua conta foi desativada. Fale com o administrador do sistema.' : 'Sua conta ainda não faz parte da equipe. Peça ao administrador para cadastrar você.')
       } else if (perfil.papel === 'admin') {
+        souAdmin = true
         $('#menu-usuarios').hidden = false
       }
     } catch (err) {
