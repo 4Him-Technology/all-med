@@ -248,6 +248,36 @@ Rode o banco antes de aprovar o PR. Se o site for atualizado antes, o Painel mos
 
 Para voltar atrás: reverta o PR e, no **SQL Editor**, rode de novo a função `public.painel_gerencial` da `20261112150000_painel_gerencial.sql` e a função `public.minhas_telas` da `20261112120000_acessos.sql`, trocando `create function` por `create or replace function` (copie só o bloco de cada função, até `$fn$;`). O Painel volta a abrir só para o administrador e para quem tiver a coluna Painel marcada (as marcas antigas continuam valendo). Nenhum dado se perde.
 
+## Várias empresas
+
+O sistema passa a atender mais de uma empresa (All Med, Empresa B e as que vierem), cada uma independente: os seus leads, histórico, mapa do Google Maps, clientes ativos, equipe e Painel. Cada membro é de uma empresa só; o administrador entra em todas. Vem em etapas, um PR por vez.
+
+### Etapa 1: o banco
+
+Na tela nada muda ainda. No CRM online, nasce a tabela de empresas com a All Med, e tudo o que existe hoje (leads, histórico, mapa, clientes ativos e equipe) passa a ser dela. A separação fica na RLS: quem é de uma empresa não lê nem grava nada da outra, mesmo chamando a API direto. Quem hoje é **Administrador** passa a ser o administrador geral e vai entrar em todas as empresas.
+
+Instalação, nesta ordem e uma logo depois da outra:
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261116200000_varias_empresas.sql` e clique em **Run**. Ela não apaga nem regrava dado nenhum (as datas de atualização ficam como estão) e roda inteira de uma vez: se aparecer erro, nada fica pela metade.
+2. **Site:** aprove o PR no GitHub. O site atualiza sozinho em um ou dois minutos. No PC não há nada a fazer.
+
+Entre o passo 1 e o site atualizado, mandar empresas para o kanban e guardar uma busca do Google dão erro, porque o site ainda usa a chave única antiga: por isso os dois passos em seguida. A busca que terminar nesse meio-tempo fica no PC com o aviso do erro e é guardada quando a aba Google Maps abrir de novo; não clique em "Tirar", senão o resultado se perde.
+
+Para conferir, no **SQL Editor**:
+
+```sql
+select e.nome, (select count(*) from public.leads l where l.empresa_id = e.id) as leads from public.empresas e;
+select nome, email from public.membros where papel = 'admin' and ativo;
+```
+
+A primeira mostra só a All Med, com todos os leads. A segunda mostra quem vai entrar em todas as empresas. Se alguém ali for só da All Med, troque o papel antes de existir a segunda empresa: `update public.membros set papel = 'membro' where email = '<e-mail da pessoa>';`.
+
+Ainda não crie a Empresa B (nem pelo SQL Editor): com duas empresas, o site de hoje não sabe em qual gravar o que o administrador manda. A escolha da empresa depois do login vem na etapa 2, e o cadastro de empresas e de pessoas em cada uma, na etapa 3.
+
+Cargas no SQL Editor depois desta etapa: as chaves únicas valem dentro de cada empresa, então o `on conflict` passa a começar por `empresa_id` (`on conflict (empresa_id, place_id, segmento, local_busca)` no mapa e `on conflict (empresa_id, lower(btrim(nome))) where deleted_at is null` nos clientes ativos).
+
+Para voltar atrás (enquanto só existir a All Med): no topo da migration há um script de volta (as linhas que começam com `-- drop`, `-- alter`, `-- create`, `-- revoke` e `-- grant`). Copie essas linhas sem o `-- ` do começo e rode no **SQL Editor**; depois rode de novo o bloco da função `public.painel_gerencial` da `20261112200000_painel_mais_cortes.sql` (até `$fn$;`, mais as duas linhas de `revoke` e `grant` logo abaixo) e reverta o PR no GitHub. Os dados ficam todos, só sem a empresa.
+
 ## Atualizar o sistema
 
 ```powershell

@@ -22,13 +22,14 @@ Depois, as migrations seguintes da mesma pasta, em ordem, e a função de cadast
 
 O que as migrations garantem no banco, testado em [test/crm-sql.test.js](test/crm-sql.test.js):
 
-- a equipe (membros ativos) vê e trabalha os mesmos leads e atendimentos (RLS); conta fora da equipe, membro desativado e visitante sem login não leem nada;
+- cada empresa atendida pelo sistema (All Med, Empresa B...) é independente: quem é de uma não lê, não grava e não conta nada da outra, nem pelo Painel; cada membro é de uma empresa só, e o administrador entra em todas (tabela `empresas` e `empresa_id` em cada dado, com a separação na RLS; migration `20261116200000_varias_empresas.sql`, detalhes em [INSTALAR.md](INSTALAR.md), "Várias empresas");
+- a equipe (membros ativos) de cada empresa vê e trabalha os mesmos leads e atendimentos (RLS); conta fora da equipe, membro desativado e visitante sem login não leem nada;
 - cada pessoa abre só as telas que o administrador liberou (tabela `membro_telas`; as policies pedem `crm.pode('<tela>')`); o administrador abre todas; sem a tela, o banco não entrega os dados dela (migration `20261112120000_acessos.sql`, detalhes em [INSTALAR.md](INSTALAR.md), "Acessos por tela");
 - só a função `usuarios`, com a chave secreta, cadastra e desativa membros, e só a pedido de um admin; o primeiro acesso (a pessoa cadastrada cria a própria senha digitando o e-mail) vale uma vez só, com tentativas limitadas ([test/usuarios.test.js](test/usuarios.test.js));
 - quem criou, origem, CNPJ e datas não podem ser alterados depois de criados (permissão por coluna);
 - nada é apagado de verdade: arquivar preenche `deleted_at`, e o histórico de atendimentos é imutável;
 - mudança de coluna no kanban grava sozinha no histórico, e o usuário não consegue forjar esse registro;
-- a mesma empresa (CNPJ ou lugar do Maps) não entra duas vezes na equipe, nem depois de arquivada;
+- a mesma empresa prospectada (CNPJ ou lugar do Maps) não entra duas vezes como lead da mesma empresa do sistema, nem depois de arquivada; na All Med e na Empresa B ela pode ser lead das duas;
 - a conta de quem criou um lead não pode ser apagada (o trabalho é da equipe); para tirar alguém, desativa-se;
 - a equipe guarda as empresas das buscas do Google Maps e exclui uma busca (preenchendo `deleted_at`), mas não apaga de verdade nem mexe nas datas; quem está fora da equipe não grava;
 - site, e-mails, CNPJ, avaliação e tamanhos de texto são validados por CHECK.
@@ -131,7 +132,7 @@ A tela é um mapa só com todas elas ([public/mapa.js](public/mapa.js); a lógic
 
 O mapa não depende do PC, então a aba também aparece no site para quem está logado.
 
-A equipe grava nessa tabela só pelo que a tela manda: as colunas da empresa e o `deleted_at` (sem DELETE e sem mexer nas datas), e só quem é membro ativo (RLS). A carga das planilhas roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar. A quantidade de avaliações fica vazia nessa carga: na planilha de origem a coluna trazia a nota vezes 10, não a quantidade. Para tirar tudo: `delete from public.maps_lugares;`. Para voltar atrás na tabela, veja o rollback no começo da migration. Para voltar à tela anterior (um cartão por local e segmento), reverta no git o commit do mapa das empresas.
+A equipe grava nessa tabela só pelo que a tela manda: as colunas da empresa e o `deleted_at` (sem DELETE e sem mexer nas datas), e só quem é membro ativo (RLS). A carga das planilhas roda no SQL Editor do Supabase, e cada arquivo pode rodar de novo sem duplicar, com `on conflict (empresa_id, place_id, segmento, local_busca)`. Enquanto só existir a All Med, a carga não precisa dizer a empresa; com mais de uma, cada linha leva o `empresa_id`. A quantidade de avaliações fica vazia nessa carga: na planilha de origem a coluna trazia a nota vezes 10, não a quantidade. Para tirar tudo de uma empresa: `delete from public.maps_lugares where empresa_id = '<id da empresa>';`. Para voltar atrás na tabela, veja o rollback no começo da migration. Para voltar à tela anterior (um cartão por local e segmento), reverta no git o commit do mapa das empresas.
 
 ## Clientes ativos
 
@@ -146,7 +147,7 @@ O reconhecimento é pelo nome, porque a lista de clientes não tem CNPJ, telefon
 
 Além de esconder quem é o cliente, o mapa avisa quem tem nome parecido ("Parece cliente"), sem esconder: a marca do cliente (a primeira palavra dele que não é de ramo nem comum, como "Posto" ou "Hotel", com 5 letras ou mais) aparece no nome da empresa, ou os dois têm duas dessas palavras em comum. Esse aviso pega o que a regra de esconder deixa passar de propósito, como a marca no meio do nome ou uma unidade com outro complemento.
 
-A carga inicial é um arquivo SQL gerado da planilha, rodado no SQL Editor e fora do git (é a lista de clientes); pode rodar de novo sem duplicar. Os testes usam nomes inventados pelo mesmo motivo. Para tirar a tabela: o rollback está no começo da migration.
+A carga inicial é um arquivo SQL gerado da planilha, rodado no SQL Editor e fora do git (é a lista de clientes); pode rodar de novo sem duplicar, com `on conflict (empresa_id, lower(btrim(nome))) where deleted_at is null do nothing`. Cada empresa tem a sua lista: o mesmo cliente pode estar na da All Med e na da Empresa B. Os testes usam nomes inventados pelo mesmo motivo. Para tirar a tabela: o rollback está no começo da migration.
 
 ## Painel gerencial
 
@@ -174,7 +175,7 @@ Regras das contas, testadas em [test/crm-sql.test.js](test/crm-sql.test.js) (per
 - tempos são medianas, que não se deixam levar por um lead esquecido por meses;
 - na matriz segmento por local, a cor mais escura vem das células com 10 empresas ou mais, para uma célula de 1 empresa não virar a referência.
 
-Quem vê: todo membro ativo da equipe (pedido do Filipe em 12/11/2026: "a tela gerencial literalmente é para todos verem"), sem precisar marcar nada em "Usuários e acessos", onde o Painel nem aparece. A função roda como dona das tabelas (security definer) e confere `crm.membro_ativo()` dentro dela, porque mostra os números de todos os leads mesmo para quem não abre o Kanban; `public.minhas_telas()` devolve `painel` para todo membro ativo, e é por ela que o site mostra as abas. Desativado e quem está fora da equipe não veem a aba e, se chamarem a função, recebem null; visitante sem login não chama. Quem abre o Painel sem Kanban e sem Leads vê o nome dos leads parados sem link, porque a ficha não abriria para ele.
+Quem vê: todo membro ativo da equipe (pedido do Filipe em 12/11/2026: "a tela gerencial literalmente é para todos verem"), sem precisar marcar nada em "Usuários e acessos", onde o Painel nem aparece. Cada empresa tem o seu Painel: a função recebe a empresa (`p_empresa`; sem ela, a de quem está logado), conta só os dados dela e abre para o membro ativo dela e para o administrador. Ela roda como dona das tabelas (security definer) e confere isso dentro dela, porque mostra os números de todos os leads da empresa mesmo para quem não abre o Kanban; `public.minhas_telas()` devolve `painel` para todo membro ativo, e é por ela que o site mostra as abas. Desativado e quem está fora da equipe não veem a aba e, se chamarem a função, recebem null; visitante sem login não chama. Quem abre o Painel sem Kanban e sem Leads vê o nome dos leads parados sem link, porque a ficha não abriria para ele.
 
 ## Segurança
 

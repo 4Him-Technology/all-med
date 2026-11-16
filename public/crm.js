@@ -75,11 +75,12 @@ export const atualizarLead = async (id, campos) => ok(await cliente().from('lead
 export const arquivarLead = async (id) => ok(await cliente().from('leads').update({ deleted_at: new Date().toISOString() }).eq('id', id).select('id').single())
 export const registrarAtendimento = async (leadId, a) => ok(await cliente().from('atendimentos').insert({ lead_id: leadId, ...a }).select('id').single())
 
-// Manda leads em lotes; os que já estão no CRM da equipe (mesmo place_id do Maps ou mesmo CNPJ) o banco ignora
+// Manda leads em lotes; os que já estão no CRM da empresa (mesmo place_id do Maps ou mesmo CNPJ) o banco ignora.
+// A chave única vale dentro de cada empresa; sem empresa_id nas linhas, o banco põe a de quem grava.
 export async function enviarLeads(leads, chave = 'place_id') {
   let novos = 0
   for (let i = 0; i < leads.length; i += 500) {
-    const { data } = ok(await cliente().from('leads').upsert(leads.slice(i, i + 500), { onConflict: chave, ignoreDuplicates: true }).select('id'))
+    const { data } = ok(await cliente().from('leads').upsert(leads.slice(i, i + 500), { onConflict: `empresa_id,${chave}`, ignoreDuplicates: true }).select('id'))
     novos += data.length
   }
   return novos
@@ -105,7 +106,7 @@ export const empresasMaps = () =>
 // Guarda no CRM online as empresas de uma busca do PC (lugaresDaBusca). A mesma busca de novo atualiza as que já
 // estavam e traz de volta as de uma busca excluída; vai em partes para não passar do tamanho de uma chamada.
 export async function guardarBusca(linhas) {
-  for (let i = 0; i < linhas.length; i += 500) ok(await cliente().from('maps_lugares').upsert(linhas.slice(i, i + 500), { onConflict: 'place_id,segmento,local_busca' }))
+  for (let i = 0; i < linhas.length; i += 500) ok(await cliente().from('maps_lugares').upsert(linhas.slice(i, i + 500), { onConflict: 'empresa_id,place_id,segmento,local_busca' }))
 }
 
 // A busca do PC já foi guardada (mesmo que excluída depois) se alguma empresa dela foi gravada depois que ela terminou.
