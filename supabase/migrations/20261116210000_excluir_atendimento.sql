@@ -8,23 +8,27 @@
 -- O caminho é só a função public.excluir_atendimento: UPDATE e DELETE em atendimentos continuam negados para o app.
 -- Vem depois da 20261116200000_varias_empresas.sql e mantém o que ela fez: a policy de leitura por empresa e o Painel de
 -- cada empresa ganham só o filtro "deleted_at is null".
+-- Pode rodar mais de uma vez e serve também se a versão antiga da exclusão (20261116120000, de antes de várias empresas)
+-- já tiver rodado: as colunas, a regra, o índice e a função só são criados se faltarem, e um Painel de dois parâmetros,
+-- se existir, sai (o site chama o de três, com a empresa opcional).
 --
 -- Rollback (o registro excluído volta a aparecer):
 -- drop function public.excluir_atendimento(uuid);
--- drop policy "atendimentos: lê quem é da empresa e abre a tela" on public.atendimentos;
+-- drop policy if exists "atendimentos: lê quem é da empresa e abre a tela" on public.atendimentos;
 -- create policy "atendimentos: lê quem é da empresa e abre a tela" on public.atendimentos for select to authenticated using ((select crm.pode('kanban', 'leads')) and exists (select 1 from public.leads l where l.id = lead_id and ((select crm.admin()) or l.empresa_id = (select crm.minha_empresa()))));
 -- alter table public.atendimentos drop column deleted_by, drop column deleted_at;
 --   e rode de novo a função public.painel_gerencial da 20261116200000_varias_empresas.sql, trocando "create function"
 --   por "create or replace function" (só o bloco dela, até $fn$;).
 
 alter table public.atendimentos
-  add column deleted_at timestamptz,
+  add column if not exists deleted_at timestamptz,
   -- RESTRICT: quem excluiu fica registrado; como em leads e atendimentos, a conta não se apaga, desativa-se o membro
-  add column deleted_by uuid references auth.users (id) on delete restrict,
+  add column if not exists deleted_by uuid references auth.users (id) on delete restrict,
+  drop constraint if exists atendimentos_exclusao_completa,
   add constraint atendimentos_exclusao_completa check ((deleted_at is null) = (deleted_by is null));
 
 -- chave estrangeira para auth.users, só nas linhas excluídas (as únicas que têm deleted_by)
-create index atendimentos_excluido_por_idx on public.atendimentos (deleted_by) where deleted_by is not null;
+create index if not exists atendimentos_excluido_por_idx on public.atendimentos (deleted_by) where deleted_by is not null;
 
 -- quem lê o histórico não vê o excluído (a regra por empresa da 20261116200000 continua igual); as views
 -- security_invoker (último contato do kanban e da lista) seguem a mesma regra
@@ -36,7 +40,7 @@ create policy "atendimentos: lê quem é da empresa e abre a tela" on public.ate
          and deleted_at is null);
 
 -- security definer: o app não tem UPDATE em atendimentos; a função confere quem pede, a empresa do lead e o que pode ser excluído
-create function public.excluir_atendimento(p_id uuid) returns void
+create or replace function public.excluir_atendimento(p_id uuid) returns void
 language plpgsql security definer set search_path = '' as $fn$
 begin
   if not (select crm.admin()) then
@@ -57,6 +61,9 @@ $fn$;
 -- no Supabase a função nova em public já nasce liberada para anon: tira de todos e devolve só para quem está logado
 revoke all on function public.excluir_atendimento(uuid) from public, anon, authenticated;
 grant execute on function public.excluir_atendimento(uuid) to authenticated;
+
+-- por garantia: um Painel de dois parâmetros, sem empresa, não pode ficar ao lado do de três (a chamada do site ficaria ambígua)
+drop function if exists public.painel_gerencial(timestamptz, timestamptz);
 
 -- o Painel de cada empresa (security definer, não passa pela RLS) também deixa de contar o excluído; o resto é igual
 create or replace function public.painel_gerencial(p_de timestamptz default null, p_ate timestamptz default null, p_empresa uuid default null)

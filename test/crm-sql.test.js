@@ -910,6 +910,29 @@ test('Várias empresas: excluir registro do histórico respeita a empresa; o Pai
   assert.equal(await contatos(BRUNO, B), undefined)
 })
 
+// A exclusão antiga (20261116120000, sem empresa) pode ter rodado no CRM online antes da de várias empresas: as colunas
+// e a função já existiriam. A migration da exclusão roda de novo sem erro e continua escondendo o excluído.
+test('Histórico: a migration da exclusão roda de novo sem erro e mantém o filtro do excluído', async () => {
+  const banco = new PGlite()
+  await banco.exec(AUTH_SUPABASE)
+  await migrar(banco)
+  const exclusao = ARQUIVOS.find((n) => n.endsWith('_excluir_atendimento.sql'))
+  assert.ok(ARQUIVOS.indexOf(exclusao) > ARQUIVOS.indexOf(MIGRATION_EMPRESAS), 'a exclusão roda depois de várias empresas')
+  await banco.exec(readFileSync(new URL(exclusao, MIGRATIONS), 'utf8'))
+  await banco.query(`insert into auth.users values ($1, 'ana@x.com'), ($2, 'bruno@x.com')`, [ANA, BRUNO])
+  await banco.query(`insert into public.membros (user_id, email, nome, papel) values ($1, 'ana@x.com', 'Ana', 'admin'), ($2, 'bruno@x.com', 'Bruno', 'membro')`, [ANA, BRUNO])
+  await banco.query('insert into public.membro_telas (user_id, tela) select $1, unnest($2::text[])::public.tela', [BRUNO, TODAS])
+  const [{ id: lead }] = await comoEm(banco, BRUNO, `insert into public.leads (nome) values ('Lead da conferência') returning id`)
+  const [{ id }] = await comoEm(banco, BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'oi') returning id`, [lead])
+  const contatos = async () => (await comoEm(banco, BRUNO, 'select public.painel_gerencial() as p'))[0].p.atual.contatos
+  assert.equal(await contatos(), 1)
+  await comoEm(banco, ANA, 'select public.excluir_atendimento($1)', [id])
+  assert.equal((await comoEm(banco, BRUNO, 'select id from public.atendimentos')).length, 0)
+  assert.equal(await contatos(), 0)
+  // um Painel só, o de três parâmetros: a chamada do site (dois parâmetros) não fica ambígua
+  assert.deepEqual((await banco.query(`select pg_get_function_identity_arguments(oid) as a from pg_proc where proname = 'painel_gerencial'`)).rows.map((r) => r.a), ['p_de timestamp with time zone, p_ate timestamp with time zone, p_empresa uuid'])
+})
+
 test('Várias empresas: cada membro é de uma empresa e vê só a equipe dela; empresa excluída fecha tudo para quem é dela', async () => {
   const { b, B, c } = await empresasProntas()
   const equipe = async (uid) => (await c(uid, 'select nome from public.membros order by nome')).map((m) => m.nome)
