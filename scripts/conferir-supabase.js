@@ -26,8 +26,10 @@ const checagens = [
   ['ler kanban', () => chamar('leads_kanban?select=id&limit=1'), '42501'],
   ['ler atendimentos', () => chamar('atendimentos?select=id&limit=1'), '42501'],
   ['criar lead', () => chamar('leads', { method: 'POST', body: JSON.stringify({ nome: 'teste anônimo' }) }), '42501'],
+  ['ler empresas', () => chamar('empresas?select=id&limit=1'), '42501'],
   // funções internas (esquema crm) não podem aparecer na API
   ['chamar função interna', () => chamar('rpc/emails_validos', { method: 'POST', body: JSON.stringify({ lista: [] }) }), 'PGRST202'],
+  ['chamar a empresa padrão', () => chamar('rpc/empresa_padrao', { method: 'POST', body: '{}' }), 'PGRST202'],
 ]
 
 let falhas = 0

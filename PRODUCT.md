@@ -10,6 +10,8 @@ web
 
 O Filipe e uma equipe pequena de vendas (B2B). Cada pessoa tem o próprio login, a equipe trabalha os mesmos leads e o administrador escolhe quais telas cada um abre (por exemplo, quem só prospecta fica com Prospecção e Google Maps). O uso principal é no computador, sentado, montando listas de empresas e trabalhando o funil; o celular é secundário.
 
+O sistema atende mais de uma empresa (All Med, Empresa B e as que vierem), independentes entre si: cada membro é de uma empresa só, e o administrador entra em todas e escolhe em qual trabalhar depois do login. Mesmo site e mesmo visual para todas; o Painel é de cada empresa, sem somar todas (decisões do Filipe em 16/11/2026; em construção, uma etapa por vez).
+
 ## Product Purpose
 
 Encontrar empresas para prospectar e acompanhar cada uma até fechar ou descartar. Dois caminhos de entrada: a base de CNPJ da Receita Federal (filtros por localização, CNAE, situação, porte, regime, natureza jurídica, abertura, capital, contato e sócios) e buscas no Google Maps. As empresas escolhidas viram leads num kanban de acompanhamento, com histórico de atendimentos registrados à mão. Sucesso é montar uma lista qualificada em minutos e não perder nenhum follow-up.

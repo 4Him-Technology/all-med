@@ -11,16 +11,19 @@ const CARLA = '33333333-3333-4333-8333-333333333333' // tem conta, mas não é d
 const DANI = '44444444-4444-4444-8444-444444444444' // membro desativado
 const EDU = '55555555-5555-4555-8555-555555555555' // membro que só prospecta: Prospecção e Google Maps
 const FABI = '66666666-6666-4666-8666-666666666666' // membro só com o Kanban
+const GUI = '77777777-7777-4777-8777-777777777777' // membro da Empresa B
+const HEL = '88888888-8888-4888-8888-888888888888' // cadastrado pela função usuarios
 const TODAS = ['kanban', 'leads', 'prospeccao', 'buscas', 'clientes']
 let db
 
+// service_role é o papel da chave secreta (a função usuarios); como no Supabase, passa por cima da RLS
 const AUTH_SUPABASE = `
-  create role anon nologin; create role authenticated nologin;
+  create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
   create schema auth;
   create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant usage on schema public to anon, authenticated;
+  grant usage on schema auth to anon, authenticated, service_role;
+  grant usage on schema public to anon, authenticated, service_role;
 `
 const ARQUIVOS = readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).sort()
 const migrar = async (banco, arquivos = ARQUIVOS) => {
@@ -48,15 +51,16 @@ before(async () => {
 })
 
 // executa como um usuário logado do Supabase (papel authenticated + sub do JWT)
-async function como(uid, sql, params) {
-  await db.exec('set role authenticated')
-  await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid])
+async function comoEm(banco, uid, sql, params) {
+  await banco.exec('set role authenticated')
+  await banco.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid])
   try {
-    return (await db.query(sql, params)).rows
+    return (await banco.query(sql, params)).rows
   } finally {
-    await db.exec('reset role')
+    await banco.exec('reset role')
   }
 }
+const como = (uid, sql, params) => comoEm(db, uid, sql, params)
 const novoLead = async (uid, campos = {}) => {
   const c = { nome: 'Empresa', ...campos }
   const cols = Object.keys(c)
@@ -119,7 +123,7 @@ test('a mesma empresa não entra duas vezes na equipe, nem depois de arquivada',
   await assert.rejects(novoLead(BRUNO, { nome: 'A de novo', cnpj: '11111111000101' }), (err) => err.code === '23505')
   // importação do Maps ignora o que já existe
   await novoLead(ANA, { nome: 'P', place_id: 'ChIJ1' })
-  const r = await como(BRUNO, `insert into public.leads (nome, place_id) values ('P', 'ChIJ1'), ('Q', 'ChIJ2') on conflict (place_id) do nothing returning nome`)
+  const r = await como(BRUNO, `insert into public.leads (nome, place_id) values ('P', 'ChIJ1'), ('Q', 'ChIJ2') on conflict (empresa_id, place_id) do nothing returning nome`)
   assert.deepEqual(r.map((x) => x.nome), ['Q'])
 })
 
@@ -155,7 +159,7 @@ test('kanban traz o último contato sem contar mudança de status, para a equipe
 test('lista de leads ordena pelo último contato e o envio em lote por CNPJ ignora os repetidos', async () => {
   const a = await novoLead(ANA, { nome: 'Lista A', cnpj: '33333333000101', origem: 'receita' })
   await como(ANA, `insert into public.atendimentos (lead_id, tipo, descricao, data) values ($1, 'ligacao', 'oi', '2026-10-02T10:00:00Z')`, [a.id])
-  const lote = await como(BRUNO, `insert into public.leads (nome, cnpj, origem) values ('Lista A de novo', '33333333000101', 'receita'), ('Lista B', '44444444000101', 'receita') on conflict (cnpj) do nothing returning nome`)
+  const lote = await como(BRUNO, `insert into public.leads (nome, cnpj, origem) values ('Lista A de novo', '33333333000101', 'receita'), ('Lista B', '44444444000101', 'receita') on conflict (empresa_id, cnpj) do nothing returning nome`)
   assert.deepEqual(lote.map((l) => l.nome), ['Lista B'])
   const lista = await como(ANA, `select nome, origem, created_at, total_avaliacoes from public.leads_kanban where nome like 'Lista %' order by ultimo_atendimento asc nulls first`)
   assert.deepEqual(lista.map((l) => l.nome), ['Lista B', 'Lista A'])
@@ -437,7 +441,7 @@ const lugarMaps = (placeId, nome, extra = {}) => {
   const cols = Object.keys(c)
   return db.query(
     `insert into public.maps_lugares (${cols.join(',')}) values (${cols.map((_, i) => `$${i + 1}`).join(',')})
-     on conflict (place_id, segmento, local_busca) do update set nome = excluded.nome`,
+     on conflict (empresa_id, place_id, segmento, local_busca) do update set nome = excluded.nome`,
     Object.values(c),
   )
 }
@@ -466,7 +470,7 @@ const guardarDaBusca = (uid, extra = {}) => {
   return como(
     uid,
     `insert into public.maps_lugares (${cols.join(',')}) values (${cols.map((_, i) => `$${i + 1}`).join(',')})
-     on conflict (place_id, segmento, local_busca) do update set ${cols.map((k) => `${k} = excluded.${k}`).join(', ')} returning nome`,
+     on conflict (empresa_id, place_id, segmento, local_busca) do update set ${cols.map((k) => `${k} = excluded.${k}`).join(', ')} returning nome`,
     Object.values(c),
   )
 }
@@ -552,7 +556,7 @@ test('Clientes ativos: o mesmo nome não entra duas vezes na lista, mas volta de
   await como(BRUNO, `insert into public.clientes_ativos (nome) values ('Transportes Vento Sul Ltda')`)
   assert.equal((await clientesAtivos(ANA)).filter((n) => n === 'Transportes Vento Sul Ltda').length, 1)
   const carga = `insert into public.clientes_ativos (nome) values ('Construtora Pedra Lisa Ltda'), ('Transportes Vento Sul Ltda')
-    on conflict (lower(btrim(nome))) where deleted_at is null do nothing`
+    on conflict (empresa_id, lower(btrim(nome))) where deleted_at is null do nothing`
   await db.exec(carga)
   await db.exec(carga)
   assert.equal((await clientesAtivos(ANA)).filter((n) => n === 'Construtora Pedra Lisa Ltda').length, 1)
@@ -586,7 +590,7 @@ test('Acessos: sem Kanban e sem Leads o banco não mostra os leads nem o histór
   assert.equal((await como(EDU, 'select * from public.atendimentos where lead_id = $1', [daAna.id])).length, 0)
   assert.equal((await como(EDU, `update public.leads set nome = 'x' where id = $1 returning id`, [daAna.id])).length, 0)
   // o envio em lote da Prospecção e do Google Maps: o repetido o banco ignora, o novo volta para contar
-  const lote = await como(EDU, `insert into public.leads (nome, place_id, origem) values ('Repetido', '0xacesso1:0x1', 'maps'), ('Novo do Edu', '0xacesso2:0x2', 'maps') on conflict (place_id) do nothing returning id, nome`)
+  const lote = await como(EDU, `insert into public.leads (nome, place_id, origem) values ('Repetido', '0xacesso1:0x1', 'maps'), ('Novo do Edu', '0xacesso2:0x2', 'maps') on conflict (empresa_id, place_id) do nothing returning id, nome`)
   assert.deepEqual(lote.map((l) => l.nome), ['Novo do Edu'])
   assert.equal((await como(EDU, 'select * from public.leads where id = $1', [lote[0].id])).length, 1)
   // mas não trabalha o lead: editar e registrar atendimento são do Kanban e da aba Leads
@@ -685,10 +689,218 @@ test('Acessos: o script de volta do topo da migration devolve tudo a quem é da 
   // sem tela nenhuma o banco recusa
   await assert.rejects(gravar(lead), /row-level security/)
   await assert.rejects(gravar(lugar), /row-level security/)
-  const migration = readFileSync(new URL(ARQUIVOS.find((n) => n.endsWith('_acessos.sql')), MIGRATIONS), 'utf8')
-  const volta = migration.split('\n').filter((l) => /^-- (drop|create) /.test(l)).map((l) => l.slice(3)).join('\n')
-  await banco.exec(volta)
+  // as migrations que vieram depois e trocaram as mesmas regras voltam antes, da mais nova para a mais velha
+  await voltarVariasEmpresas(banco)
+  await banco.exec(scriptDeVolta(ARQUIVOS.find((n) => n.endsWith('_acessos.sql'))))
   assert.deepEqual(await gravar(lead), [{ nome: 'Depois da volta' }])
   await gravar(lugar)
   assert.equal((await banco.query(`select to_regclass('public.membro_telas') as t`)).rows[0].t, null)
+})
+
+// ---------- várias empresas ----------
+const MIGRATION_EMPRESAS = ARQUIVOS.find((n) => n.endsWith('_varias_empresas.sql'))
+
+// as linhas "-- drop/create/alter/revoke/grant ..." do comentário do topo da migration, sem o "-- "
+function scriptDeVolta(arquivo) {
+  const linhas = readFileSync(new URL(arquivo, MIGRATIONS), 'utf8').split('\n')
+  const topo = linhas.slice(0, linhas.findIndex((l) => !l.startsWith('--')))
+  return topo.filter((l) => /^-- (drop|create|alter|revoke|grant) /.test(l)).map((l) => l.slice(3)).join('\n')
+}
+// o que o topo da migration de várias empresas manda rodar para voltar: o script dele e a função do Painel de antes
+async function voltarVariasEmpresas(banco) {
+  await banco.exec(scriptDeVolta(MIGRATION_EMPRESAS))
+  const painel = readFileSync(new URL('20261112200000_painel_mais_cortes.sql', MIGRATIONS), 'utf8')
+  await banco.exec(painel.match(/create or replace function public\.painel_gerencial[\s\S]*?\$fn\$;/)[0])
+  await banco.exec(painel.split('\n').filter((l) => /^(revoke|grant) .*painel_gerencial/.test(l)).join('\n'))
+}
+
+test('Várias empresas: o que já existia fica com a All Med, sem mexer nas datas, e quem já usava continua vendo e gravando', async () => {
+  const banco = new PGlite()
+  await banco.exec(AUTH_SUPABASE)
+  const i = ARQUIVOS.indexOf(MIGRATION_EMPRESAS)
+  assert.ok(i > 0, 'falta a migration de várias empresas')
+  await migrar(banco, ARQUIVOS.slice(0, i))
+  await banco.query(`insert into auth.users values ($1, 'ana@x.com'), ($2, 'bruno@x.com'), ($3, 'hel@x.com')`, [ANA, BRUNO, HEL])
+  await banco.query(`insert into public.membros (user_id, email, nome, papel) values ($1, 'ana@x.com', 'Ana', 'admin'), ($2, 'bruno@x.com', 'Bruno', 'membro')`, [ANA, BRUNO])
+  await banco.query('insert into public.membro_telas (user_id, tela) select $1, unnest($2::text[])::public.tela', [BRUNO, TODAS])
+  const antes = '2026-10-01T12:00:00.000Z'
+  const [{ id }] = (await banco.query(`insert into public.leads (user_id, nome, cnpj, updated_at) values ($1, 'Lead Antigo', '12345678000101', $2) returning id`, [BRUNO, antes])).rows
+  await banco.query(`insert into public.atendimentos (lead_id, user_id, tipo, descricao) values ($1, $2, 'ligacao', 'oi')`, [id, BRUNO])
+  await banco.query(`insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao, updated_at) values ('0xantigo:0x1', 'S', 'L', 'Lugar Antigo', 'E', 'T', 4, $1)`, [antes])
+  await banco.query(`insert into public.clientes_ativos (nome) values ('Cliente Antigo Ltda')`)
+  await migrar(banco, ARQUIVOS.slice(i))
+
+  const empresas = (await banco.query('select id, nome from public.empresas')).rows
+  assert.deepEqual(empresas.map((e) => e.nome), ['All Med'])
+  const allMed = empresas[0].id
+  for (const tabela of ['leads', 'maps_lugares', 'clientes_ativos', 'membros']) {
+    assert.deepEqual((await banco.query(`select distinct empresa_id from public.${tabela}`)).rows, [{ empresa_id: allMed }], tabela)
+  }
+  // o kanban e a lista de buscas feitas se ordenam por updated_at: a migration não mexe nele
+  assert.equal((await banco.query('select updated_at from public.leads')).rows[0].updated_at.toISOString(), antes)
+  assert.equal((await banco.query('select updated_at from public.maps_lugares')).rows[0].updated_at.toISOString(), antes)
+  const comoBruno = (sql) => comoEm(banco, BRUNO, sql)
+  for (const tabela of ['leads_kanban', 'atendimentos', 'maps_empresas', 'clientes_ativos']) assert.equal((await comoBruno(`select * from public.${tabela}`)).length, 1, tabela)
+  // o site e o PC de hoje gravam sem dizer a empresa: enquanto a All Med é a única, vai para ela
+  assert.equal((await comoBruno(`insert into public.leads (nome) values ('Lead Novo') returning empresa_id`))[0].empresa_id, allMed)
+  assert.equal((await comoEm(banco, ANA, `insert into public.leads (nome) values ('Lead da Ana') returning empresa_id`))[0].empresa_id, allMed)
+  // a função usuarios, com a chave secreta, cadastra sem dizer a empresa: o membro novo entra na All Med
+  await banco.query(`select set_config('request.jwt.claim.sub', '', false)`)
+  await banco.exec('grant select, insert on public.membros to service_role; set role service_role')
+  try {
+    await banco.query(`insert into public.membros (user_id, email, nome) values ($1, 'hel@x.com', 'Hel')`, [HEL])
+  } finally {
+    await banco.exec('reset role')
+  }
+  assert.equal((await banco.query('select empresa_id from public.membros where user_id = $1', [HEL])).rows[0].empresa_id, allMed)
+})
+
+// Banco próprio: com a segunda empresa, a administradora passa a ter de dizer a empresa ao gravar.
+// Ana é a administradora geral; Bruno ficou na All Med, a dona de tudo o que existia antes; Gui é da Empresa B.
+let bancoEmpresas
+const empresasProntas = () => (bancoEmpresas ??= montarEmpresas())
+async function montarEmpresas() {
+  const b = new PGlite()
+  await b.exec(AUTH_SUPABASE)
+  await migrar(b)
+  for (const [id, email] of [[ANA, 'ana@x.com'], [BRUNO, 'bruno@x.com'], [CARLA, 'carla@x.com'], [GUI, 'gui@x.com'], [HEL, 'hel@x.com']]) await b.query('insert into auth.users values ($1, $2)', [id, email])
+  await b.query(`insert into public.membros (user_id, email, nome, papel) values ($1, 'ana@x.com', 'Ana', 'admin'), ($2, 'bruno@x.com', 'Bruno', 'membro')`, [ANA, BRUNO])
+  const c = (uid, sql, params) => comoEm(b, uid, sql, params)
+  const [{ id: B }] = await c(ANA, `insert into public.empresas (nome) values ('Empresa B') returning id`)
+  const A = (await b.query(`select id from public.empresas where nome = 'All Med'`)).rows[0].id
+  await b.query(`insert into public.membros (user_id, email, nome, papel, empresa_id) values ($1, 'gui@x.com', 'Gui', 'membro', $2)`, [GUI, B])
+  for (const uid of [BRUNO, GUI]) await b.query('insert into public.membro_telas (user_id, tela) select $1, unnest($2::text[])::public.tela', [uid, TODAS])
+  return { b, A, B, c }
+}
+
+test('Várias empresas: a administradora geral cria empresas e vê todas; cada membro vê só a dele', async () => {
+  const { b, c } = await empresasProntas()
+  const nomes = async (uid) => (await c(uid, 'select nome from public.empresas order by nome')).map((e) => e.nome)
+  assert.deepEqual(await nomes(ANA), ['All Med', 'Empresa B'])
+  assert.deepEqual(await nomes(BRUNO), ['All Med'])
+  assert.deepEqual(await nomes(GUI), ['Empresa B'])
+  assert.deepEqual(await nomes(CARLA), [])
+  // só a administradora cria e muda empresa; o nome não se repete; empresa não se apaga
+  await assert.rejects(c(BRUNO, `insert into public.empresas (nome) values ('Empresa do Bruno')`), /row-level security/)
+  assert.equal((await c(GUI, `update public.empresas set nome = 'Trocada' returning id`)).length, 0)
+  await assert.rejects(c(ANA, `insert into public.empresas (nome) values (' empresa b ')`), /empresas_nome_unico/)
+  await assert.rejects(c(ANA, 'delete from public.empresas'), /permission denied/)
+  await b.exec('set role anon')
+  try {
+    await assert.rejects(b.query('select * from public.empresas'), /permission denied/)
+  } finally {
+    await b.exec('reset role')
+  }
+})
+
+test('Várias empresas: quem é de uma empresa não lê, não grava e não mexe nos leads e no histórico da outra', async () => {
+  const { A, B, c } = await empresasProntas()
+  // a mesma empresa prospectada pode ser lead nas duas
+  const [daA] = await c(BRUNO, `insert into public.leads (nome, cnpj, place_id) values ('Lead da All Med', '98765432000101', '0xemp:0x1') returning id, empresa_id`)
+  const [daB] = await c(GUI, `insert into public.leads (nome, cnpj) values ('Lead da B', '98765432000101') returning id, empresa_id`)
+  assert.deepEqual([daA.empresa_id, daB.empresa_id], [A, B])
+  await c(BRUNO, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'oi')`, [daA.id])
+  await c(GUI, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'oi')`, [daB.id])
+  for (const [quem, alheio, outra] of [[GUI, daA.id, A], [BRUNO, daB.id, B]]) {
+    assert.equal((await c(quem, 'select * from public.leads where id = $1', [alheio])).length, 0)
+    assert.equal((await c(quem, 'select * from public.leads_kanban where id = $1', [alheio])).length, 0)
+    assert.equal((await c(quem, 'select * from public.atendimentos where lead_id = $1', [alheio])).length, 0)
+    assert.equal((await c(quem, `update public.leads set status = 'ganho' where id = $1 returning id`, [alheio])).length, 0)
+    await assert.rejects(c(quem, `insert into public.atendimentos (lead_id, tipo, descricao) values ($1, 'ligacao', 'intruso')`, [alheio]), /row-level security/)
+    await assert.rejects(c(quem, `insert into public.leads (nome, empresa_id) values ('intruso', $1)`, [outra]), /row-level security/)
+  }
+  // dentro da empresa a mesma empresa prospectada continua entrando uma vez só; o envio em lote ignora a repetida
+  await assert.rejects(c(GUI, `insert into public.leads (nome, cnpj) values ('B de novo', '98765432000101')`), (err) => err.code === '23505')
+  const lote = `insert into public.leads (nome, place_id) values ('Lote da B', '0xemp:0x9') on conflict (empresa_id, place_id) do nothing returning nome`
+  assert.deepEqual(await c(GUI, lote), [{ nome: 'Lote da B' }])
+  assert.deepEqual(await c(GUI, lote), [])
+  // a administradora vê as duas e, com duas empresas, tem de dizer em qual grava
+  assert.deepEqual((await c(ANA, 'select empresa_id from public.leads_kanban where id in ($1, $2) order by nome', [daA.id, daB.id])).map((l) => l.empresa_id), [A, B])
+  await assert.rejects(c(ANA, `insert into public.leads (nome) values ('Sem empresa')`), (err) => err.code === '23502')
+  const [daAna] = await c(ANA, `insert into public.leads (nome, empresa_id) values ('Da Ana na B', $1) returning id`, [B])
+  assert.equal((await c(GUI, 'select id from public.leads where id = $1', [daAna.id])).length, 1)
+  assert.equal((await c(BRUNO, 'select id from public.leads where id = $1', [daAna.id])).length, 0)
+  // o lead não muda de empresa
+  await assert.rejects(c(ANA, 'update public.leads set empresa_id = $1 where id = $2', [A, daAna.id]), /permission denied/)
+})
+
+test('Várias empresas: o mapa do Google Maps e os clientes ativos são de cada empresa', async () => {
+  const { A, c } = await empresasProntas()
+  const guardar = (uid, nome) =>
+    c(uid, `insert into public.maps_lugares (place_id, segmento, local_busca, nome, endereco, telefone, avaliacao) values ('0xemp:0x1', 'Transportadora', 'Lapa', $1, 'R. A, 1', '(11) 3333-0001', 4.5)
+            on conflict (empresa_id, place_id, segmento, local_busca) do update set nome = excluded.nome`, [nome])
+  await guardar(BRUNO, 'Na All Med')
+  await guardar(GUI, 'Na B')
+  await guardar(GUI, 'Na B, de novo')
+  // a All Med já tem esse lugar como lead, a B não: "no kanban" é de cada empresa
+  assert.deepEqual(await c(BRUNO, `select nome, enviado from public.maps_empresas where place_id = '0xemp:0x1'`), [{ nome: 'Na All Med', enviado: true }])
+  assert.deepEqual(await c(GUI, `select nome, enviado from public.maps_empresas where place_id = '0xemp:0x1'`), [{ nome: 'Na B, de novo', enviado: false }])
+  assert.deepEqual(await c(GUI, 'select local_busca, encontrados, enviados from public.maps_grupos'), [{ local_busca: 'Lapa', encontrados: 1, enviados: 0 }])
+  assert.equal((await c(ANA, `select empresa_id from public.maps_grupos where local_busca = 'Lapa'`)).length, 2)
+  // excluir a busca na B não tira a da All Med
+  assert.equal((await c(GUI, `update public.maps_lugares set deleted_at = now() where local_busca = 'Lapa' returning id`)).length, 1)
+  assert.equal((await c(BRUNO, `select * from public.maps_empresas where local_busca = 'Lapa'`)).length, 1)
+  // o mesmo cliente pode estar nas duas listas, e cada uma mexe só na sua
+  await c(BRUNO, `insert into public.clientes_ativos (nome) values ('Cliente Comum Ltda')`)
+  await c(GUI, `insert into public.clientes_ativos (nome) values ('Cliente Comum Ltda'), ('Cliente Só da B')`)
+  const lista = async (uid) => (await c(uid, 'select nome from public.clientes_ativos where deleted_at is null order by nome')).map((x) => x.nome)
+  assert.deepEqual(await lista(BRUNO), ['Cliente Comum Ltda'])
+  assert.deepEqual(await lista(GUI), ['Cliente Comum Ltda', 'Cliente Só da B'])
+  assert.equal((await c(BRUNO, 'update public.clientes_ativos set deleted_at = now() returning id')).length, 1)
+  assert.deepEqual(await lista(GUI), ['Cliente Comum Ltda', 'Cliente Só da B'])
+  await assert.rejects(c(GUI, `insert into public.clientes_ativos (nome, empresa_id) values ('Na All Med', $1)`, [A]), /row-level security/)
+})
+
+test('Várias empresas: o Painel de cada empresa conta só os dados dela', async () => {
+  const { b, A, B, c } = await empresasProntas()
+  const painel = async (uid, empresa) => (await c(uid, 'select public.painel_gerencial(null, null, $1) as p', [empresa]))[0].p
+  const leads = async (empresa) => Number((await b.query('select count(*) as n from public.leads where empresa_id = $1 and deleted_at is null', [empresa])).rows[0].n)
+  // sem dizer a empresa, o membro vê a dele
+  const daA = await painel(BRUNO, null)
+  const daB = await painel(GUI, null)
+  assert.deepEqual([daA.atual.leads_novos, daB.atual.leads_novos], [await leads(A), await leads(B)])
+  assert.notEqual(daA.atual.leads_novos, daB.atual.leads_novos)
+  assert.deepEqual([daA.atual.contatos, daB.atual.contatos], [1, 1])
+  assert.deepEqual([daA.hoje.clientes_ativos, daB.hoje.clientes_ativos], [0, 2])
+  assert.deepEqual([daA.hoje.empresas, daA.hoje.empresas_lead, daB.hoje.empresas], [1, 1, 0])
+  // o membro não abre o Painel da outra empresa; a administradora abre o de qualquer uma, mas tem de dizer qual
+  assert.equal(await painel(GUI, A), null)
+  assert.deepEqual((await painel(ANA, B)).atual, daB.atual)
+  assert.equal(await painel(ANA, null), null)
+})
+
+test('Várias empresas: cada membro é de uma empresa e vê só a equipe dela; empresa excluída fecha tudo para quem é dela', async () => {
+  const { b, B, c } = await empresasProntas()
+  const equipe = async (uid) => (await c(uid, 'select nome from public.membros order by nome')).map((m) => m.nome)
+  assert.deepEqual(await equipe(GUI), ['Gui'])
+  assert.deepEqual(await equipe(BRUNO), ['Ana', 'Bruno'])
+  assert.deepEqual(await equipe(ANA), ['Ana', 'Bruno', 'Gui'])
+  // com duas empresas, membro cadastrado sem empresa o banco recusa; administrador não precisa de empresa
+  await b.query(`select set_config('request.jwt.claim.sub', '', false)`)
+  await assert.rejects(b.query(`insert into public.membros (user_id, email, nome) values ($1, 'hel@x.com', 'Hel')`, [HEL]), /membros_membro_tem_empresa/)
+  await b.query(`insert into public.membros (user_id, email, nome, papel) values ($1, 'hel@x.com', 'Hel', 'admin')`, [HEL])
+  assert.deepEqual((await c(HEL, 'select nome from public.empresas order by nome')).map((e) => e.nome), ['All Med', 'Empresa B'])
+  // empresa excluída (deleted_at): quem é dela não abre mais nada, nem o Painel; a administradora ainda a vê, para trazer de volta
+  await c(ANA, 'update public.empresas set deleted_at = now() where id = $1', [B])
+  assert.equal((await c(GUI, 'select * from public.leads')).length, 0)
+  assert.equal((await c(GUI, 'select * from public.empresas')).length, 0)
+  assert.equal((await c(GUI, 'select public.painel_gerencial() as p'))[0].p, null)
+  await assert.rejects(c(GUI, `insert into public.leads (nome) values ('Depois de excluída')`), /row-level security/)
+  assert.equal((await c(ANA, 'select id from public.empresas where id = $1', [B])).length, 1)
+})
+
+test('Várias empresas: o script de volta tira as empresas e devolve as chaves únicas e o Painel de antes', async () => {
+  const banco = new PGlite()
+  await banco.exec(AUTH_SUPABASE)
+  await migrar(banco)
+  await banco.query(`insert into auth.users values ($1, 'ana@x.com')`, [ANA])
+  await banco.query(`insert into public.membros (user_id, email, nome, papel) values ($1, 'ana@x.com', 'Ana', 'admin')`, [ANA])
+  await comoEm(banco, ANA, `insert into public.leads (nome, cnpj) values ('Antes da volta', '11111111000101')`)
+  await voltarVariasEmpresas(banco)
+  assert.equal((await banco.query(`select to_regclass('public.empresas') as t`)).rows[0].t, null)
+  // o site de antes: envio em lote pela chave única de antes, kanban e Painel com dois parâmetros
+  const lote = await comoEm(banco, ANA, `insert into public.leads (nome, cnpj) values ('Repetido', '11111111000101'), ('Novo', '22222222000101') on conflict (cnpj) do nothing returning nome`)
+  assert.deepEqual(lote.map((l) => l.nome), ['Novo'])
+  assert.equal((await comoEm(banco, ANA, 'select * from public.leads_kanban')).length, 2)
+  assert.equal((await comoEm(banco, ANA, 'select public.painel_gerencial(null, null) as p'))[0].p.atual.leads_novos, 2)
 })
