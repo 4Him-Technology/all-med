@@ -910,6 +910,32 @@ test('Várias empresas: excluir registro do histórico respeita a empresa; o Pai
   assert.equal(await contatos(BRUNO, B), undefined)
 })
 
+// O que o site manda depois de escolher a empresa: ela vai explícita em toda gravação. No envio em lote e ao guardar uma
+// busca, o upsert do PostgREST regrava as colunas que envia, empresa_id junto.
+test('Várias empresas: o site grava na empresa escolhida, dizendo qual; ninguém grava na empresa que não é dele', async () => {
+  const { A, B, c } = await empresasProntas()
+  const lote = (uid, empresa, nome) =>
+    c(uid, `insert into public.leads (nome, place_id, origem, empresa_id) values ($1, '0xescolha:0x1', 'maps', $2) on conflict (empresa_id, place_id) do nothing returning empresa_id`, [nome, empresa])
+  const colunas = ['place_id', 'segmento', 'local_busca', 'nome', 'endereco', 'telefone', 'avaliacao', 'deleted_at', 'empresa_id']
+  const busca = (uid, empresa, nome) =>
+    c(uid, `insert into public.maps_lugares (${colunas}) values ('0xescolha:0x1', 'Padaria', 'Centro', $1, 'R. C, 3', '(11) 3333-0003', 4.2, null, $2)
+            on conflict (empresa_id, place_id, segmento, local_busca) do update set ${colunas.map((k) => `${k} = excluded.${k}`).join(', ')} returning empresa_id`, [nome, empresa])
+  // a administradora escolheu a Empresa B: grava lá, e a mesma empresa ou a mesma busca de novo não duplica
+  assert.deepEqual(await lote(ANA, B, 'Padaria do Centro'), [{ empresa_id: B }])
+  assert.deepEqual(await lote(ANA, B, 'Padaria do Centro'), [])
+  assert.deepEqual(await busca(ANA, B, 'Padaria do Centro'), [{ empresa_id: B }])
+  assert.deepEqual(await busca(ANA, B, 'Padaria do Centro (nome novo)'), [{ empresa_id: B }])
+  assert.deepEqual(await c(GUI, `select nome from public.maps_empresas where place_id = '0xescolha:0x1'`), [{ nome: 'Padaria do Centro (nome novo)' }])
+  // depois, na All Med, o mesmo lugar vira lead de novo: cada empresa fica com o seu
+  assert.deepEqual(await lote(ANA, A, 'Padaria do Centro'), [{ empresa_id: A }])
+  // o membro dizendo a empresa dele grava; dizendo a outra, o banco recusa
+  assert.deepEqual(await busca(GUI, B, 'Padaria do Centro (pelo Gui)'), [{ empresa_id: B }])
+  assert.deepEqual(await c(GUI, `insert into public.clientes_ativos (nome, empresa_id) values ('Cliente escolhido', $1) returning empresa_id`, [B]), [{ empresa_id: B }])
+  await assert.rejects(lote(GUI, A, 'Intruso'), /row-level security/)
+  await assert.rejects(busca(GUI, A, 'Intruso'), /row-level security/)
+  await assert.rejects(c(GUI, `insert into public.clientes_ativos (nome, empresa_id) values ('Intruso', $1)`, [A]), /row-level security/)
+})
+
 // A exclusão antiga (20261116120000, sem empresa) pode ter rodado no CRM online antes da de várias empresas: as colunas
 // e a função já existiriam. A migration da exclusão roda de novo sem erro e continua escondendo o excluído.
 test('Histórico: a migration da exclusão roda de novo sem erro e mantém o filtro do excluído', async () => {

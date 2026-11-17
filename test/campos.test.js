@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buscaMaps, camposLead, mensagemErro, resumoBusca, termoBusca, ultimoContato } from '../public/campos.js'
+import { buscaMaps, camposLead, empresaInicial, mensagemErro, resumoBusca, termoBusca, ultimoContato } from '../public/campos.js'
+
+test('empresa depois do login: o membro entra direto na dele; o administrador escolhe, a não ser que já tenha escolhido nesta aba', () => {
+  const allMed = { id: 'a', nome: 'All Med', deleted_at: null }
+  const b = { id: 'b', nome: 'Empresa B', deleted_at: null }
+  const excluida = { id: 'c', nome: 'Empresa C', deleted_at: '2026-11-16T12:00:00Z' }
+  // o membro não escolhe nada, nem com uma escolha de outra conta guardada na aba
+  assert.deepEqual(empresaInicial({ empresas: [allMed], admin: false, guardada: 'b' }), { empresa: allMed, opcoes: [] })
+  // membro de empresa excluída (o banco não devolve nenhuma): nem entra nem escolhe
+  assert.deepEqual(empresaInicial({ empresas: [], admin: false, guardada: null }), { empresa: null, opcoes: [] })
+  // o administrador vê os botões sempre, mesmo com uma empresa só; a excluída não aparece
+  assert.deepEqual(empresaInicial({ empresas: [allMed], admin: true, guardada: null }), { empresa: null, opcoes: [allMed] })
+  assert.deepEqual(empresaInicial({ empresas: [allMed, b, excluida], admin: true, guardada: null }), { empresa: null, opcoes: [allMed, b] })
+  assert.deepEqual(empresaInicial({ empresas: [allMed, b], admin: true, guardada: 'b' }), { empresa: b, opcoes: [allMed, b] })
+  // a escolha guardada de uma empresa excluída não vale: volta para os botões
+  assert.deepEqual(empresaInicial({ empresas: [allMed, b, excluida], admin: true, guardada: 'c' }), { empresa: null, opcoes: [allMed, b] })
+  // quem recebe mais de uma empresa escolhe, mesmo sem o papel de administrador carregado: nunca cai na primeira sem ver
+  assert.deepEqual(empresaInicial({ empresas: [allMed, b], admin: false, guardada: null }), { empresa: null, opcoes: [allMed, b] })
+})
 
 test('converte o formulário para as colunas do Supabase', () => {
   assert.deepEqual(camposLead({ nome: ' Clínica ', site: '', emails: 'a@b.com, ,c@d.com', temperatura: '' }), {

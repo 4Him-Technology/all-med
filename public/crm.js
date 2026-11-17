@@ -17,6 +17,20 @@ const ok = ({ data, error, count }) => {
   return { data, count }
 }
 
+// ---------- empresa ----------
+// A empresa escolhida depois do login: toda leitura e gravação daqui para baixo é dela. O administrador lê todas as
+// empresas pela RLS, então é o filtro por empresa_id que separa a tela; para o membro a RLS já separa.
+let empresa = null
+export const usarEmpresa = (id) => {
+  empresa = id
+}
+const daEmpresa = () => {
+  if (!empresa) throw new Error('Escolha a empresa antes de continuar.')
+  return empresa
+}
+// o membro recebe só a dele; o administrador, todas (inclusive as excluídas, que a tela não oferece)
+export const listarEmpresas = async () => ok(await cliente().from('empresas').select('id,nome,deleted_at').order('nome')).data
+
 // Uma consulta só para o quadro inteiro (antes eram sete, uma por coluna, e a tela levava uns 2 a 3 s)
 // shortcut: traz os 1000 leads ativos mais recentes; acima disso os totais das colunas ficam por baixo (avisado na tela)
 export const LIMITE_KANBAN = 1000
@@ -25,6 +39,7 @@ export async function kanban() {
     await cliente()
       .from('leads_kanban')
       .select('id,nome,categoria,telefone,temperatura,avaliacao,status,updated_at,ultimo_atendimento')
+      .eq('empresa_id', daEmpresa())
       .order('updated_at', { ascending: false })
       .limit(LIMITE_KANBAN),
   )
@@ -40,7 +55,7 @@ export const ORDENAVEIS = ['nome', 'status', 'temperatura', 'ultimo_atendimento'
 
 // lê da view do kanban (só leads ativos) porque ela já traz o último atendimento para ordenar
 export async function listarLeads({ q, status, temperatura, ordem = 'ultimo_atendimento', crescente = false, page = 1, limit = 25 }) {
-  let consulta = cliente().from('leads_kanban').select('id,nome,categoria,status,temperatura,ultimo_atendimento,created_at', { count: 'exact' })
+  let consulta = cliente().from('leads_kanban').select('id,nome,categoria,status,temperatura,ultimo_atendimento,created_at', { count: 'exact' }).eq('empresa_id', daEmpresa())
   if (status) consulta = consulta.eq('status', status)
   if (temperatura) consulta = consulta.eq('temperatura', temperatura)
   const termo = termoBusca(q)
@@ -58,7 +73,7 @@ export async function listarLeads({ q, status, temperatura, ordem = 'ultimo_aten
 // Quais destas empresas já estão no CRM (inclusive arquivadas, que o banco também não deixa voltar): Map cnpj -> arquivada?
 export async function jaNoCrm(cnpjs) {
   if (!supabase || !cnpjs.length) return new Map()
-  const { data } = ok(await cliente().from('leads').select('cnpj,deleted_at').in('cnpj', cnpjs))
+  const { data } = ok(await cliente().from('leads').select('cnpj,deleted_at').eq('empresa_id', daEmpresa()).in('cnpj', cnpjs))
   return new Map(data.map((l) => [l.cnpj, l.deleted_at != null]))
 }
 
@@ -70,19 +85,21 @@ export async function lerLead(id) {
   return { ...ok(lead).data, atendimentos: ok(historico).data }
 }
 
-export const criarLead = async (campos) => ok(await cliente().from('leads').insert(campos).select().single()).data
+export const criarLead = async (campos) => ok(await cliente().from('leads').insert({ ...campos, empresa_id: daEmpresa() }).select().single()).data
 export const atualizarLead = async (id, campos) => ok(await cliente().from('leads').update(campos).eq('id', id).select().single()).data
 export const arquivarLead = async (id) => ok(await cliente().from('leads').update({ deleted_at: new Date().toISOString() }).eq('id', id).select('id').single())
 export const registrarAtendimento = async (leadId, a) => ok(await cliente().from('atendimentos').insert({ lead_id: leadId, ...a }).select('id').single())
 // só o administrador, e só registro manual: o banco confere; o registro some do histórico mas fica guardado
 export const excluirAtendimento = async (id) => ok(await cliente().rpc('excluir_atendimento', { p_id: id }))
 
-// Manda leads em lotes; os que já estão no CRM da empresa (mesmo place_id do Maps ou mesmo CNPJ) o banco ignora.
-// A chave única vale dentro de cada empresa; sem empresa_id nas linhas, o banco põe a de quem grava.
+// Manda leads em lotes para a empresa escolhida; os que já estão no CRM dela (mesmo place_id do Maps ou mesmo CNPJ)
+// o banco ignora. A chave única vale dentro de cada empresa.
 export async function enviarLeads(leads, chave = 'place_id') {
+  const empresa_id = daEmpresa()
   let novos = 0
   for (let i = 0; i < leads.length; i += 500) {
-    const { data } = ok(await cliente().from('leads').upsert(leads.slice(i, i + 500), { onConflict: `empresa_id,${chave}`, ignoreDuplicates: true }).select('id'))
+    const lote = leads.slice(i, i + 500).map((l) => ({ ...l, empresa_id }))
+    const { data } = ok(await cliente().from('leads').upsert(lote, { onConflict: `empresa_id,${chave}`, ignoreDuplicates: true }).select('id'))
     novos += data.length
   }
   return novos
@@ -97,6 +114,7 @@ export const empresasMaps = () =>
       await cliente()
         .from('maps_empresas')
         .select('place_id,segmento,servico,local_busca,nome,categoria,endereco,telefone,site,avaliacao,latitude,longitude,link_maps,enviado', { count: 'exact' })
+        .eq('empresa_id', daEmpresa())
         .order('nome')
         .order('place_id')
         .order('segmento')
@@ -108,23 +126,29 @@ export const empresasMaps = () =>
 // Guarda no CRM online as empresas de uma busca do PC (lugaresDaBusca). A mesma busca de novo atualiza as que já
 // estavam e traz de volta as de uma busca excluída; vai em partes para não passar do tamanho de uma chamada.
 export async function guardarBusca(linhas) {
-  for (let i = 0; i < linhas.length; i += 500) ok(await cliente().from('maps_lugares').upsert(linhas.slice(i, i + 500), { onConflict: 'empresa_id,place_id,segmento,local_busca' }))
+  const empresa_id = daEmpresa()
+  for (let i = 0; i < linhas.length; i += 500) {
+    ok(await cliente().from('maps_lugares').upsert(linhas.slice(i, i + 500).map((l) => ({ ...l, empresa_id })), { onConflict: 'empresa_id,place_id,segmento,local_busca' }))
+  }
 }
 
 // A busca do PC já foi guardada (mesmo que excluída depois) se alguma empresa dela foi gravada depois que ela terminou.
 // O PC antigo não apaga a busca guardada: sem isto, o site gravaria de novo, e traria de volta a excluída, a cada visita.
 export async function buscaJaGuardada({ segmento, local_busca }, terminouEm) {
-  return ok(await cliente().from('maps_lugares').select('id').eq('segmento', segmento).eq('local_busca', local_busca).gte('updated_at', terminouEm).limit(1)).data.length > 0
+  const consulta = cliente().from('maps_lugares').select('id').eq('empresa_id', daEmpresa()).eq('segmento', segmento).eq('local_busca', local_busca)
+  return ok(await consulta.gte('updated_at', terminouEm).limit(1)).data.length > 0
 }
 
 // As buscas guardadas, uma por segmento e local, da mais nova para a mais antiga
 // shortcut: lê até 1000 buscas; acima disso, ler em páginas com lerTudo
 export const buscasGuardadas = async () =>
-  ok(await cliente().from('maps_grupos').select('local_busca,segmento,encontrados,enviados,ultima').order('ultima', { ascending: false }).limit(1000)).data
+  ok(await cliente().from('maps_grupos').select('local_busca,segmento,encontrados,enviados,ultima').eq('empresa_id', daEmpresa()).order('ultima', { ascending: false }).limit(1000)).data
 
 // Excluir a busca tira as empresas dela do mapa (deleted_at); o que já virou lead continua no kanban. Devolve quantas saíram.
+// Só na empresa escolhida: o administrador, que grava em todas, não tira a mesma busca de outra empresa.
 export async function excluirBusca({ segmento, local_busca }) {
-  const { data } = ok(await cliente().from('maps_lugares').update({ deleted_at: new Date().toISOString() }).eq('segmento', segmento).eq('local_busca', local_busca).is('deleted_at', null).select('id'))
+  const consulta = cliente().from('maps_lugares').update({ deleted_at: new Date().toISOString() }).eq('empresa_id', daEmpresa())
+  const { data } = ok(await consulta.eq('segmento', segmento).eq('local_busca', local_busca).is('deleted_at', null).select('id'))
   return data.length
 }
 
@@ -133,7 +157,7 @@ export async function excluirBusca({ segmento, local_busca }) {
 // shortcut: lê até 1000 clientes de uma vez; acima disso, ler em páginas com lerTudo
 let pedidoClientes
 export function clientesAtivos() {
-  pedidoClientes ??= (async () => ok(await cliente().from('clientes_ativos').select('id,nome').is('deleted_at', null).order('nome').limit(1000)).data)().catch((err) => {
+  pedidoClientes ??= (async () => ok(await cliente().from('clientes_ativos').select('id,nome').eq('empresa_id', daEmpresa()).is('deleted_at', null).order('nome').limit(1000)).data)().catch((err) => {
     pedidoClientes = null
     throw err
   })
@@ -141,7 +165,7 @@ export function clientesAtivos() {
 }
 
 export async function cadastrarCliente(nome) {
-  const { error } = await cliente().from('clientes_ativos').insert({ nome })
+  const { error } = await cliente().from('clientes_ativos').insert({ nome, empresa_id: daEmpresa() })
   if (error?.code === '23505') throw new Error('Esse cliente já está na lista.')
   ok({ error })
   pedidoClientes = null
@@ -154,9 +178,9 @@ export async function tirarCliente(id) {
 }
 
 // ---------- painel gerencial ----------
-// As contas são feitas no banco (public.painel_gerencial) e chegam prontas num JSON; sem início, desde o começo
+// As contas são feitas no banco (public.painel_gerencial) e chegam prontas num JSON, só da empresa escolhida; sem início, desde o começo
 export async function painelGerencial({ de, ate }) {
-  const { data } = ok(await cliente().rpc('painel_gerencial', { p_de: de, p_ate: ate }))
+  const { data } = ok(await cliente().rpc('painel_gerencial', { p_de: de, p_ate: ate, p_empresa: daEmpresa() }))
   if (!data) throw new Error('Sua conta não tem acesso ao painel. Fale com o administrador do sistema.')
   return data
 }

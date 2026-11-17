@@ -1,5 +1,5 @@
 import { acompanharBuscas, iniciarBuscas } from './buscas-mapa.js'
-import { buscaMaps, camposLead, resumoBusca, ultimoContato } from './campos.js'
+import { buscaMaps, camposLead, empresaInicial, resumoBusca, ultimoContato } from './campos.js'
 import { clienteDe, prepararClientes } from './clientes.js'
 import * as crm from './crm.js'
 import { abrirMapa, carregarLeaflet } from './mapa.js'
@@ -878,8 +878,13 @@ function abrirTrocaSenha() {
 }
 
 // ---------- login ----------
-function mostrarLogin() {
+// antes de entrar numa empresa, o topo fica só com a marca (e a conta, para poder sair)
+const esconderSistema = () => {
   for (const el of document.querySelectorAll('.abas, [data-crm], main')) el.hidden = true
+}
+
+function mostrarLogin() {
+  esconderSistema()
   $('#tela-login').hidden = false
   // entrar e primeiro acesso dividem a tela; o e-mail digitado passa de um para o outro
   const trocar = (de, para) => {
@@ -937,6 +942,40 @@ function aviso(texto) {
   el.hidden = false
 }
 
+// ---------- empresa ----------
+// a empresa escolhida fica só nesta aba, como a sessão; Sair e Trocar a esquecem
+const CHAVE_EMPRESA = 'empresa'
+const esquecerEmpresa = () => sessionStorage.removeItem(CHAVE_EMPRESA)
+
+// o administrador escolhe nos botões; a página carrega de novo já com a empresa, sem nada da anterior na memória
+function mostrarEscolhaEmpresa(opcoes) {
+  esconderSistema()
+  // Usuários e acessos abre depois de escolher a empresa (o formulário de cadastro só é ligado no fim do início)
+  $('#menu-usuarios').hidden = true
+  const escolher = (e) => (ev) => {
+    carregando(ev.currentTarget, 'Abrindo…')
+    sessionStorage.setItem(CHAVE_EMPRESA, e.id)
+    location.reload()
+  }
+  $('#empresas-escolha').replaceChildren(...opcoes.map((e) => h('button', { type: 'button', class: 'empresa-opcao', onclick: escolher(e) }, h('span', {}, e.nome), icone('avancar'))))
+  $('#tela-empresas').hidden = false
+  $('#empresas-escolha button').focus()
+}
+
+function mostrarEmpresaNoTopo(e) {
+  $('#empresa-nome').textContent = e.nome
+  $('#empresa-atual').hidden = false
+  document.title = `${e.nome} · Leads Maps`
+  if (!souAdmin) return
+  const trocar = $('#btn-trocar-empresa')
+  trocar.setAttribute('aria-label', `Trocar de empresa (agora: ${e.nome})`)
+  trocar.hidden = false
+  trocar.addEventListener('click', () => {
+    esquecerEmpresa()
+    location.reload()
+  })
+}
+
 // ---------- início ----------
 async function iniciar() {
   prepararDialogos()
@@ -972,10 +1011,15 @@ async function iniciar() {
     $('#menu-usuarios').addEventListener('click', abrirUsuarios)
     $('#menu-sair').addEventListener('click', async (e) => {
       carregando(e.currentTarget, 'Saindo…')
+      esquecerEmpresa()
       await supabase.auth.signOut()
       location.reload()
     })
-    supabase.auth.onAuthStateChange((evento) => evento === 'SIGNED_OUT' && location.reload())
+    supabase.auth.onAuthStateChange((evento) => {
+      if (evento !== 'SIGNED_OUT') return
+      esquecerEmpresa()
+      location.reload()
+    })
 
     // equipe: só membro ativo entra nos leads; admin cadastra e desativa usuários
     try {
@@ -996,6 +1040,28 @@ async function iniciar() {
     } catch (err) {
       // sem conseguir ler a equipe, segue com o que a RLS deixar ver; só o cadastro de usuários não aparece
       console.error('equipe:', err.message)
+    }
+
+    // várias empresas: o membro entra direto na dele; o administrador escolhe nos botões e troca pelo topo
+    if (logado) {
+      let escolha
+      try {
+        escolha = empresaInicial({ empresas: await crm.listarEmpresas(), admin: souAdmin, guardada: sessionStorage.getItem(CHAVE_EMPRESA) })
+      } catch (err) {
+        // sem saber a empresa, nenhuma tela abre: o administrador veria todas misturadas
+        console.error('empresas:', err.message)
+        esconderSistema()
+        return aviso('Não foi possível carregar as empresas. Confira sua conexão e recarregue a página.')
+      }
+      if (escolha.empresa) {
+        crm.usarEmpresa(escolha.empresa.id)
+        mostrarEmpresaNoTopo(escolha.empresa)
+      } else if (escolha.opcoes.length) {
+        return mostrarEscolhaEmpresa(escolha.opcoes)
+      } else {
+        logado = false
+        aviso(souAdmin ? 'Nenhuma empresa ativa no sistema.' : 'Sua empresa não está ativa no sistema. Fale com o administrador.')
+      }
     }
   } else if (config.local) {
     aviso('O CRM online não está ligado neste computador. A prospecção funciona, mas o envio ao kanban fica desativado até a configuração ser concluída.')

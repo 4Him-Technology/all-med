@@ -240,6 +240,8 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 - As colunas de tela são as abas do topo, com o mesmo nome; aba nova entra sozinha, menos o Painel, que abre para todos (a nota do formulário diz isso). Na linha do administrador, as caixas dão lugar a "Abre todas as telas". Marcar grava na hora, com o aviso "Bruno agora abre Leads"; se o banco recusar, a caixa volta e o aviso diz o erro. Pelo teclado, o foco fica na caixa.
 - A aba e o botão (Novo lead, Nova busca pelo PC) de tela não liberada somem do topo. Sem nenhuma tela, fica só o aviso para pedir acesso ao administrador.
 - Login com dois cartões que se alternam: Entrar e Primeiro acesso (o e-mail digitado passa de um para o outro).
+- Escolha da empresa (só o administrador, depois do login): o mesmo cartão do login, com a pergunta "Em qual empresa você vai trabalhar?" e um botão largo por empresa (48px de altura, nome à esquerda e a seta à direita), em ordem de nome; o foco começa no primeiro. O topo fica só com a marca e o ícone da conta.
+- Empresa no topo: o nome dela numa segunda linha embaixo de Leads Maps (12px, marinho, semibold), com "Trocar" ao lado só para o administrador. As duas linhas cabem na altura dos botões do topo, então o topo não cresce no computador; nome longo sai com reticências. O título da aba do navegador começa pelo nome da empresa.
 
 ### Ficha ao lado (Leads)
 - Painel branco fixo de 470px que entra deslizando, rola por dentro e fecha no x ou com Esc. É o mesmo conteúdo da gaveta do kanban.
