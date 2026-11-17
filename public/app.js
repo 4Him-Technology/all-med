@@ -8,7 +8,7 @@ import { carregarClientes } from './tela-clientes.js'
 import { carregarPainel } from './tela-painel.js'
 import { ROTULOS as R, STATUS } from './rotulos.js'
 import { config, supabase } from './supa.js'
-import { $, api, avaliacao, carregando, esqueleto, estado, fecharDialogo, h, icone, prepararDialogos, toast } from './ui.js'
+import { $, api, avaliacao, carregando, confirmar, esqueleto, estado, fecharDialogo, h, icone, prepararDialogos, toast } from './ui.js'
 
 const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 const fmtDia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
@@ -374,7 +374,7 @@ function renderLead(dlg, l) {
                   h('strong', {}, R.tipo[a.tipo]),
                   h('time', { datetime: a.data }, quando(a.data)),
                   // a mudança de etapa é o sistema que grava: não tem botão
-                  souAdmin && a.tipo !== 'status' && h('button', { type: 'button', class: 'ev-excluir', 'aria-label': `Excluir o registro de ${R.tipo[a.tipo]} de ${quando(a.data)}`, onclick: (e) => excluirRegistro(l, e.currentTarget, a), onblur: desarmarExclusao }, 'Excluir'),
+                  souAdmin && a.tipo !== 'status' && h('button', { type: 'button', class: 'ev-excluir', 'aria-label': `Excluir o registro de ${R.tipo[a.tipo]} de ${quando(a.data)}`, onclick: (e) => excluirRegistro(l, e.currentTarget, a) }, 'Excluir'),
                 ),
                 h('p', {}, a.descricao),
               ),
@@ -408,14 +408,16 @@ function renderLead(dlg, l) {
   )
 }
 
-// excluir pede um segundo clique; o registro some do histórico, das contas e do último contato, mas fica guardado no banco
+// excluir pede confirmação numa janela no meio da tela; o registro some do histórico, das contas e do último contato,
+// mas fica guardado no banco
 async function excluirRegistro(l, botao, a) {
-  if (!botao.dataset.confirmar) {
-    botao.dataset.confirmar = 'sim'
-    botao.textContent = 'Confirmar exclusão'
-    botao.classList.add('perigo')
-    return
-  }
+  const sim = await confirmar({
+    titulo: 'Excluir este registro do histórico?',
+    texto: `O registro de ${R.tipo[a.tipo]} de ${quando(a.data)} sai da ficha, do último contato e das contas do Painel. Ele continua guardado no banco, mas não volta pela tela.`,
+    detalhe: a.descricao,
+    acao: 'Excluir registro',
+  })
+  if (!sim) return botao.focus()
   const restaurar = carregando(botao, 'Excluindo…')
   try {
     await crm.excluirAtendimento(a.id)
@@ -430,13 +432,6 @@ async function excluirRegistro(l, botao, a) {
   }
 }
 
-function desarmarExclusao(e) {
-  const b = e.currentTarget
-  if (!b.dataset.confirmar || b.disabled) return
-  delete b.dataset.confirmar
-  b.textContent = 'Excluir'
-  b.classList.remove('perigo')
-}
 
 async function arquivar(l, botao) {
   if (!confirm(`Arquivar "${l.nome}"? Ele sai do kanban e da lista, e não volta em novas buscas.`)) return
