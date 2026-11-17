@@ -177,6 +177,16 @@ Regras das contas, testadas em [test/crm-sql.test.js](test/crm-sql.test.js) (per
 
 Quem vê: todo membro ativo da equipe (pedido do Filipe em 12/11/2026: "a tela gerencial literalmente é para todos verem"), sem precisar marcar nada em "Usuários e acessos", onde o Painel nem aparece. Cada empresa tem o seu Painel: a função recebe a empresa (`p_empresa`; sem ela, a de quem está logado), conta só os dados dela e abre para o membro ativo dela e para o administrador. Ela roda como dona das tabelas (security definer) e confere isso dentro dela, porque mostra os números de todos os leads da empresa mesmo para quem não abre o Kanban; `public.minhas_telas()` devolve `painel` para todo membro ativo, e é por ela que o site mostra as abas. Desativado e quem está fora da equipe não veem a aba e, se chamarem a função, recebem null; visitante sem login não chama. Quem abre o Painel sem Kanban e sem Leads vê o nome dos leads parados sem link, porque a ficha não abriria para ele.
 
+## Várias empresas
+
+O sistema atende mais de uma empresa (All Med, Empresa B e as que vierem), independentes entre si. No banco, cada dado tem a sua empresa e a separação fica na RLS (ver "Configurar o Supabase"). Na tela:
+
+- quem é administrador escolhe a empresa depois do login, num botão por empresa, e troca pelo **Trocar** embaixo da marca, no topo; a escolha fica só naquela aba (`sessionStorage`) e some ao sair;
+- o membro entra direto na empresa dele, sem escolha;
+- toda leitura e gravação do site passa por `public/crm.js` com a empresa escolhida (`usarEmpresa`): o administrador lê todas as empresas pela RLS, e é esse filtro que separa a tela dele. A regra de quem escolhe e quem entra direto está em `empresaInicial`, em [public/campos.js](public/campos.js), testada em [test/campos.test.js](test/campos.test.js).
+
+Ainda não são por empresa: Usuários e acessos (etapa 3) e as buscas do Google pelo PC (etapa 4). Detalhes e o passo a passo em [INSTALAR.md](INSTALAR.md), "Várias empresas".
+
 ## Segurança
 
 - Tela local: presa em `127.0.0.1`, checagem do cabeçalho Host (contra DNS rebinding), POST só com `application/json`, CSP restrita, DOM montado sem `innerHTML`, sem stack trace nas respostas.

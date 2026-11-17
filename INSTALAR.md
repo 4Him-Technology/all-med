@@ -272,11 +272,26 @@ select nome, email from public.membros where papel = 'admin' and ativo;
 
 A primeira mostra só a All Med, com todos os leads. A segunda mostra quem vai entrar em todas as empresas. Se alguém ali for só da All Med, troque o papel antes de existir a segunda empresa: `update public.membros set papel = 'membro' where email = '<e-mail da pessoa>';`.
 
-Ainda não crie a Empresa B (nem pelo SQL Editor): com duas empresas, o site de hoje não sabe em qual gravar o que o administrador manda. A escolha da empresa depois do login vem na etapa 2, e o cadastro de empresas e de pessoas em cada uma, na etapa 3.
+Ainda não crie a Empresa B (nem pelo SQL Editor): sem a etapa 2, o site não sabe em qual empresa gravar o que o administrador manda, e sem a etapa 3 o cadastro de usuários não sabe em qual empresa pôr a pessoa.
 
 Cargas no SQL Editor depois desta etapa: as chaves únicas valem dentro de cada empresa, então o `on conflict` passa a começar por `empresa_id` (`on conflict (empresa_id, place_id, segmento, local_busca)` no mapa e `on conflict (empresa_id, lower(btrim(nome))) where deleted_at is null` nos clientes ativos).
 
 Para voltar atrás (enquanto só existir a All Med): no topo da migration há um script de volta (as linhas que começam com `-- drop`, `-- alter`, `-- create`, `-- revoke` e `-- grant`). Copie essas linhas sem o `-- ` do começo e rode no **SQL Editor**; depois rode de novo o bloco da função `public.painel_gerencial` da `20261112200000_painel_mais_cortes.sql` (até `$fn$;`, mais as duas linhas de `revoke` e `grant` logo abaixo) e reverta o PR no GitHub. Os dados ficam todos, só sem a empresa.
+
+### Etapa 2: escolher a empresa depois do login
+
+Quem é **Administrador**, ao entrar, vê um botão para cada empresa e escolhe em qual vai trabalhar (sempre, mesmo enquanto só existe a All Med). A escolha vale naquela aba até sair do sistema ou clicar em **Trocar**, embaixo do nome Leads Maps, no topo, que volta aos botões. O membro não vê escolha nenhuma: entra direto na empresa dele, e o nome dela aparece no topo, sem o Trocar. O nome da empresa também vai para o título da aba do navegador.
+
+Tudo o que a tela lê e grava passa a ser da empresa escolhida: Painel, Kanban, Leads, a ficha, o envio da Prospecção e do Google Maps ao kanban, o mapa, as buscas guardadas e a lista de clientes ativos. Para o membro o banco já separava; para o administrador, que lê todas as empresas, é a escolha que separa.
+
+Instalação: só aprovar o PR no GitHub. O banco não muda e o PC não precisa de nada. Para conferir, entre no site com a sua conta: aparece o botão **All Med**; clique e tudo fica como antes.
+
+O que ainda não é por empresa, até as próximas etapas:
+
+- **Usuários e acessos** continua listando todo mundo, e o cadastro não pergunta a empresa. Com uma segunda empresa criada, cadastrar alguém dá erro até a etapa 3, que traz o cadastro de empresas e de pessoas em cada uma. Por isso, espere a etapa 3 para criar a Empresa B.
+- **Buscas do Google pelo PC:** quando uma busca termina, ela é guardada na empresa de quem estiver com o site aberto naquela hora. Com duas empresas usando o mesmo PC, isso fica certo na etapa 4.
+
+Para voltar atrás: reverta o PR no GitHub. Nada muda no banco.
 
 ## Excluir registro do histórico
 

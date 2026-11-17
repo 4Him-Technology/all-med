@@ -31,7 +31,11 @@
   <body>
     <a class="pular" href="#conteudo">Pular para o conteúdo</a>
     <header class="topo">
-      <h1 class="marca" translate="no">Leads <span>Maps</span></h1>
+      <div class="marca-bloco">
+        <h1 class="marca" translate="no">Leads <span>Maps</span></h1>
+        <!-- a empresa em que a pessoa está trabalhando; só o administrador troca -->
+        <p id="empresa-atual" class="empresa-atual" hidden><span id="empresa-nome" translate="no"></span><button type="button" id="btn-trocar-empresa" class="link" hidden>Trocar</button></p>
+      </div>
       <nav class="abas" aria-label="Seções">
         <button type="button" class="aba" data-aba="painel" data-crm>Painel</button>
         <button type="button" class="aba" data-aba="kanban" data-crm>Kanban</button>
@@ -77,6 +81,16 @@
         <button class="primario">Criar senha e entrar</button>
         <button type="button" id="voltar-login" class="link">Já tenho senha</button>
       </form>
+    </section>
+
+    <!-- depois do login, o administrador escolhe a empresa; o membro entra direto na dele e não vê esta tela -->
+    <section id="tela-empresas" class="tela-login" aria-labelledby="empresas-titulo" hidden>
+      <div class="cartao">
+        <p class="marca marca-login" translate="no" aria-hidden="true">Leads <span>Maps</span></p>
+        <h2 id="empresas-titulo">Em qual empresa você vai trabalhar?</h2>
+        <p class="muted pequeno">Como administrador, você entra em todas. Para mudar depois, clique em Trocar, no topo.</p>
+        <div id="empresas-escolha" class="empresas-escolha"></div>
+      </div>
     </section>
 
     <main id="conteudo" tabindex="-1">

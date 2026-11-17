@@ -21,6 +21,16 @@ export function camposLead(form) {
   return out
 }
 
+// Em qual empresa a pessoa entra depois do login. O membro é de uma só (o banco só devolve a dele) e entra direto. O
+// administrador escolhe entre as que não foram excluídas, a não ser que já tenha escolhido nesta aba (guardada).
+// Quem recebe mais de uma também escolhe (o papel pode não ter carregado), em vez de cair na primeira sem ver.
+// Sem empresa e sem opções, a conta não tem onde entrar.
+export function empresaInicial({ empresas, admin, guardada }) {
+  const ativas = empresas.filter((e) => !e.deleted_at)
+  if (!admin && ativas.length <= 1) return { empresa: ativas[0] ?? null, opcoes: [] }
+  return { empresa: ativas.find((e) => e.id === guardada) ?? null, opcoes: ativas }
+}
+
 // tira o que tem significado na sintaxe de filtro do PostgREST (vírgula, parênteses, curingas, aspas)
 export const termoBusca = (q) =>
   String(q ?? '')

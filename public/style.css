@@ -188,6 +188,41 @@ textarea {
   font-weight: 500;
 }
 
+/* a empresa escolhida fica embaixo da marca: não alarga o topo, e as duas linhas cabem na altura dos botões (38px) */
+.marca-bloco {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  max-width: 220px;
+}
+
+.marca-bloco .marca {
+  line-height: 1.1;
+}
+
+.empresa-atual {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--fg);
+}
+
+#empresa-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empresa-atual .link {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
 .abas {
   display: flex;
   gap: 6px;
@@ -3446,6 +3481,30 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   font-size: 19px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--borda);
+}
+
+/* escolha da empresa depois do login: um botão grande por empresa, na ordem do nome */
+.empresas-escolha {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empresa-opcao {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--fg);
+  transition: background-color var(--dur-rapida) var(--ease-out), border-color var(--dur-rapida) var(--ease-out);
+}
+
+.empresa-opcao .ico {
+  flex-shrink: 0;
+  color: var(--primaria);
 }
 
 
