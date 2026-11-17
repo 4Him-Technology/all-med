@@ -53,6 +53,7 @@
         <button type="button" id="btn-conta" class="btn-conta" popovertarget="menu-conta" aria-label="Minha conta" hidden></button>
         <div id="menu-conta" class="menu-conta" popover>
           <p class="menu-conta-quem"><strong id="conta-nome"></strong><span id="conta-email" class="muted pequeno"></span></p>
+          <button type="button" id="menu-empresas" class="item-menu" hidden>Empresas</button>
           <button type="button" id="menu-usuarios" class="item-menu" hidden>Usuários e acessos</button>
           <button type="button" id="menu-senha" class="item-menu">Trocar senha</button>
           <button type="button" id="menu-sair" class="item-menu">Sair</button>
@@ -90,6 +91,7 @@
         <h2 id="empresas-titulo">Em qual empresa você vai trabalhar?</h2>
         <p class="muted pequeno">Como administrador, você entra em todas. Para mudar depois, clique em Trocar, no topo.</p>
         <div id="empresas-escolha" class="empresas-escolha"></div>
+        <button type="button" id="ir-empresas" class="link">Criar, renomear ou excluir empresas</button>
       </div>
     </section>
 
@@ -278,7 +280,7 @@
           </label>
           <button class="primario">Cadastrar</button>
         </div>
-        <p class="muted pequeno">Depois de cadastrada, a pessoa abre o sistema, clica em "Primeiro acesso", digita este e-mail e cria a própria senha. Na lista, marque as telas que cada pessoa abre: a mudança vale na hora, e quem não tem a tela não vê a aba nem os dados dela. Administrador abre todas e também cadastra e desativa usuários. O Painel abre para toda a equipe, por isso não está na lista.</p>
+        <p class="muted pequeno">A lista mostra a equipe da <strong id="usuarios-empresa"></strong> e os administradores. Quem você cadastra como Membro entra nesta empresa e só vê os dados dela; Administrador entra em todas as empresas, abre todas as telas e também cadastra e desativa usuários. Depois de cadastrada, a pessoa abre o sistema, clica em "Primeiro acesso", digita este e-mail e cria a própria senha. Na lista, marque as telas que cada pessoa abre: a mudança vale na hora, e quem não tem a tela não vê a aba nem os dados dela. O Painel abre para toda a equipe, por isso não está na lista.</p>
       </form>
       <div class="tabela-wrap">
         <table class="tabela tabela-usuarios">

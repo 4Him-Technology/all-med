@@ -18,6 +18,9 @@ const MEMBRO = '22222222-2222-4222-8222-222222222222'
 const PENDENTE = '33333333-3333-4333-8333-333333333333' // cadastrado, ainda sem primeiro acesso
 const BLOQUEADO = '44444444-4444-4444-8444-444444444444' // cadastrado e desativado antes do primeiro acesso
 const NOVO = '99999999-9999-4999-8999-999999999999'
+const ALL_MED = 'aaaaaaaa-1111-4111-8111-111111111111'
+const EMPRESA_B = 'bbbbbbbb-2222-4222-8222-222222222222'
+const EXCLUIDA = 'cccccccc-3333-4333-8333-333333333333' // empresa que o administrador excluiu (deleted_at)
 const SITE = 'https://allmed.4him.com.br'
 const PENDENTE_MSG = /Não há primeiro acesso pendente/
 
@@ -33,6 +36,7 @@ function crmFalso() {
   const chamadas = []
   const falhas = new Set()
   const deps = {
+    empresaAtiva: async (id) => [ALL_MED, EMPRESA_B].includes(id),
     usuarioDoToken: async (t) => ({ 'token-admin': ADMIN, 'token-membro': MEMBRO })[t] ?? null,
     membro: async (id) => membros.get(id) ?? null,
     membroPorEmail: async (email) => [...membros.values()].find((m) => m.email === email) ?? null,
@@ -100,18 +104,26 @@ test('cadastrar, desativar e reativar exigem login de admin', async () => {
   assert.deepEqual(chamadas, [])
 })
 
-test('admin cadastra com nome, e-mail e papel; a senha fica para a pessoa criar', async () => {
+test('admin cadastra com nome, e-mail, papel e empresa; a senha fica para a pessoa criar', async () => {
   const { tratar, chamadas } = crmFalso()
-  const r = await tratar(pedido('token-admin', { acao: 'criar', email: '  Novo@X.com ', nome: ' Novo Usuário ', papel: 'membro', senha: 'escolhida-pelo-admin', ativo: false, user_id: ADMIN }))
+  const r = await tratar(pedido('token-admin', { acao: 'criar', email: '  Novo@X.com ', nome: ' Novo Usuário ', papel: 'membro', empresa_id: EMPRESA_B, senha: 'escolhida-pelo-admin', ativo: false, user_id: ADMIN }))
   assert.equal(r.status, 201)
   // só os campos permitidos entram: senha, "ativo" e "user_id" mandados no pedido são ignorados
-  assert.deepEqual(await r.json(), { user_id: NOVO, email: 'novo@x.com', nome: 'Novo Usuário', papel: 'membro', ativo: true, ativado_em: null })
+  assert.deepEqual(await r.json(), { user_id: NOVO, email: 'novo@x.com', nome: 'Novo Usuário', papel: 'membro', empresa_id: EMPRESA_B, ativo: true, ativado_em: null })
   assert.deepEqual(chamadas, [['criarConta', 'novo@x.com', 'Novo Usuário']])
+})
+
+test('administrador cadastrado não fica preso a uma empresa: entra em todas', async () => {
+  const { tratar } = crmFalso()
+  const r = await tratar(pedido('token-admin', { acao: 'criar', email: 'gerente@x.com', nome: 'Gerente', papel: 'admin', empresa_id: ALL_MED }))
+  assert.equal(r.status, 201)
+  assert.equal((await r.json()).empresa_id, null)
 })
 
 test('recusa cadastro com dado inválido sem criar conta', async () => {
   const { tratar, chamadas } = crmFalso()
-  for (const corpo of [{ email: 'sem-arroba', nome: 'X' }, { email: 'a@b.com', nome: '' }, { email: 'a@b.com', nome: 'X', papel: 'dono' }]) {
+  const certo = { email: 'a@b.com', nome: 'X', empresa_id: ALL_MED }
+  for (const corpo of [{ ...certo, email: 'sem-arroba' }, { ...certo, nome: '' }, { ...certo, papel: 'dono' }]) {
     const r = await tratar(pedido('token-admin', { acao: 'criar', ...corpo }))
     assert.equal(r.status, 422, JSON.stringify(corpo))
     assert.equal(typeof (await r.json()).erro, 'string')
@@ -119,12 +131,22 @@ test('recusa cadastro com dado inválido sem criar conta', async () => {
   assert.deepEqual(chamadas, [])
 })
 
+test('membro só se cadastra numa empresa que existe: sem empresa, com uma inventada ou com a excluída, nada é criado', async () => {
+  const { tratar, chamadas } = crmFalso()
+  for (const empresa_id of [undefined, '', 'All Med', NOVO, EXCLUIDA]) {
+    const r = await tratar(pedido('token-admin', { acao: 'criar', email: 'a@b.com', nome: 'X', papel: 'membro', empresa_id }))
+    assert.equal(r.status, 422, String(empresa_id))
+    assert.match((await r.json()).erro, /empresa/i)
+  }
+  assert.deepEqual(chamadas, [])
+})
+
 test('e-mail já cadastrado vira mensagem clara; falha ao gravar o membro desfaz a conta criada', async () => {
   const { tratar, chamadas } = crmFalso()
-  const repetido = await tratar(pedido('token-admin', { acao: 'criar', email: 'ja@existe.com', nome: 'X' }))
+  const repetido = await tratar(pedido('token-admin', { acao: 'criar', email: 'ja@existe.com', nome: 'X', empresa_id: ALL_MED }))
   assert.equal(repetido.status, 422)
   assert.match((await repetido.json()).erro, /Já existe/)
-  const falha = await tratar(pedido('token-admin', { acao: 'criar', email: 'f@x.com', nome: 'Falha' }))
+  const falha = await tratar(pedido('token-admin', { acao: 'criar', email: 'f@x.com', nome: 'Falha', empresa_id: ALL_MED }))
   assert.equal(falha.status, 500)
   assert.doesNotMatch((await falha.json()).erro, /banco fora do ar/)
   assert.deepEqual(chamadas.at(-1), ['apagarConta', NOVO])

@@ -286,12 +286,33 @@ Tudo o que a tela lê e grava passa a ser da empresa escolhida: Painel, Kanban, 
 
 Instalação: só aprovar o PR no GitHub. O banco não muda e o PC não precisa de nada. Para conferir, entre no site com a sua conta: aparece o botão **All Med**; clique e tudo fica como antes.
 
-O que ainda não é por empresa, até as próximas etapas:
-
-- **Usuários e acessos** continua listando todo mundo, e o cadastro não pergunta a empresa. Com uma segunda empresa criada, cadastrar alguém dá erro até a etapa 3, que traz o cadastro de empresas e de pessoas em cada uma. Por isso, espere a etapa 3 para criar a Empresa B.
-- **Buscas do Google pelo PC:** quando uma busca termina, ela é guardada na empresa de quem estiver com o site aberto naquela hora. Com duas empresas usando o mesmo PC, isso fica certo na etapa 4.
+Nesta etapa, Usuários e acessos ainda listava todo mundo e o cadastro não perguntava a empresa: isso veio na etapa 3, logo abaixo. As buscas do Google pelo PC são guardadas na empresa de quem estiver com o site aberto quando a busca termina; com duas empresas usando o mesmo PC, isso fica certo na etapa 4.
 
 Para voltar atrás: reverta o PR no GitHub. Nada muda no banco.
+
+### Etapa 3: empresas e pessoas em cada uma
+
+Quem é **Administrador** ganha a janela **Empresas**, no ícone da conta e também na tela de escolha (**Criar, renomear ou excluir empresas**): cria uma empresa nova, muda o nome de uma e exclui. Excluir não apaga nada: quem é da empresa perde o acesso na hora, e os leads, o histórico e o mapa dela ficam guardados no CRM online. O nome não se repete entre as empresas que existem. Ao fechar a janela depois de mudar alguma coisa, a página carrega de novo, já com os botões e o nome no topo atualizados.
+
+**Usuários e acessos** passa a mostrar a equipe da empresa em que você está e os administradores, que aparecem com "Abre todas as empresas e todas as telas". Quem você cadastra como **Membro** entra nessa empresa e só vê os dados dela; quem você cadastra como **Administrador** entra em todas as empresas. Não existe administrador de uma empresa só: todo administrador abre todas (decisão do Filipe em 16/11/2026). A função `usuarios` confere, com a chave secreta, se a empresa existe e não foi excluída antes de criar a conta.
+
+Instalação, nesta ordem e uma logo depois da outra (o banco não muda):
+
+1. **Site:** aprove o PR no GitHub. O site atualiza sozinho.
+2. **Função `usuarios`:** no painel do CRM online, em **Edge Functions**, abra a `usuarios`, cole o conteúdo de `supabase/functions/usuarios/index.ts` no lugar do código e clique em **Deploy updates**. A verificação de JWT continua desligada, como já está.
+
+Se a função for publicada antes do site, cadastrar alguém como Membro responde "Escolha a empresa da pessoa." até o site atualizar. No PC não há nada a fazer.
+
+**A Empresa B já pode ser criada.** Pela tela:
+
+1. Entre no site e clique no ícone da conta, no canto do topo, e depois em **Empresas** (ou, na tela de escolha, em **Criar, renomear ou excluir empresas**).
+2. Em **Nova empresa**, digite o nome e clique em **Criar**. Feche a janela: a página carrega de novo.
+3. Clique em **Trocar**, embaixo de Leads Maps, e escolha a empresa nova.
+4. No ícone da conta, abra **Usuários e acessos**, cadastre as pessoas dela como Membro e marque as telas de cada uma.
+
+Mudar alguém de empresa ainda não tem tela. Pelo **SQL Editor**: `update public.membros set empresa_id = (select id from public.empresas where nome = '<empresa>' and deleted_at is null) where email = '<e-mail da pessoa>';`. Para trazer de volta uma empresa excluída (se o nome não foi usado de novo): `update public.empresas set deleted_at = null where nome = '<empresa>';`.
+
+Para voltar atrás: reverta o PR no GitHub e publique de novo a versão anterior de `supabase/functions/usuarios/index.ts` (no GitHub, no histórico do arquivo). Nada muda no banco; as empresas criadas continuam lá.
 
 ## Excluir registro do histórico
 
