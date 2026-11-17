@@ -768,6 +768,7 @@ const telasDoSistema = () => [...document.querySelectorAll('.aba')].filter((b) =
 
 function abrirUsuarios() {
   $('#menu-conta').hidePopover()
+  $('#usuarios-empresa').textContent = empresaAtual?.nome ?? ''
   $('#dlg-usuarios').showModal()
   carregarUsuarios()
 }
@@ -800,7 +801,7 @@ const linhaUsuario = (m, eu, telas, liberadas) =>
     h('td', {}, situacaoUsuario(m)),
     // administrador abre todas as telas, sem precisar marcar (o banco faz a mesma conta)
     ...(m.papel === 'admin'
-      ? [h('td', { colspan: String(telas.length), class: 'todas-telas muted' }, 'Abre todas as telas')]
+      ? [h('td', { colspan: String(telas.length), class: 'todas-telas muted' }, 'Abre todas as empresas e todas as telas')]
       : telas.map((t) =>
           h(
             'td',
@@ -950,8 +951,10 @@ const esquecerEmpresa = () => sessionStorage.removeItem(CHAVE_EMPRESA)
 // o administrador escolhe nos botões; a página carrega de novo já com a empresa, sem nada da anterior na memória
 function mostrarEscolhaEmpresa(opcoes) {
   esconderSistema()
-  // Usuários e acessos abre depois de escolher a empresa (o formulário de cadastro só é ligado no fim do início)
+  // Usuários e acessos abre depois de escolher a empresa (o formulário de cadastro só é ligado no fim do início);
+  // Empresas abre daqui também, para criar a empresa antes de entrar nela
   $('#menu-usuarios').hidden = true
+  $('#ir-empresas').hidden = !souAdmin
   const escolher = (e) => (ev) => {
     carregando(ev.currentTarget, 'Abrindo…')
     sessionStorage.setItem(CHAVE_EMPRESA, e.id)
@@ -962,7 +965,10 @@ function mostrarEscolhaEmpresa(opcoes) {
   $('#empresas-escolha button').focus()
 }
 
+let empresaAtual = null
+
 function mostrarEmpresaNoTopo(e) {
+  empresaAtual = e
   $('#empresa-nome').textContent = e.nome
   $('#empresa-atual').hidden = false
   document.title = `${e.nome} · Leads Maps`
@@ -976,6 +982,105 @@ function mostrarEmpresaNoTopo(e) {
   })
 }
 
+// Janela Empresas (só o administrador; o banco recusa os outros): criar, renomear e excluir. Ao fechar depois de mudar
+// alguma, a página carrega de novo, para os botões de escolha e o nome no topo virem certos.
+let empresasMudaram = false
+function abrirEmpresas() {
+  $('#menu-conta').hidePopover()
+  const dlg = $('#dlg-novo')
+  const lista = h('ul', { class: 'lista-empresas', 'aria-label': 'Empresas' })
+  dlg.replaceChildren(
+    h(
+      'div',
+      { class: 'janela-empresas' },
+      h('header', { class: 'drawer-topo' }, h('h2', { id: 'novo-titulo' }, 'Empresas'), botaoFechar(dlg)),
+      h(
+        'form',
+        {
+          class: 'nova-empresa',
+          onsubmit: enviar(
+            async (d, form) => {
+              await crm.criarEmpresa(String(d.nome).trim())
+              form.reset()
+              empresasMudaram = true
+              carregarEmpresas(lista)
+            },
+            'Empresa criada. Ela aparece nos botões de escolha ao fechar esta janela.',
+            'Criando…',
+          ),
+        },
+        campo('Nova empresa', 'nome', '', { required: true, maxlength: '100', autofocus: true }),
+        h('button', { class: 'primario' }, 'Criar'),
+      ),
+      h('p', { class: 'muted pequeno' }, 'Excluir tira o acesso de quem é da empresa na hora. Os leads, o histórico e o mapa dela ficam guardados no CRM online.'),
+      lista,
+    ),
+  )
+  dlg.addEventListener('close', () => empresasMudaram && location.reload(), { once: true })
+  dlg.showModal()
+  carregarEmpresas(lista)
+}
+
+async function carregarEmpresas(lista) {
+  if (!lista.childElementCount) lista.replaceChildren(h('li', {}, esqueleto('linha')))
+  try {
+    const empresas = (await crm.listarEmpresas()).filter((e) => !e.deleted_at)
+    lista.replaceChildren(...empresas.map((e) => linhaEmpresa(e, lista)))
+  } catch (err) {
+    lista.replaceChildren(h('li', {}, estado({ tipo: 'erro', titulo: 'Não foi possível carregar as empresas', texto: err.message })))
+  }
+}
+
+// o nome fica num campo: mudar e clicar em Renomear grava
+const linhaEmpresa = (e, lista) =>
+  h(
+    'li',
+    {},
+    h(
+      'form',
+      {
+        class: 'linha-empresa',
+        onsubmit: async (ev) => {
+          ev.preventDefault()
+          const nome = ev.currentTarget.elements.nome.value.trim()
+          if (!nome || nome === e.nome) return
+          const restaurar = carregando(ev.currentTarget.querySelector('button'), 'Salvando…')
+          try {
+            await crm.renomearEmpresa(e.id, nome)
+            toast(`${e.nome} agora se chama ${nome}`)
+            empresasMudaram = true
+            carregarEmpresas(lista)
+          } catch (err) {
+            toast(err.message, 'erro')
+            restaurar()
+          }
+        },
+      },
+      h('input', { name: 'nome', value: e.nome, required: true, maxlength: '100', autocomplete: 'off', 'aria-label': `Nome da empresa ${e.nome}` }),
+      h('button', {}, 'Renomear'),
+      h('button', { type: 'button', class: 'perigo', onclick: (ev) => excluirEmpresaDaLista(e, ev.currentTarget, lista) }, 'Excluir'),
+    ),
+  )
+
+async function excluirEmpresaDaLista(e, botao, lista) {
+  const sim = await confirmar({
+    titulo: `Excluir ${e.nome}?`,
+    texto: 'Quem é dela perde o acesso ao sistema na hora. Os leads, o histórico e o mapa dela ficam guardados no CRM online.',
+    acao: 'Excluir empresa',
+  })
+  if (!sim) return
+  const restaurar = carregando(botao, 'Excluindo…')
+  try {
+    await crm.excluirEmpresa(e.id)
+    toast(`${e.nome} excluída`)
+    empresasMudaram = true
+    carregarEmpresas(lista)
+  } catch (err) {
+    toast(err.message, 'erro')
+    restaurar()
+  }
+}
+
 // ---------- início ----------
 async function iniciar() {
   prepararDialogos()
@@ -984,6 +1089,7 @@ async function iniciar() {
   $('#btn-busca-pc').prepend(icone('buscar'))
   $('#btn-conta').append(icone('usuario', 20))
   $('#menu-usuarios').prepend(icone('equipe'))
+  $('#menu-empresas').prepend(icone('predio'))
   $('#menu-senha').prepend(icone('chave'))
   $('#menu-sair').prepend(icone('sair'))
   $('#fechar-usuarios').append(icone('x', 20))
@@ -1009,6 +1115,8 @@ async function iniciar() {
     $('#conta-email').textContent = data.session.user.email
     $('#menu-senha').addEventListener('click', abrirTrocaSenha)
     $('#menu-usuarios').addEventListener('click', abrirUsuarios)
+    $('#menu-empresas').addEventListener('click', abrirEmpresas)
+    $('#ir-empresas').addEventListener('click', abrirEmpresas)
     $('#menu-sair').addEventListener('click', async (e) => {
       carregando(e.currentTarget, 'Saindo…')
       esquecerEmpresa()
@@ -1036,6 +1144,7 @@ async function iniciar() {
       } else if (perfil.papel === 'admin') {
         souAdmin = true
         $('#menu-usuarios').hidden = false
+        $('#menu-empresas').hidden = false
       }
     } catch (err) {
       // sem conseguir ler a equipe, segue com o que a RLS deixar ver; só o cadastro de usuários não aparece
@@ -1130,11 +1239,11 @@ async function iniciar() {
     'submit',
     enviar(
       async (d, form) => {
-        await crm.gerirUsuario({ acao: 'criar', ...d })
+        await crm.cadastrarUsuario(d)
         form.reset()
         carregarUsuarios()
       },
-      'Usuário cadastrado. Marque na lista as telas que a pessoa abre e avise para ela entrar em "Primeiro acesso" com este e-mail.',
+      'Usuário cadastrado. Marque na lista as telas que a pessoa abre (o administrador abre todas) e avise para ela entrar em "Primeiro acesso" com este e-mail.',
       'Cadastrando…',
     ),
   )

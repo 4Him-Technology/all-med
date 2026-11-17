@@ -3507,6 +3507,55 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   color: var(--primaria);
 }
 
+/* janela Empresas (administrador): criar numa linha em cima, e cada empresa com o nome num campo, Renomear e Excluir */
+.janela-empresas {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px;
+}
+
+.janela-empresas form {
+  padding: 0;
+}
+
+.nova-empresa,
+.linha-empresa {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.nova-empresa label {
+  flex: 1;
+}
+
+.lista-empresas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.linha-empresa input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* no celular o nome fica na linha de cima e os dois botões embaixo */
+@media (max-width: 480px) {
+  .linha-empresa {
+    flex-wrap: wrap;
+  }
+  .linha-empresa input {
+    flex-basis: 100%;
+  }
+}
+
 
 /* ---------- skeleton e toast ---------- */
 .skel {

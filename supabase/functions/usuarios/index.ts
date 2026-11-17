@@ -1,5 +1,5 @@
 // Função do CRM online (Supabase Edge Function) dos usuários da equipe:
-//   - um admin cadastra (nome, e-mail, papel), desativa e reativa;
+//   - um admin cadastra (nome, e-mail, papel e a empresa do membro), desativa e reativa;
 //   - quem foi cadastrado faz o primeiro acesso sem login: digita o e-mail e cria a própria senha, uma vez só.
 // A chave secreta vem do ambiente da função (SUPABASE_SECRET_KEYS) e nunca vai para o navegador. A verificação de JWT
 // da plataforma fica desligada porque o primeiro acesso é sem login; as ações de admin conferem o login aqui, no Auth.
@@ -14,8 +14,9 @@ const PAPEIS = ['admin', 'membro']
 const SEM_PENDENTE = 'Não há primeiro acesso pendente para esse e-mail. Confira o e-mail ou fale com o administrador.'
 const LIMITE = { tentativas: 10, janelaMs: 15 * 60_000 }
 
-type Membro = { user_id: string; email: string; nome: string; papel: string; ativo: boolean; ativado_em?: string | null }
+type Membro = { user_id: string; email: string; nome: string; papel: string; empresa_id: string | null; ativo: boolean; ativado_em?: string | null }
 type Deps = {
+  empresaAtiva: (id: string) => Promise<boolean>
   usuarioDoToken: (token: string) => Promise<string | null>
   membro: (userId: string) => Promise<Membro | null>
   membroPorEmail: (email: string) => Promise<Membro | null>
@@ -44,14 +45,17 @@ const emailDe = (c: Record<string, unknown>) => {
   return email
 }
 
-// allowlist: do pedido de cadastro só saem estes três campos (contra mass assignment); senha não entra
+// allowlist: do pedido de cadastro só saem estes campos (contra mass assignment); senha não entra.
+// O membro é de uma empresa só; o administrador entra em todas e não fica preso a nenhuma (empresa_id vazio).
 function validarNovo(c: Record<string, unknown>) {
   const nome = String(c.nome ?? '').trim()
   const papel = String(c.papel ?? 'membro')
   const email = emailDe(c)
   if (!nome || nome.length > 100) throw new Erro(422, 'Informe o nome (até 100 letras).')
   if (!PAPEIS.includes(papel)) throw new Erro(422, 'Papel inválido.')
-  return { email, nome, papel }
+  const empresa_id = papel === 'membro' ? String(c.empresa_id ?? '') : null
+  if (empresa_id !== null && !UUID.test(empresa_id)) throw new Erro(422, 'Escolha a empresa da pessoa.')
+  return { email, nome, papel, empresa_id }
 }
 
 function validarSenha(senha: unknown) {
@@ -123,9 +127,11 @@ export function criarTratador(deps: Deps, origens = ORIGENS) {
 
       if (corpo?.acao === 'criar') {
         const n = validarNovo(corpo)
+        // a chave secreta passa por cima da RLS: a empresa é conferida aqui, antes de criar a conta
+        if (n.empresa_id && !(await deps.empresaAtiva(n.empresa_id))) return responder(422, { erro: 'Essa empresa não existe ou foi excluída.' })
         const id = await deps.criarConta(n.email, n.nome)
         try {
-          return responder(201, await deps.inserirMembro({ user_id: id, email: n.email, nome: n.nome, papel: n.papel, ativo: true }))
+          return responder(201, await deps.inserirMembro({ user_id: id, email: n.email, nome: n.nome, papel: n.papel, empresa_id: n.empresa_id, ativo: true }))
         } catch (err) {
           // conta sem membro não entra em nada e prenderia o e-mail: desfaz
           await deps.apagarConta(id)
@@ -164,10 +170,11 @@ if (deno) {
     if (error) throw new Error(error.message)
     return data
   }
-  const CAMPOS = 'user_id,email,nome,papel,ativo,ativado_em'
+  const CAMPOS = 'user_id,email,nome,papel,empresa_id,ativo,ativado_em'
 
   deno.serve(
     criarTratador({
+      empresaAtiva: async (id) => Boolean(ok(await admin.from('empresas').select('id').eq('id', id).is('deleted_at', null).maybeSingle())),
       usuarioDoToken: async (t) => (await admin.auth.getUser(t)).data.user?.id ?? null,
       membro: async (id) => ok(await admin.from('membros').select(CAMPOS).eq('user_id', id).maybeSingle()) as Membro | null,
       membroPorEmail: async (email) => ok(await admin.from('membros').select(CAMPOS).eq('email', email).maybeSingle()) as Membro | null,

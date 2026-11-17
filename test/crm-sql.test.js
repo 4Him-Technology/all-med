@@ -979,6 +979,20 @@ test('Várias empresas: cada membro é de uma empresa e vê só a equipe dela; e
   assert.equal((await c(ANA, 'select id from public.empresas where id = $1', [B])).length, 1)
 })
 
+// o que a janela Empresas faz (só o administrador): criar, renomear e excluir, que é preencher deleted_at
+test('Várias empresas: só a administradora cria, renomeia e exclui empresa; o nome não se repete entre as que existem', async () => {
+  const { c } = await empresasProntas()
+  const [{ id }] = await c(ANA, `insert into public.empresas (nome) values ('Empresa Nova') returning id`)
+  assert.deepEqual(await c(ANA, `update public.empresas set nome = 'Empresa Renomeada' where id = $1 returning nome`, [id]), [{ nome: 'Empresa Renomeada' }])
+  await assert.rejects(c(ANA, `update public.empresas set nome = ' all med ' where id = $1`, [id]), /empresas_nome_unico/)
+  await assert.rejects(c(ANA, `update public.empresas set nome = '' where id = $1`, [id]), /check/)
+  await assert.rejects(c(ANA, 'update public.empresas set created_at = now() where id = $1', [id]), /permission denied/)
+  assert.equal((await c(BRUNO, `update public.empresas set nome = 'Tomada', deleted_at = now() returning id`)).length, 0)
+  // excluída, ela some para quem é dela e o nome fica livre para outra empresa
+  await c(ANA, 'update public.empresas set deleted_at = now() where id = $1', [id])
+  assert.deepEqual(await c(ANA, `insert into public.empresas (nome) values ('Empresa Renomeada') returning nome`), [{ nome: 'Empresa Renomeada' }])
+})
+
 test('Várias empresas: o script de volta tira as empresas e devolve as chaves únicas e o Painel de antes', async () => {
   const banco = new PGlite()
   await banco.exec(AUTH_SUPABASE)

@@ -31,6 +31,15 @@ const daEmpresa = () => {
 // o membro recebe só a dele; o administrador, todas (inclusive as excluídas, que a tela não oferece)
 export const listarEmpresas = async () => ok(await cliente().from('empresas').select('id,nome,deleted_at').order('nome')).data
 
+// criar, renomear e excluir empresa: só o administrador (RLS). Excluir não apaga: preenche deleted_at, e quem é dela perde o acesso
+const nomeRepetido = (error) => {
+  if (error?.code === '23505') throw new Error('Já existe uma empresa com esse nome.')
+  ok({ error })
+}
+export const criarEmpresa = async (nome) => nomeRepetido((await cliente().from('empresas').insert({ nome })).error)
+export const renomearEmpresa = async (id, nome) => nomeRepetido((await cliente().from('empresas').update({ nome }).eq('id', id)).error)
+export const excluirEmpresa = async (id) => ok(await cliente().from('empresas').update({ deleted_at: new Date().toISOString() }).eq('id', id))
+
 // Uma consulta só para o quadro inteiro (antes eram sete, uma por coluna, e a tela levava uns 2 a 3 s)
 // shortcut: traz os 1000 leads ativos mais recentes; acima disso os totais das colunas ficam por baixo (avisado na tela)
 export const LIMITE_KANBAN = 1000
@@ -188,7 +197,9 @@ export async function painelGerencial({ de, ate }) {
 // ---------- equipe ----------
 // a linha de quem está logado diz se ele entra nos leads (ativo) e se cadastra usuários (admin)
 export const meuPerfil = async (userId) => ok(await cliente().from('membros').select('nome,papel,ativo').eq('user_id', userId).maybeSingle()).data
-export const listarMembros = async () => ok(await cliente().from('membros').select('user_id,nome,email,papel,ativo,ativado_em').order('nome')).data
+// a equipe da empresa escolhida e os administradores, que entram em todas
+export const listarMembros = async () =>
+  ok(await cliente().from('membros').select('user_id,nome,email,papel,ativo,ativado_em').or(`empresa_id.eq.${daEmpresa()},papel.eq.admin`).order('nome')).data
 
 // ---------- acessos por tela ----------
 // as telas que a pessoa logada abre (administrador: todas); o banco confere de novo em cada tabela
@@ -210,6 +221,9 @@ export async function gerirUsuario(corpo) {
   const motivo = await error.context?.json?.().then((j) => j.erro, () => null)
   throw new Error(motivo ?? 'O cadastro de usuários não respondeu. Confira se a função "usuarios" está instalada no CRM online.')
 }
+
+// o membro cadastrado entra na empresa escolhida; para o administrador a função ignora a empresa (ele entra em todas)
+export const cadastrarUsuario = (d) => gerirUsuario({ acao: 'criar', ...d, empresa_id: daEmpresa() })
 
 // sem login: quem o admin cadastrou digita o e-mail e cria a própria senha, uma vez só
 export const primeiroAcesso = (email, senha) => gerirUsuario({ acao: 'primeiro_acesso', email, senha })
