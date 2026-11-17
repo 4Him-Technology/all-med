@@ -276,7 +276,7 @@ Ainda não crie a Empresa B (nem pelo SQL Editor): sem a etapa 2, o site não sa
 
 Cargas no SQL Editor depois desta etapa: as chaves únicas valem dentro de cada empresa, então o `on conflict` passa a começar por `empresa_id` (`on conflict (empresa_id, place_id, segmento, local_busca)` no mapa e `on conflict (empresa_id, lower(btrim(nome))) where deleted_at is null` nos clientes ativos).
 
-Para voltar atrás (enquanto só existir a All Med): no topo da migration há um script de volta (as linhas que começam com `-- drop`, `-- alter`, `-- create`, `-- revoke` e `-- grant`). Copie essas linhas sem o `-- ` do começo e rode no **SQL Editor**; depois rode de novo o bloco da função `public.painel_gerencial` da `20261112200000_painel_mais_cortes.sql` (até `$fn$;`, mais as duas linhas de `revoke` e `grant` logo abaixo) e reverta o PR no GitHub. Os dados ficam todos, só sem a empresa.
+Para voltar atrás (enquanto só existir a All Med): se a `20261117120000_empresa_excluida_sem_telas.sql` já rodou, volte ela primeiro ("Excluir uma empresa", mais abaixo). No topo da migration há um script de volta (as linhas que começam com `-- drop`, `-- alter`, `-- create`, `-- revoke` e `-- grant`). Copie essas linhas sem o `-- ` do começo e rode no **SQL Editor**; depois rode de novo o bloco da função `public.painel_gerencial` da `20261112200000_painel_mais_cortes.sql` (até `$fn$;`, mais as duas linhas de `revoke` e `grant` logo abaixo) e reverta o PR no GitHub. Os dados ficam todos, só sem a empresa.
 
 ### Etapa 2: escolher a empresa depois do login
 
@@ -292,7 +292,7 @@ Para voltar atrás: reverta o PR no GitHub. Nada muda no banco.
 
 ### Etapa 3: empresas e pessoas em cada uma
 
-Quem é **Administrador** ganha a janela **Empresas**, no ícone da conta e também na tela de escolha (**Criar, renomear ou excluir empresas**): cria uma empresa nova, muda o nome de uma e exclui. Excluir não apaga nada: quem é da empresa perde o acesso na hora, e os leads, o histórico e o mapa dela ficam guardados no CRM online. O nome não se repete entre as empresas que existem. Ao fechar a janela depois de mudar alguma coisa, a página carrega de novo, já com os botões e o nome no topo atualizados.
+Quem é **Administrador** ganha a janela **Empresas**, no ícone da conta: cria uma empresa nova e muda o nome de uma. O nome não se repete entre as empresas que existem. Ao fechar a janela depois de mudar alguma coisa, a página carrega de novo, já com os botões e o nome no topo atualizados. Excluir ficou mais escondido depois (17/11/2026): veja "Excluir uma empresa", logo abaixo.
 
 **Usuários e acessos** passa a mostrar a equipe da empresa em que você está e os administradores, que aparecem com "Abre todas as empresas e todas as telas". Quem você cadastra como **Membro** entra nessa empresa e só vê os dados dela; quem você cadastra como **Administrador** entra em todas as empresas. Não existe administrador de uma empresa só: todo administrador abre todas (decisão do Filipe em 16/11/2026). A função `usuarios` confere, com a chave secreta, se a empresa existe e não foi excluída antes de criar a conta.
 
@@ -305,7 +305,7 @@ Se a função for publicada antes do site, cadastrar alguém como Membro respond
 
 **A Empresa B já pode ser criada.** Pela tela:
 
-1. Entre no site e clique no ícone da conta, no canto do topo, e depois em **Empresas** (ou, na tela de escolha, em **Criar, renomear ou excluir empresas**).
+1. Entre no site e clique no ícone da conta, no canto do topo, e depois em **Empresas** (funciona também na tela de escolha, antes de entrar numa empresa).
 2. Em **Nova empresa**, digite o nome e clique em **Criar**. Feche a janela: a página carrega de novo.
 3. Clique em **Trocar**, embaixo de Leads Maps, e escolha a empresa nova.
 4. No ícone da conta, abra **Usuários e acessos**, cadastre as pessoas dela como Membro e marque as telas de cada uma.
@@ -313,6 +313,32 @@ Se a função for publicada antes do site, cadastrar alguém como Membro respond
 Mudar alguém de empresa ainda não tem tela. Pelo **SQL Editor**: `update public.membros set empresa_id = (select id from public.empresas where nome = '<empresa>' and deleted_at is null) where email = '<e-mail da pessoa>';`. Para trazer de volta uma empresa excluída (se o nome não foi usado de novo): `update public.empresas set deleted_at = null where nome = '<empresa>';`.
 
 Para voltar atrás: reverta o PR no GitHub e publique de novo a versão anterior de `supabase/functions/usuarios/index.ts` (no GitHub, no histórico do arquivo). Nada muda no banco; as empresas criadas continuam lá.
+
+### Excluir uma empresa
+
+Pedido do Filipe em 17/11/2026: excluir empresa não pode ficar à mão. O botão saiu da lista e da tela de escolha. Agora:
+
+1. Entre na empresa que vai ser excluída (só a empresa em que você está trabalhando pode ser excluída, e nunca a única que sobrou).
+2. No ícone da conta, abra **Empresas**. No fim da janela, clique em **Excluir \<empresa\>** para abrir a explicação e depois no botão **Excluir \<empresa\>…**.
+3. A confirmação diz quantas pessoas da equipe perdem o acesso e só libera o botão **Excluir empresa** depois que você digita o nome da empresa igual, com as maiúsculas.
+
+Excluir não apaga nada: preenche `deleted_at`, e os leads, o histórico e o mapa ficam guardados. A página volta para os botões de escolha.
+
+Na mesma conferência apareceu um furo: depois de excluída a empresa, o CRM online já escondia os dados dela, mas quem era dela continuava com as telas liberadas, e a API do PC (Prospecção e buscas do Google) só confere essa lista. A migration nova fecha as telas de quem é de empresa excluída; o administrador não muda. No PC vale em até 1 minuto, sem atualizar nada lá. E quem entra com login sem poder trabalhar (conta desativada, fora da equipe, empresa excluída) passa a ver só o aviso, sem as abas.
+
+Instalação, nesta ordem e uma logo depois da outra:
+
+1. **Banco:** em **SQL Editor**, numa consulta nova, cole o conteúdo de `supabase/migrations/20261117120000_empresa_excluida_sem_telas.sql` e clique em **Run**. Ela só troca duas funções de acesso (`crm.pode` e `crm.membro_ativo`); nenhum dado muda, e pode rodar de novo sem erro.
+2. **Site:** aprove o PR no GitHub (o site atualiza sozinho). No PC não há nada a fazer.
+
+Para conferir, no **SQL Editor** (as duas colunas dão `true`):
+
+```sql
+select pg_get_functiondef('crm.pode(public.tela[])'::regprocedure) like '%public.empresas%' as pode_confere_empresa,
+       pg_get_functiondef('crm.membro_ativo()'::regprocedure) like '%public.empresas%' as ativo_confere_empresa;
+```
+
+Para voltar atrás: no topo da migration há as duas funções como eram (as linhas que começam com `-- create or replace`). Rode essas linhas sem o `-- ` do começo no **SQL Editor** e reverta o PR. Para voltar também a migration de várias empresas, rode estas antes, porque as funções novas leem a tabela de empresas.
 
 ## Excluir registro do histórico
 

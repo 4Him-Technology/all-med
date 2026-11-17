@@ -722,8 +722,10 @@ function scriptDeVolta(arquivo) {
   const topo = linhas.slice(0, linhas.findIndex((l) => !l.startsWith('--')))
   return topo.filter((l) => /^-- (drop|create|alter|revoke|grant) /.test(l)).map((l) => l.slice(3)).join('\n')
 }
-// o que o topo da migration de várias empresas manda rodar para voltar: o script dele e a função do Painel de antes
+// o que o topo da migration de várias empresas manda rodar para voltar: o script dele e a função do Painel de antes.
+// Antes, da mais nova para a mais velha, a de 17/11, que mexe nas mesmas funções de acesso e lê public.empresas.
 async function voltarVariasEmpresas(banco) {
+  await banco.exec(scriptDeVolta(ARQUIVOS.find((n) => n.endsWith('_empresa_excluida_sem_telas.sql'))))
   await banco.exec(scriptDeVolta(MIGRATION_EMPRESAS))
   const painel = readFileSync(new URL('20261112200000_painel_mais_cortes.sql', MIGRATIONS), 'utf8')
   await banco.exec(painel.match(/create or replace function public\.painel_gerencial[\s\S]*?\$fn\$;/)[0])
@@ -971,12 +973,22 @@ test('Várias empresas: cada membro é de uma empresa e vê só a equipe dela; e
   await b.query(`insert into public.membros (user_id, email, nome, papel) values ($1, 'hel@x.com', 'Hel', 'admin')`, [HEL])
   assert.deepEqual((await c(HEL, 'select nome from public.empresas order by nome')).map((e) => e.nome), ['All Med', 'Empresa B'])
   // empresa excluída (deleted_at): quem é dela não abre mais nada, nem o Painel; a administradora ainda a vê, para trazer de volta
+  const telas = async (uid) => (await c(uid, 'select public.minhas_telas() as t'))[0].t
+  assert.deepEqual(await telas(GUI), [...TODAS, 'painel'])
   await c(ANA, 'update public.empresas set deleted_at = now() where id = $1', [B])
   assert.equal((await c(GUI, 'select * from public.leads')).length, 0)
   assert.equal((await c(GUI, 'select * from public.empresas')).length, 0)
   assert.equal((await c(GUI, 'select public.painel_gerencial() as p'))[0].p, null)
   await assert.rejects(c(GUI, `insert into public.leads (nome) values ('Depois de excluída')`), /row-level security/)
   assert.equal((await c(ANA, 'select id from public.empresas where id = $1', [B])).length, 1)
+  // nem tela nenhuma: a API do PC (Prospecção e buscas do Google) confere esta lista, e não os dados do CRM online
+  assert.deepEqual(await telas(GUI), [])
+  assert.deepEqual(await c(GUI, `select crm.pode('prospeccao', 'buscas') as p`), [{ p: false }])
+  // quem é da outra empresa e a administradora seguem iguais; trazer a empresa de volta devolve as telas
+  assert.deepEqual(await telas(BRUNO), [...TODAS, 'painel'])
+  assert.deepEqual(await telas(ANA), [...TODAS, 'painel'])
+  await c(ANA, 'update public.empresas set deleted_at = null where id = $1', [B])
+  assert.deepEqual(await telas(GUI), [...TODAS, 'painel'])
 })
 
 // o que a janela Empresas faz (só o administrador): criar, renomear e excluir, que é preencher deleted_at

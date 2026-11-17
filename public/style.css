@@ -3507,7 +3507,7 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   color: var(--primaria);
 }
 
-/* janela Empresas (administrador): criar numa linha em cima, e cada empresa com o nome num campo, Renomear e Excluir */
+/* janela Empresas (administrador): criar numa linha em cima, cada empresa com o nome num campo e Renomear, e excluir no fim, fechado */
 .janela-empresas {
   display: flex;
   flex-direction: column;
@@ -3546,14 +3546,43 @@ body:has(#aba-buscas:not([hidden]) #mapa-empresas:not([hidden]) .barra-lote:not(
   min-width: 0;
 }
 
-/* no celular o nome fica na linha de cima e os dois botões embaixo */
-@media (max-width: 480px) {
-  .linha-empresa {
-    flex-wrap: wrap;
-  }
-  .linha-empresa input {
-    flex-basis: 100%;
-  }
+/* excluir longe da mão: um título discreto no fim, que abre a explicação e só então o botão */
+.excluir-empresa {
+  padding-top: 12px;
+  border-top: 1px solid var(--borda);
+}
+
+.excluir-empresa > p,
+.excluir-empresa details p {
+  margin: 0;
+}
+
+.excluir-empresa summary {
+  width: max-content;
+  max-width: 100%;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.excluir-empresa details[open] summary {
+  margin-bottom: 8px;
+  color: var(--perigo);
+}
+
+.excluir-empresa details button {
+  margin-top: 12px;
+}
+
+/* o nome a digitar para ligar o botão de confirmar */
+.confirmar-digitar {
+  margin-top: 14px;
+  color: var(--fg);
+}
+
+.confirmar-digitar strong {
+  overflow-wrap: anywhere;
 }
 
 

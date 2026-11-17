@@ -1,5 +1,5 @@
 import { acompanharBuscas, iniciarBuscas } from './buscas-mapa.js'
-import { buscaMaps, camposLead, empresaInicial, resumoBusca, ultimoContato } from './campos.js'
+import { buscaMaps, camposLead, empresaInicial, exclusaoEmpresa, quemPerdeAcesso, resumoBusca, ultimoContato } from './campos.js'
 import { clienteDe, prepararClientes } from './clientes.js'
 import * as crm from './crm.js'
 import { abrirMapa, carregarLeaflet } from './mapa.js'
@@ -952,9 +952,8 @@ const esquecerEmpresa = () => sessionStorage.removeItem(CHAVE_EMPRESA)
 function mostrarEscolhaEmpresa(opcoes) {
   esconderSistema()
   // Usuários e acessos abre depois de escolher a empresa (o formulário de cadastro só é ligado no fim do início);
-  // Empresas abre daqui também, para criar a empresa antes de entrar nela
+  // Empresas fica só no menu da conta, longe dos botões de entrar
   $('#menu-usuarios').hidden = true
-  $('#ir-empresas').hidden = !souAdmin
   const escolher = (e) => (ev) => {
     carregando(ev.currentTarget, 'Abrindo…')
     sessionStorage.setItem(CHAVE_EMPRESA, e.id)
@@ -982,13 +981,16 @@ function mostrarEmpresaNoTopo(e) {
   })
 }
 
-// Janela Empresas (só o administrador; o banco recusa os outros): criar, renomear e excluir. Ao fechar depois de mudar
-// alguma, a página carrega de novo, para os botões de escolha e o nome no topo virem certos.
+// Janela Empresas (só o administrador, pelo menu da conta; o banco recusa os outros): criar e renomear. Excluir fica no
+// fim, fechado, só para a empresa aberta agora e com o nome digitado (pedido do Filipe em 17/11/2026: excluir não fica
+// à mão). Ao fechar depois de mudar alguma, a página carrega de novo, para os botões de escolha e o nome no topo virem certos.
 let empresasMudaram = false
 function abrirEmpresas() {
   $('#menu-conta').hidePopover()
   const dlg = $('#dlg-novo')
   const lista = h('ul', { class: 'lista-empresas', 'aria-label': 'Empresas' })
+  const fim = h('div', { class: 'excluir-empresa' })
+  const recarregar = () => carregarEmpresas(lista, fim, recarregar)
   dlg.replaceChildren(
     h(
       'div',
@@ -1003,36 +1005,39 @@ function abrirEmpresas() {
               await crm.criarEmpresa(String(d.nome).trim())
               form.reset()
               empresasMudaram = true
-              carregarEmpresas(lista)
+              recarregar()
             },
-            'Empresa criada. Ela aparece nos botões de escolha ao fechar esta janela.',
+            // dentro de uma empresa a página volta para ela ao fechar; a nova fica no Trocar
+            empresaAtual ? 'Empresa criada. Para entrar nela, clique em Trocar, no topo.' : 'Empresa criada. Ela aparece nos botões de escolha ao fechar esta janela.',
             'Criando…',
           ),
         },
         campo('Nova empresa', 'nome', '', { required: true, maxlength: '100', autofocus: true }),
         h('button', { class: 'primario' }, 'Criar'),
       ),
-      h('p', { class: 'muted pequeno' }, 'Excluir tira o acesso de quem é da empresa na hora. Os leads, o histórico e o mapa dela ficam guardados no CRM online.'),
       lista,
+      fim,
     ),
   )
   dlg.addEventListener('close', () => empresasMudaram && location.reload(), { once: true })
   dlg.showModal()
-  carregarEmpresas(lista)
+  recarregar()
 }
 
-async function carregarEmpresas(lista) {
+async function carregarEmpresas(lista, fim, recarregar) {
   if (!lista.childElementCount) lista.replaceChildren(h('li', {}, esqueleto('linha')))
   try {
-    const empresas = (await crm.listarEmpresas()).filter((e) => !e.deleted_at)
-    lista.replaceChildren(...empresas.map((e) => linhaEmpresa(e, lista)))
+    const empresas = await crm.listarEmpresas()
+    lista.replaceChildren(...empresas.filter((e) => !e.deleted_at).map((e) => linhaEmpresa(e, recarregar)))
+    fim.replaceChildren(zonaExcluir(exclusaoEmpresa({ empresas, atualId: empresaAtual?.id })))
   } catch (err) {
     lista.replaceChildren(h('li', {}, estado({ tipo: 'erro', titulo: 'Não foi possível carregar as empresas', texto: err.message })))
+    fim.replaceChildren()
   }
 }
 
 // o nome fica num campo: mudar e clicar em Renomear grava
-const linhaEmpresa = (e, lista) =>
+const linhaEmpresa = (e, recarregar) =>
   h(
     'li',
     {},
@@ -1049,7 +1054,7 @@ const linhaEmpresa = (e, lista) =>
             await crm.renomearEmpresa(e.id, nome)
             toast(`${e.nome} agora se chama ${nome}`)
             empresasMudaram = true
-            carregarEmpresas(lista)
+            recarregar()
           } catch (err) {
             toast(err.message, 'erro')
             restaurar()
@@ -1058,23 +1063,40 @@ const linhaEmpresa = (e, lista) =>
       },
       h('input', { name: 'nome', value: e.nome, required: true, maxlength: '100', autocomplete: 'off', 'aria-label': `Nome da empresa ${e.nome}` }),
       h('button', {}, 'Renomear'),
-      h('button', { type: 'button', class: 'perigo', onclick: (ev) => excluirEmpresaDaLista(e, ev.currentTarget, lista) }, 'Excluir'),
     ),
   )
 
-async function excluirEmpresaDaLista(e, botao, lista) {
+// no fim da janela, fechado: abrir, ler o que acontece e só então aparece o botão
+const zonaExcluir = ({ empresa, motivo }) =>
+  motivo
+    ? h('p', { class: 'muted pequeno' }, motivo)
+    : h(
+        'details',
+        {},
+        h('summary', {}, `Excluir ${empresa.nome}`),
+        h('p', { class: 'muted pequeno' }, 'Só a empresa em que você está trabalhando pode ser excluída. Quem é dela perde o acesso ao sistema na hora; os leads, o histórico e o mapa dela ficam guardados no CRM online.'),
+        h('button', { type: 'button', class: 'perigo', onclick: (ev) => excluirEmpresaAberta(empresa, ev.currentTarget) }, `Excluir ${empresa.nome}…`),
+      )
+
+// a confirmação diz quantos perdem o acesso e só libera o botão com o nome da empresa digitado igual
+async function excluirEmpresaAberta(e, botao) {
+  let restaurar = carregando(botao, 'Conferindo a equipe…')
+  // a equipe é da empresa aberta, a mesma que vai ser excluída; sem ela, a frase não conta ninguém
+  const membros = await crm.listarMembros().catch((err) => (console.error('equipe:', err.message), null))
+  restaurar()
   const sim = await confirmar({
     titulo: `Excluir ${e.nome}?`,
-    texto: 'Quem é dela perde o acesso ao sistema na hora. Os leads, o histórico e o mapa dela ficam guardados no CRM online.',
+    texto: `${quemPerdeAcesso(membros)} Os leads, o histórico e o mapa dela ficam guardados no CRM online.`,
     acao: 'Excluir empresa',
+    digitar: e.nome,
   })
   if (!sim) return
-  const restaurar = carregando(botao, 'Excluindo…')
+  restaurar = carregando(botao, 'Excluindo…')
   try {
     await crm.excluirEmpresa(e.id)
-    toast(`${e.nome} excluída`)
-    empresasMudaram = true
-    carregarEmpresas(lista)
+    // a empresa aberta saiu: a página volta para os botões de escolha
+    esquecerEmpresa()
+    location.reload()
   } catch (err) {
     toast(err.message, 'erro')
     restaurar()
@@ -1116,7 +1138,6 @@ async function iniciar() {
     $('#menu-senha').addEventListener('click', abrirTrocaSenha)
     $('#menu-usuarios').addEventListener('click', abrirUsuarios)
     $('#menu-empresas').addEventListener('click', abrirEmpresas)
-    $('#ir-empresas').addEventListener('click', abrirEmpresas)
     $('#menu-sair').addEventListener('click', async (e) => {
       carregando(e.currentTarget, 'Saindo…')
       esquecerEmpresa()
@@ -1172,6 +1193,9 @@ async function iniciar() {
         aviso(souAdmin ? 'Nenhuma empresa ativa no sistema.' : 'Sua empresa não está ativa no sistema. Fale com o administrador.')
       }
     }
+    // com login e sem poder entrar (desativado, fora da equipe, empresa excluída) fica só o aviso e a conta, para sair:
+    // as abas do PC também somem, porque a API do PC confere o mesmo login e recusaria tudo
+    if (!logado) return esconderSistema()
   } else if (config.local) {
     aviso('O CRM online não está ligado neste computador. A prospecção funciona, mas o envio ao kanban fica desativado até a configuração ser concluída.')
   } else {

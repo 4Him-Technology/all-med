@@ -1,6 +1,32 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buscaMaps, camposLead, empresaInicial, mensagemErro, resumoBusca, termoBusca, ultimoContato } from '../public/campos.js'
+import { buscaMaps, camposLead, empresaInicial, exclusaoEmpresa, mensagemErro, quemPerdeAcesso, resumoBusca, termoBusca, ultimoContato } from '../public/campos.js'
+
+test('excluir empresa: só a empresa aberta agora, e nunca a única ativa', () => {
+  const allMed = { id: 'a', nome: 'All Med', deleted_at: null }
+  const b = { id: 'b', nome: 'Empresa B', deleted_at: null }
+  const excluida = { id: 'c', nome: 'Empresa C', deleted_at: '2026-11-16T12:00:00Z' }
+  const entrar = { motivo: 'Para excluir uma empresa, entre nela e abra esta janela de novo.' }
+  // dentro da Empresa B, com outra ativa: pode, com o nome que está no banco agora (renomeada na mesma janela)
+  assert.deepEqual(exclusaoEmpresa({ empresas: [allMed, { ...b, nome: 'Clínica B' }], atualId: 'b' }), { empresa: { ...b, nome: 'Clínica B' } })
+  // na tela de escolha (nenhuma aberta) não há o que excluir: só o aviso, sem botão
+  assert.deepEqual(exclusaoEmpresa({ empresas: [allMed, b], atualId: null }), entrar)
+  // a única ativa não sai: sem nenhuma, ninguém entra no sistema
+  assert.deepEqual(exclusaoEmpresa({ empresas: [allMed, excluida], atualId: 'a' }), { motivo: 'All Med é a única empresa ativa e não pode ser excluída.' })
+  // a aberta foi excluída por outro administrador enquanto isso: não oferece de novo
+  assert.deepEqual(exclusaoEmpresa({ empresas: [allMed, b, excluida], atualId: 'c' }), entrar)
+})
+
+test('excluir empresa: a confirmação conta quem perde o acesso (membro ativo; o administrador segue nas outras)', () => {
+  const admin = { papel: 'admin', ativo: true }
+  const membro = { papel: 'membro', ativo: true }
+  const desativado = { papel: 'membro', ativo: false }
+  assert.equal(quemPerdeAcesso([admin, membro, membro, desativado]), '2 pessoas da equipe dela perdem o acesso ao sistema na hora.')
+  assert.equal(quemPerdeAcesso([admin, membro]), '1 pessoa da equipe dela perde o acesso ao sistema na hora.')
+  assert.equal(quemPerdeAcesso([admin, desativado]), 'Ninguém perde o acesso: ela não tem membros ativos.')
+  // a equipe não carregou: a frase não inventa número
+  assert.equal(quemPerdeAcesso(null), 'Quem é dela perde o acesso ao sistema na hora.')
+})
 
 test('empresa depois do login: o membro entra direto na dele; o administrador escolhe, a não ser que já tenha escolhido nesta aba', () => {
   const allMed = { id: 'a', nome: 'All Med', deleted_at: null }

@@ -185,7 +185,7 @@ O sistema atende mais de uma empresa (All Med, Empresa B e as que vierem), indep
 - o membro entra direto na empresa dele, sem escolha;
 - toda leitura e gravação do site passa por `public/crm.js` com a empresa escolhida (`usarEmpresa`): o administrador lê todas as empresas pela RLS, e é esse filtro que separa a tela dele. A regra de quem escolhe e quem entra direto está em `empresaInicial`, em [public/campos.js](public/campos.js), testada em [test/campos.test.js](test/campos.test.js).
 
-- o administrador cria, renomeia e exclui empresas na janela **Empresas** (ícone da conta, ou a tela de escolha); excluir preenche `deleted_at` e tira o acesso de quem é dela;
+- o administrador cria e renomeia empresas na janela **Empresas**, só no ícone da conta. Excluir fica no fim dela, fechado, só para a empresa aberta e nunca para a única que sobrou, e a confirmação pede o nome digitado (`exclusaoEmpresa` e `quemPerdeAcesso` em [public/campos.js](public/campos.js); `confirmar` com `digitar` em [public/ui.js](public/ui.js)). Excluir preenche `deleted_at`: quem é dela perde os dados (RLS) e as telas (`crm.pode`, a lista que a API do PC confere);
 - **Usuários e acessos** mostra a equipe da empresa escolhida e os administradores; o membro cadastrado entra nela, e a função `usuarios` confere se a empresa existe e não foi excluída ([test/usuarios.test.js](test/usuarios.test.js)). Administrador entra em todas as empresas; não existe administrador de uma empresa só.
 
 Ainda não são por empresa as buscas do Google pelo PC (etapa 4): a busca é guardada na empresa de quem estiver com o site aberto quando ela termina. Detalhes e o passo a passo em [INSTALAR.md](INSTALAR.md), "Várias empresas".

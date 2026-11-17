@@ -10,7 +10,7 @@ web
 
 O Filipe e uma equipe pequena de vendas (B2B). Cada pessoa tem o próprio login, a equipe trabalha os mesmos leads e o administrador escolhe quais telas cada um abre (por exemplo, quem só prospecta fica com Prospecção e Google Maps). O uso principal é no computador, sentado, montando listas de empresas e trabalhando o funil; o celular é secundário.
 
-O sistema atende mais de uma empresa (All Med, Empresa B e as que vierem), independentes entre si: cada membro é de uma empresa só, e o administrador entra em todas e escolhe em qual trabalhar depois do login. Mesmo site e mesmo visual para todas; o Painel é de cada empresa, sem somar todas (decisões do Filipe em 16/11/2026; em construção, uma etapa por vez).
+O sistema atende mais de uma empresa (All Med, Empresa B e as que vierem), independentes entre si: cada membro é de uma empresa só, e o administrador entra em todas e escolhe em qual trabalhar depois do login. Mesmo site e mesmo visual para todas; o Painel é de cada empresa, sem somar todas (decisões do Filipe em 16/11/2026; em construção, uma etapa por vez). Criar e renomear empresa é do administrador, pela janela Empresas; excluir fica longe da mão: só a empresa aberta, nunca a única, com o nome digitado (pedido do Filipe em 17/11/2026).
 
 ## Product Purpose
 

@@ -31,6 +31,24 @@ export function empresaInicial({ empresas, admin, guardada }) {
   return { empresa: ativas.find((e) => e.id === guardada) ?? null, opcoes: ativas }
 }
 
+// Excluir empresa não fica à mão: só a empresa aberta agora (quem exclui está vendo o que exclui) e nunca a única ativa,
+// porque sem nenhuma ninguém entra. Devolve a empresa como está no banco (com o nome de agora) ou o motivo de não poder.
+export function exclusaoEmpresa({ empresas, atualId }) {
+  const ativas = empresas.filter((e) => !e.deleted_at)
+  const empresa = ativas.find((e) => e.id === atualId)
+  if (!empresa) return { motivo: 'Para excluir uma empresa, entre nela e abra esta janela de novo.' }
+  if (ativas.length < 2) return { motivo: `${empresa.nome} é a única empresa ativa e não pode ser excluída.` }
+  return { empresa }
+}
+
+// Quem perde o acesso ao excluir a empresa: os membros ativos dela. O administrador continua entrando nas outras.
+export function quemPerdeAcesso(membros) {
+  if (!membros) return 'Quem é dela perde o acesso ao sistema na hora.'
+  const n = membros.filter((m) => m.papel !== 'admin' && m.ativo).length
+  if (!n) return 'Ninguém perde o acesso: ela não tem membros ativos.'
+  return n === 1 ? '1 pessoa da equipe dela perde o acesso ao sistema na hora.' : `${n} pessoas da equipe dela perdem o acesso ao sistema na hora.`
+}
+
 // tira o que tem significado na sintaxe de filtro do PostgREST (vírgula, parênteses, curingas, aspas)
 export const termoBusca = (q) =>
   String(q ?? '')

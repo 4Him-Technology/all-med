@@ -126,7 +126,9 @@ export function prepararDialogos() {
 
 // Confirmação no meio da tela para o que não volta pela tela. Devolve true só no botão de confirmar;
 // Cancelar, Esc e clique fora devolvem false. O foco começa em Cancelar, o caminho seguro.
-export function confirmar({ titulo, texto, detalhe, acao }) {
+// Com "digitar", o botão só liga quando a pessoa escreve esse texto igual (excluir empresa não sai num clique) e o foco
+// começa no campo.
+export function confirmar({ titulo, texto, detalhe, acao, digitar }) {
   const dlg = $('#dlg-confirmar')
   return new Promise((resolver) => {
     // os botões e o Esc respondem na hora, sem esperar a animação de saída; o "close" cobre o clique fora
@@ -135,28 +137,36 @@ export function confirmar({ titulo, texto, detalhe, acao }) {
       fecharDialogo(dlg)
     }
     const cancelar = h('button', { type: 'button', onclick: () => responder(false) }, 'Cancelar')
+    const sim = h('button', { type: 'button', class: 'perigo-cheio', disabled: Boolean(digitar), onclick: () => responder(true) }, acao)
+    const confere = (v) => v.trim() === digitar
+    const campo =
+      digitar &&
+      h('input', {
+        autocomplete: 'off',
+        spellcheck: 'false',
+        oninput: (e) => (sim.disabled = !confere(e.currentTarget.value)),
+        onkeydown: (e) => e.key === 'Enter' && confere(e.currentTarget.value) && responder(true),
+      })
     dlg.replaceChildren(
       h(
         'div',
         { class: 'confirmar-corpo' },
         h('span', { class: 'confirmar-icone', 'aria-hidden': 'true' }, icone('alerta', 22)),
-        h('div', {}, h('h2', { id: 'confirmar-titulo' }, titulo), h('p', { id: 'confirmar-texto' }, texto), detalhe && h('blockquote', { class: 'confirmar-detalhe' }, detalhe)),
-      ),
-      h(
-        'div',
-        { class: 'confirmar-acoes' },
-        cancelar,
         h(
-          'button',
-          { type: 'button', class: 'perigo-cheio', onclick: () => responder(true) },
-          acao,
+          'div',
+          {},
+          h('h2', { id: 'confirmar-titulo' }, titulo),
+          h('p', { id: 'confirmar-texto' }, texto),
+          detalhe && h('blockquote', { class: 'confirmar-detalhe' }, detalhe),
+          campo && h('label', { class: 'confirmar-digitar' }, h('span', {}, 'Para confirmar, digite ', h('strong', { translate: 'no' }, digitar)), campo),
         ),
       ),
+      h('div', { class: 'confirmar-acoes' }, cancelar, sim),
     )
     dlg.addEventListener('cancel', () => resolver(false), { once: true })
     dlg.addEventListener('close', () => resolver(false), { once: true })
     dlg.showModal()
-    cancelar.focus()
+    ;(campo || cancelar).focus()
   })
 }
 
