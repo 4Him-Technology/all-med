@@ -371,6 +371,85 @@ button[aria-busy="true"] .ico-girando {
   border-color: var(--perigo);
 }
 
+/* botão de confirmar o que não volta pela tela: vermelho cheio, para não ser confundido com Cancelar */
+.perigo-cheio {
+  background: var(--perigo);
+  border-color: var(--perigo);
+  color: #fff;
+  font-weight: 600;
+}
+
+.perigo-cheio:hover:not(:disabled) {
+  background: #8f1d17;
+  border-color: #8f1d17;
+}
+
+/* ---------- confirmação no meio da tela ---------- */
+.modal-confirmar {
+  width: min(460px, calc(100vw - 32px));
+  padding: 22px 24px;
+}
+
+.modal-confirmar[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.confirmar-corpo {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.confirmar-icone {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 99px;
+  background: var(--perigo-suave);
+  color: var(--perigo);
+}
+
+.confirmar-corpo h2 {
+  margin: 2px 0 6px;
+  font-size: 18px;
+}
+
+.confirmar-corpo p {
+  margin: 0;
+}
+
+/* o texto do registro, para a pessoa ver o que está excluindo */
+.confirmar-detalhe {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--borda-forte);
+  border-radius: var(--raio-p);
+  background: var(--bg-topo);
+  font-size: 14px;
+  max-height: 8.5em;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.confirmar-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .confirmar-acoes button {
+    flex: 1;
+    min-height: 44px;
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+}
+
 button.link {
   min-height: 0;
   border: 0;

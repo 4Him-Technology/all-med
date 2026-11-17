@@ -243,7 +243,12 @@ Cantos de 12px em cartões e painéis, 8px em botões e campos, pílula (99px) e
 
 ### Ficha ao lado (Leads)
 - Painel branco fixo de 470px que entra deslizando, rola por dentro e fecha no x ou com Esc. É o mesmo conteúdo da gaveta do kanban.
-- **Excluir registro do histórico:** só para o administrador, um botão pequeno "Excluir" ao lado da data de cada registro manual (a mudança de status não tem). O primeiro clique o troca por "Confirmar exclusão" em vermelho, que volta ao normal quando perde o foco; o segundo exclui, avisa "Registro excluído do histórico." e devolve o foco ao título do histórico.
+- **Excluir registro do histórico:** só para o administrador, um botão pequeno "Excluir" ao lado da data de cada registro manual (a mudança de status não tem). O clique abre a confirmação no meio da tela (abaixo), com o tipo, a data e o texto do registro. "Excluir registro" exclui, avisa "Registro excluído do histórico." e devolve o foco ao título do histórico; Cancelar, Esc ou clique fora não mudam nada e devolvem o foco ao botão.
+
+### Confirmação no meio da tela
+- Popup de 460px, centralizado, por cima de tudo (inclusive da gaveta do lead), para o que não volta pela tela. Ícone de alerta em círculo vermelho suave, título em pergunta, uma frase do que acontece e, quando há, o texto do item numa caixa bege com borda à esquerda.
+- Dois botões à direita: Cancelar (branco, com o foco ao abrir, o caminho seguro) e a ação em vermelho cheio com letra branca. No celular os dois dividem a largura, com 44px de altura. Esc e clique fora cancelam.
+- Hoje é usada só na exclusão de registro do histórico (`confirmar`, em `public/ui.js`).
 
 ### Cartão de busca do PC (Google Maps, só sem o CRM online)
 - Título com seta, nome, status e resumo; a busca rodando mostra uma barra de andamento que só indica atividade (o scraper não informa porcentagem).
